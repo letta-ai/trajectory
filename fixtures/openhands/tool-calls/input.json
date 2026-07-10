@@ -1,0 +1,62 @@
+[
+  {
+    "kind": "MessageEvent",
+    "id": "message-1",
+    "timestamp": "2026-07-03T10:00:00",
+    "source": "user",
+    "llm_message": {
+      "role": "user",
+      "content": [{ "type": "text", "text": "Inspect and update the entry point." }]
+    }
+  },
+  {
+    "kind": "ActionEvent",
+    "id": "action-1",
+    "timestamp": "2026-07-03T10:00:01",
+    "thought": [{ "type": "text", "text": "I'll inspect the workspace first." }],
+    "tool_name": "terminal",
+    "tool_call_id": "call_oh_1",
+    "tool_call": { "arguments": "{\"command\":\"pwd\"}" }
+  },
+  {
+    "kind": "ObservationEvent",
+    "id": "observation-1",
+    "timestamp": "2026-07-03T10:00:02",
+    "action_id": "action-1",
+    "observation": {
+      "content": [
+        { "type": "text", "text": "/workspace\n" },
+        { "type": "text", "text": "ready" }
+      ],
+      "is_error": false
+    }
+  },
+  {
+    "kind": "ActionEvent",
+    "id": "action-2",
+    "timestamp": "2026-07-03T10:00:03",
+    "tool_name": "file_editor",
+    "action": {
+      "kind": "FileEditAction",
+      "path": "src/app.ts",
+      "content": "updated"
+    }
+  },
+  {
+    "kind": "UserRejectObservation",
+    "id": "rejection-2",
+    "timestamp": "2026-07-03T10:00:04",
+    "action_id": "action-2",
+    "rejection_reason": "Edit was not approved."
+  },
+  {
+    "kind": "MessageEvent",
+    "id": "message-2",
+    "timestamp": "2026-07-03T10:00:05",
+    "source": "agent",
+    "llm_message": {
+      "role": "assistant",
+      "content": [{ "type": "text", "text": "I inspected the workspace; the edit was rejected." }]
+    }
+  }
+]

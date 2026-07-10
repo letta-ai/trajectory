@@ -1,0 +1,53 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "openhands"
+    },
+    {
+      "role": "user",
+      "content": "Run the action.",
+      "timestamp": "2026-07-04T08:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "oh_action-1",
+          "name": "unknown_tool",
+          "args": "{\"_raw\":\"[]\"}"
+        }
+      ],
+      "timestamp": "2026-07-04T08:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "oh_action-1",
+      "content": "Sandbox failed.",
+      "timestamp": "2026-07-04T08:00:04.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The action failed.",
+      "timestamp": "2026-07-04T08:00:06.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "unknown_tool_name",
+      "message": "Substituted \"unknown_tool\" for a missing tool name.",
+      "recordIndex": 2
+    },
+    {
+      "code": "tool_arguments_reshaped",
+      "message": "Reshaped arguments for tool call \"oh_action-1\" into a JSON object.",
+      "recordIndex": 2
+    },
+    {
+      "code": "orphan_tool_result",
+      "message": "Dropped a tool result without a preceding call for \"\".",
+      "recordIndex": 4
+    }
+  ]
+}

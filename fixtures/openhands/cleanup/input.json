@@ -1,0 +1,49 @@
+{
+  "items": [
+    null,
+    {
+      "kind": "MessageEvent",
+      "timestamp": "2026-07-04T08:00:00",
+      "source": "user",
+      "llm_message": { "content": [{ "type": "text", "text": "ignored without id" }] }
+    },
+    {
+      "kind": "MessageEvent",
+      "id": "message-1",
+      "timestamp": "2026-07-04T08:00:01",
+      "source": "user",
+      "llm_message": { "content": [{ "type": "text", "text": "Run the action." }] }
+    },
+    {
+      "kind": "StateEvent",
+      "id": "state-1",
+      "timestamp": "2026-07-04T08:00:02"
+    },
+    {
+      "kind": "ActionEvent",
+      "id": "action-1",
+      "timestamp": "2026-07-04T08:00:03",
+      "tool_call": { "arguments": "[]" }
+    },
+    {
+      "kind": "AgentErrorEvent",
+      "id": "error-1",
+      "timestamp": "2026-07-04T08:00:04",
+      "action_id": "action-1",
+      "error": "Sandbox failed."
+    },
+    {
+      "kind": "ObservationEvent",
+      "id": "orphan-1",
+      "timestamp": "2026-07-04T08:00:05",
+      "observation": { "content": [{ "type": "text", "text": "orphaned" }] }
+    },
+    {
+      "kind": "MessageEvent",
+      "id": "message-2",
+      "timestamp": "2026-07-04T08:00:06",
+      "source": "agent",
+      "llm_message": { "content": [{ "type": "text", "text": "The action failed." }] }
+    }
+  ]
+}

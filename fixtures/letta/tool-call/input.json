@@ -1,0 +1,82 @@
+[
+  {
+    "message_type": "assistant_message",
+    "id": "message-assistant-1",
+    "content": "The entry point exports value 1.",
+    "date": "2026-07-01T12:00:06Z",
+    "seq_id": 6
+  },
+  {
+    "message_type": "tool_return_message",
+    "id": "message-tool-return-1",
+    "name": null,
+    "tool_call_id": "tool-native-1",
+    "tool_return": "export const value = 1;",
+    "status": "success",
+    "tool_returns": [
+      {
+        "type": "tool",
+        "tool_call_id": "tool-native-1",
+        "tool_return": "export const value = 1;",
+        "status": "success",
+        "stdout": null,
+        "stderr": null
+      }
+    ],
+    "date": "2026-07-01T12:00:05Z",
+    "seq_id": 5
+  },
+  {
+    "message_type": "approval_response_message",
+    "id": "message-approval-response-1",
+    "approval_request_id": "message-approval-request-1",
+    "approve": true,
+    "approvals": [],
+    "date": "2026-07-01T12:00:04Z",
+    "seq_id": 4
+  },
+  {
+    "message_type": "approval_request_message",
+    "id": "message-approval-request-1",
+    "tool_call": {
+      "name": "Read",
+      "arguments": "{\"path\":\"src/app.ts\"}",
+      "tool_call_id": "tool-native-1"
+    },
+    "tool_calls": [
+      {
+        "name": "Read",
+        "arguments": "{\"path\":\"src/app.ts\"}",
+        "tool_call_id": "tool-native-1"
+      }
+    ],
+    "date": "2026-07-01T12:00:03Z",
+    "seq_id": 3
+  },
+  {
+    "message_type": "reasoning_message",
+    "id": "message-reasoning-1",
+    "reasoning": "I should read the file before answering.",
+    "date": "2026-07-01T12:00:02Z",
+    "seq_id": 2
+  },
+  {
+    "message_type": "user_message",
+    "id": "message-user-1",
+    "content": [
+      {
+        "type": "text",
+        "text": "Inspect the application entry point."
+      }
+    ],
+    "date": "2026-07-01T12:00:01Z",
+    "seq_id": 1
+  },
+  {
+    "message_type": "system_message",
+    "id": "message-system-1",
+    "content": "Internal system prompt",
+    "date": "2026-07-01T12:00:00Z",
+    "seq_id": 0
+  }
+]

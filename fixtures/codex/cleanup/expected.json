@@ -1,0 +1,90 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "codex"
+    },
+    {
+      "role": "user",
+      "content": "inspect both files",
+      "timestamp": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_DUP",
+          "name": "exec_command",
+          "args": "{\"cmd\":\"cat a.txt\"}"
+        }
+      ],
+      "timestamp": "2026-01-01T00:00:15.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_DUP__2",
+          "name": "exec_command",
+          "args": "{\"_raw\":\"not-json\"}"
+        }
+      ],
+      "timestamp": "2026-01-01T00:00:30.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_DUP",
+      "content": "alpha",
+      "timestamp": "2026-01-01T00:00:45.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_DUP__2",
+      "content": "beta",
+      "timestamp": "2026-01-01T00:01:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Inspected both files.",
+      "timestamp": "2026-01-01T00:01:15.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 1.",
+      "inputLine": 1
+    },
+    {
+      "code": "duplicate_tool_call_id",
+      "message": "Renamed duplicate tool-call ID \"call_DUP\" to \"call_DUP__2\".",
+      "recordIndex": 3,
+      "inputLine": 4
+    },
+    {
+      "code": "tool_arguments_reshaped",
+      "message": "Reshaped arguments for tool call \"call_DUP__2\" into a JSON object.",
+      "recordIndex": 3,
+      "inputLine": 4
+    },
+    {
+      "code": "duplicate_tool_result",
+      "message": "Dropped a duplicate result for tool call \"call_DUP\".",
+      "recordIndex": 6,
+      "inputLine": 7
+    },
+    {
+      "code": "orphan_tool_result",
+      "message": "Dropped a tool result without a preceding call for \"missing\".",
+      "recordIndex": 6,
+      "inputLine": 8
+    },
+    {
+      "code": "timestamps_synthesized",
+      "message": "Synthesized timestamps for 6 normalized records.",
+      "count": 6
+    }
+  ]
+}

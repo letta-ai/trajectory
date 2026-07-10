@@ -1,0 +1,42 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "letta"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the application entry point.",
+      "timestamp": "2026-07-01T12:00:01.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I should read the file before answering.",
+      "timestamp": "2026-07-01T12:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tool-native-1",
+          "name": "Read",
+          "args": "{\"path\":\"src/app.ts\"}"
+        }
+      ],
+      "timestamp": "2026-07-01T12:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tool-native-1",
+      "content": "export const value = 1;",
+      "timestamp": "2026-07-01T12:00:05.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The entry point exports value 1.",
+      "timestamp": "2026-07-01T12:00:06.000Z"
+    }
+  ],
+  "diagnostics": []
+}

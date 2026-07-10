@@ -1,0 +1,5 @@
+not-json
+{"type":"user","uuid":"u1","message":{"role":"user","content":"summarize the change"}}
+{"type":"user","uuid":"u2","isMeta":true,"message":{"role":"user","content":"<command-name>/clear</command-name>"}}
+{"type":"assistant","uuid":"a1","isSidechain":true,"message":{"role":"assistant","content":[{"type":"text","text":"subagent transport"}]}}
+{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"The retry behavior now uses bounded backoff."}]}}

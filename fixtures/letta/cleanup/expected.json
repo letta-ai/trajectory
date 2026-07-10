@@ -1,0 +1,48 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "letta"
+    },
+    {
+      "role": "user",
+      "content": "Run the failing command.",
+      "timestamp": "2026-07-02T09:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tool-cleanup-1",
+          "name": "Bash",
+          "args": "{\"_raw\":\"not-json\"}"
+        }
+      ],
+      "timestamp": "2026-07-02T09:00:02.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tool-cleanup-1",
+      "content": "Error: command failed",
+      "timestamp": "2026-07-02T09:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The command failed.",
+      "timestamp": "2026-07-02T09:00:03.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "tool_arguments_reshaped",
+      "message": "Reshaped arguments for tool call \"tool-cleanup-1\" into a JSON object.",
+      "recordIndex": 2
+    },
+    {
+      "code": "orphan_tool_result",
+      "message": "Dropped a tool result without a preceding call for \"missing-call\".",
+      "recordIndex": 4
+    }
+  ]
+}

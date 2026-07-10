@@ -1,0 +1,48 @@
+[
+  {
+    "message_type": "system_message",
+    "content": "Internal system prompt",
+    "date": "2026-07-02T08:59:59Z",
+    "seq_id": 0
+  },
+  {
+    "message_type": "user_message",
+    "content": "Run the failing command.",
+    "date": "2026-07-02T09:00:00Z",
+    "seq_id": 1
+  },
+  {
+    "message_type": "tool_call_message",
+    "tool_call": {
+      "name": "Bash",
+      "arguments": "not-json",
+      "tool_call_id": "tool-cleanup-1"
+    },
+    "date": "2026-07-02T09:00:02Z",
+    "seq_id": 2
+  },
+  {
+    "message_type": "tool_return_message",
+    "name": "Bash",
+    "tool_call_id": "tool-cleanup-1",
+    "tool_return": "command failed",
+    "status": "error",
+    "date": "2026-07-02T09:00:02Z",
+    "seq_id": 3
+  },
+  {
+    "message_type": "tool_return_message",
+    "name": "Read",
+    "tool_call_id": "missing-call",
+    "tool_return": "orphaned",
+    "status": "success",
+    "date": "2026-07-02T09:00:02Z",
+    "seq_id": 4
+  },
+  {
+    "message_type": "assistant_message",
+    "content": "The command failed.",
+    "date": "2026-07-02T09:00:03Z",
+    "seq_id": 5
+  }
+]

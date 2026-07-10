@@ -1,0 +1,60 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "openhands"
+    },
+    {
+      "role": "user",
+      "content": "Inspect and update the entry point.",
+      "timestamp": "2026-07-03T10:00:00.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I'll inspect the workspace first.",
+      "timestamp": "2026-07-03T10:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_oh_1",
+          "name": "terminal",
+          "args": "{\"command\":\"pwd\"}"
+        }
+      ],
+      "timestamp": "2026-07-03T10:00:01.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_oh_1",
+      "content": "/workspace\nready",
+      "timestamp": "2026-07-03T10:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "oh_action-2",
+          "name": "file_editor",
+          "args": "{\"path\":\"src/app.ts\",\"content\":\"updated\"}"
+        }
+      ],
+      "timestamp": "2026-07-03T10:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "oh_action-2",
+      "content": "Edit was not approved.",
+      "timestamp": "2026-07-03T10:00:04.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I inspected the workspace; the edit was rejected.",
+      "timestamp": "2026-07-03T10:00:05.000Z"
+    }
+  ],
+  "diagnostics": []
+}

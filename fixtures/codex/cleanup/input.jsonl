@@ -1,0 +1,9 @@
+not-json
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"inspect both files"}]}}
+{"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"call_DUP","arguments":"{\"cmd\":\"cat a.txt\"}"}}
+{"type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"call_DUP","arguments":"not-json"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_DUP","output":"alpha"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_DUP","output":"beta"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"call_DUP","output":"duplicate"}}
+{"type":"response_item","payload":{"type":"function_call_output","call_id":"missing","output":"orphan"}}
+{"type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Inspected both files."}]}}

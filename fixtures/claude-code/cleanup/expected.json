@@ -1,0 +1,41 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "claude-code"
+    },
+    {
+      "role": "user",
+      "content": "summarize the change",
+      "timestamp": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The retry behavior now uses bounded backoff.",
+      "timestamp": "2026-01-01T00:00:15.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 1.",
+      "inputLine": 1
+    },
+    {
+      "code": "sidechain_record_dropped",
+      "message": "Dropped a Claude Code sidechain record on line 4.",
+      "inputLine": 4
+    },
+    {
+      "code": "noise_record_dropped",
+      "message": "Dropped a harness-noise user record.",
+      "recordIndex": 2,
+      "inputLine": 3
+    },
+    {
+      "code": "timestamps_synthesized",
+      "message": "Synthesized timestamps for 2 normalized records.",
+      "count": 2
+    }
+  ]
+}

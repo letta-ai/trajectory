@@ -14,6 +14,8 @@ const fixtures = [
   { source: "claude-code", name: "claude-code/cleanup" },
   { source: "codex", name: "codex/tool-calls" },
   { source: "codex", name: "codex/cleanup" },
+  { source: "langsmith", name: "langsmith/tool-call" },
+  { source: "langsmith", name: "langsmith/cleanup" },
   { source: "letta", name: "letta/tool-call" },
   { source: "letta", name: "letta/cleanup" },
   { source: "openhands", name: "openhands/tool-calls" },
@@ -65,7 +67,7 @@ describe("public API", () => {
   test("rejects an unknown source", () => {
     expect(() =>
       normalizeTranscript({
-        source: "langsmith" as TrajectorySource,
+        source: "not-a-source" as TrajectorySource,
         transcript: "{}",
       }),
     ).toThrow(
@@ -99,6 +101,208 @@ describe("public API", () => {
         transcript: "{}",
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects an invalid LangSmith document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "langsmith",
+        transcript: '{"runs":{}}',
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("accepts a single LangSmith run object", () => {
+    const transcript = JSON.stringify({
+      id: "run-1",
+      run_type: "llm",
+      start_time: "2026-07-10T00:00:00Z",
+      end_time: "2026-07-10T00:00:01Z",
+      inputs: { messages: [{ role: "user", content: "hello" }] },
+      outputs: {
+        choices: [{ message: { role: "assistant", content: "hi" } }],
+      },
+    });
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+  });
+
+  test("flattens nested LangSmith runs envelopes", () => {
+    const transcript = JSON.stringify({
+      runs: [
+        {
+          id: "root",
+          run_type: "chain",
+          child_runs: [
+            {
+              id: "llm",
+              run_type: "llm",
+              inputs: { messages: [{ role: "user", content: "hello" }] },
+              outputs: { role: "assistant", content: "hi" },
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+  });
+
+  test("decodes Anthropic reasoning and tool blocks from LangSmith runs", () => {
+    const firstAssistant = {
+      id: "msg-1",
+      role: "assistant",
+      content: [
+        { type: "thinking", thinking: "I should check." },
+        { type: "text", text: "Checking." },
+        {
+          type: "tool_use",
+          id: "toolu-1",
+          name: "weather",
+          input: { city: "Paris" },
+        },
+      ],
+    };
+    const transcript = JSON.stringify([
+      {
+        id: "llm-1",
+        run_type: "llm",
+        start_time: "2026-07-10T00:00:00Z",
+        end_time: "2026-07-10T00:00:01Z",
+        inputs: { messages: [{ role: "user", content: "weather?" }] },
+        outputs: { message: firstAssistant },
+      },
+      {
+        id: "tool-1",
+        run_type: "tool",
+        name: "weather",
+        start_time: "2026-07-10T00:00:02Z",
+        end_time: "2026-07-10T00:00:03Z",
+        inputs: { city: "Paris" },
+        outputs: { output: { condition: "sunny" } },
+      },
+      {
+        id: "llm-2",
+        run_type: "llm",
+        start_time: "2026-07-10T00:00:04Z",
+        end_time: "2026-07-10T00:00:05Z",
+        inputs: {
+          messages: [
+            { role: "user", content: "weather?" },
+            firstAssistant,
+            {
+              role: "user",
+              content: [
+                { type: "tool_result", tool_use_id: "toolu-1", content: "sunny" },
+              ],
+            },
+          ],
+        },
+        outputs: { message: { role: "assistant", content: "It is sunny." } },
+      },
+    ]);
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "reasoning",
+      "assistant",
+      "assistant",
+      "tool",
+      "assistant",
+    ]);
+    expect(result.records.filter((record) => record.role === "tool")).toHaveLength(1);
+  });
+
+  test("decodes OpenAI Responses items from LangSmith runs", () => {
+    const transcript = JSON.stringify([
+      {
+        id: "response-1",
+        run_type: "llm",
+        start_time: "2026-07-10T00:00:00Z",
+        end_time: "2026-07-10T00:00:01Z",
+        inputs: {
+          instructions: "Be helpful.",
+          input: [{ type: "message", role: "user", content: "weather?" }],
+        },
+        outputs: {
+          output: [
+            {
+              type: "reasoning",
+              id: "reasoning-1",
+              summary: [{ type: "summary_text", text: "Check weather." }],
+            },
+            {
+              type: "function_call",
+              call_id: "call-1",
+              name: "weather",
+              arguments: '{"city":"Paris"}',
+            },
+          ],
+        },
+      },
+      {
+        id: "tool-1",
+        run_type: "tool",
+        name: "weather",
+        start_time: "2026-07-10T00:00:02Z",
+        end_time: "2026-07-10T00:00:03Z",
+        inputs: { call_id: "call-1" },
+        outputs: { output: "sunny" },
+      },
+      {
+        id: "response-2",
+        run_type: "llm",
+        start_time: "2026-07-10T00:00:04Z",
+        end_time: "2026-07-10T00:00:05Z",
+        inputs: {
+          input: [
+            { type: "message", role: "user", content: "weather?" },
+            {
+              type: "function_call",
+              call_id: "call-1",
+              name: "weather",
+              arguments: '{"city":"Paris"}',
+            },
+            { type: "function_call_output", call_id: "call-1", output: "sunny" },
+          ],
+        },
+        outputs: {
+          output: [
+            {
+              type: "message",
+              role: "assistant",
+              content: [{ type: "output_text", text: "It is sunny." }],
+            },
+          ],
+        },
+      },
+    ]);
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "reasoning",
+      "assistant",
+      "tool",
+      "assistant",
+    ]);
   });
 
   test("rejects a non-flat Letta document shape", () => {

@@ -1,5 +1,6 @@
 import { claudeCodeAdapter } from "./adapters/claude-code.js";
 import { codexAdapter } from "./adapters/codex.js";
+import { langSmithAdapter } from "./adapters/langsmith.js";
 import { lettaAdapter } from "./adapters/letta.js";
 import { openHandsAdapter } from "./adapters/openhands.js";
 import { resolveBounds } from "./bounds.js";
@@ -15,6 +16,7 @@ import { NormalizationError } from "./types.js";
 const ADAPTERS: Record<TrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  langsmith: langSmithAdapter,
   letta: lettaAdapter,
   openhands: openHandsAdapter,
 };

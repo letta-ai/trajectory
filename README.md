@@ -72,6 +72,7 @@ and is empty when the transcript required no recoverable cleanup.
 | --- | --- | --- |
 | `claude-code` | Native Claude Code JSONL | `claude-code` |
 | `codex` | Native Codex rollout JSONL | `codex` |
+| `langsmith` | LangSmith run object, run array, `{ "runs": [...] }`, or run JSONL | `langsmith` |
 | `letta` | Native Letta transcript JSON | `letta` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 
@@ -82,6 +83,17 @@ complete response by `seq_id`, handles singular and batched tool fields, and
 ignores system and approval-control records. OpenHands inputs are serialized
 exports; when a native store uses individual event files, assembling the event
 array remains the caller's responsibility.
+
+LangSmith inputs contain the runs for one trace. The output of
+`langsmith trace export <directory> --project <project> --full` can be passed
+directly as one transcript per exported JSONL file. Runs are ordered by
+`dotted_order` and `start_time`; nested `child_runs` are flattened. The adapter
+decodes the LangChain/LangGraph, OpenAI Chat Completions and Responses,
+Anthropic Messages, and Vercel AI SDK message envelopes documented by
+LangSmith. Repeated message-history snapshots from successive LLM runs are
+deduplicated, while tool runs are linked to the earlier model tool call by call
+ID and then by tool name when an integration omits the ID. Fetching or exporting
+runs from LangSmith remains the caller's responsibility.
 
 ## Normalized records
 

@@ -130,8 +130,9 @@ LangSmith Messages-view formats for LangChain/LangGraph, OpenAI Chat
 Completions and Responses, Anthropic Messages, and the Vercel AI SDK. Repeated
 message-history snapshots are deduplicated, while tool runs are linked to the
 earlier model tool call by call ID and then by tool name when an integration
-omits the ID. Fetching or exporting runs from LangSmith remains the caller's
-responsibility.
+omits the ID. Runs carrying the `ls_message_view_exclude` metadata key are
+ignored, matching LangSmith's Messages-view behavior. Fetching or exporting
+runs from LangSmith remains the caller's responsibility.
 
 LangSmith's Anthropic wrapper aggregates stream events before storing outputs,
 but that reducer is not exported as a public SDK utility. When canonical Run

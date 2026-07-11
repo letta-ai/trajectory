@@ -1,0 +1,11 @@
+{
+  "records": [
+    { "role": "meta", "source": "langsmith", "model": "claude-opus-4-7" },
+    { "role": "user", "content": "what is the weather in paris?", "timestamp": "2026-07-10T12:00:01.000Z" },
+    { "role": "assistant", "content": "Let me check.", "timestamp": "2026-07-10T12:00:02.000Z" },
+    { "role": "assistant", "content": null, "tool_calls": [{ "id": "toolu_01", "name": "get_weather", "args": "{\"city\":\"Paris\"}" }], "timestamp": "2026-07-10T12:00:02.000Z" },
+    { "role": "tool", "tool_call_id": "toolu_01", "content": "{\"temperature\":22,\"condition\":\"Sunny\"}", "timestamp": "2026-07-10T12:00:04.000Z" },
+    { "role": "assistant", "content": "It's sunny and 22°C in Paris.", "timestamp": "2026-07-10T12:00:06.000Z" }
+  ],
+  "diagnostics": []
+}

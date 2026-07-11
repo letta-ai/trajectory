@@ -18,6 +18,7 @@ interface OrderedRun {
 
 interface ConversationItem {
   key: string;
+  semanticKey?: string;
   stable?: boolean;
   event?: DecodedEvent;
 }
@@ -40,7 +41,7 @@ interface AnthropicStreamBlock {
 
 interface DecodeState {
   events: DecodedEvent[];
-  history: string[];
+  history: ConversationItem[];
   pendingCalls: PendingCall[];
 }
 
@@ -61,6 +62,7 @@ export const langSmithAdapter: SourceAdapter = {
 
     for (const { run } of runs) {
       const metadata = runMetadata(run);
+      if (Object.hasOwn(metadata, "ls_message_view_exclude")) continue;
       model ??= firstString(metadata.ls_model_name, metadata.model);
       cwd ??= firstString(metadata.cwd, metadata.working_directory);
       gitBranch ??= firstString(metadata.git_branch, metadata.gitBranch);
@@ -442,12 +444,16 @@ function messageItem(
   model?: string,
 ): ConversationItem {
   const canonical = role === "assistant" ? "assistant" : role === "user" ? "user" : role;
+  const semanticKey = `message:${canonical}:${jsonString(content)}`;
   const key = stableId
     ? `message:${stableId}:${index}`
-    : `message:${canonical}:${jsonString(content)}`;
-  if (canonical !== "user" && canonical !== "assistant") return { key };
+    : semanticKey;
+  if (canonical !== "user" && canonical !== "assistant") {
+    return { key, semanticKey };
+  }
   return {
     key,
+    semanticKey,
     ...(stableId ? { stable: true } : {}),
     event: {
       type: "message",
@@ -488,7 +494,10 @@ function toolCallItem(
   model?: string,
 ): ConversationItem {
   const fn = isObject(value.function) ? value.function : {};
-  const id = firstString(value.id, value.call_id, value.toolCallId);
+  const id =
+    value.type === "function_call"
+      ? firstString(value.call_id, value.id, value.toolCallId)
+      : firstString(value.id, value.call_id, value.toolCallId);
   const name = firstString(value.name, value.toolName, fn.name);
   const rawArgs = firstDefined(value.arguments, value.args, value.input, fn.arguments);
   const args = typeof rawArgs === "string" ? rawArgs : jsonString(rawArgs);
@@ -566,6 +575,7 @@ function decodeToolRun(
     outputs.output,
     outputs.content,
     run.error,
+    Object.keys(outputs).length > 0 ? outputs : undefined,
   );
   if (rawResult === undefined) return undefined;
   let content = resultText(rawResult);
@@ -619,7 +629,7 @@ function mergeItems(state: DecodeState, items: ConversationItem[]): void {
     let matches = true;
     const historyStart = state.history.length - overlap;
     for (let index = 0; index < overlap; index += 1) {
-      if (state.history[historyStart + index] !== items[index]?.key) {
+      if (!conversationItemsMatch(state.history[historyStart + index], items[index])) {
         matches = false;
         break;
       }
@@ -630,14 +640,28 @@ function mergeItems(state: DecodeState, items: ConversationItem[]): void {
 
   const repeatedSnapshot =
     overlap === 0 &&
-    items.some((item) => item.stable === true && state.history.includes(item.key));
+    items.some(
+      (item) =>
+        item.stable === true &&
+        state.history.some((historyItem) => historyItem.key === item.key),
+    );
 
   for (let index = overlap; index < items.length; index += 1) {
     const item = items[index];
     if (!item) continue;
-    if (item.stable === true && state.history.includes(item.key)) continue;
-    if (repeatedSnapshot && state.history.includes(item.key)) continue;
-    state.history.push(item.key);
+    if (
+      item.stable === true &&
+      state.history.some((historyItem) => historyItem.key === item.key)
+    ) {
+      continue;
+    }
+    if (
+      repeatedSnapshot &&
+      state.history.some((historyItem) => conversationItemsMatch(historyItem, item))
+    ) {
+      continue;
+    }
+    state.history.push(item);
     if (!item.event) continue;
     if (isDuplicateAdjacentMessage(state.events.at(-1), item.event)) continue;
     state.events.push(item.event);
@@ -651,6 +675,19 @@ function mergeItems(state: DecodeState, items: ConversationItem[]): void {
       matchPendingCall(state.pendingCalls, item.event.callId, undefined);
     }
   }
+}
+
+function conversationItemsMatch(
+  previous: ConversationItem | undefined,
+  current: ConversationItem | undefined,
+): boolean {
+  if (!previous || !current) return false;
+  if (previous.key === current.key) return true;
+  return (
+    previous.semanticKey !== undefined &&
+    previous.semanticKey === current.semanticKey &&
+    (previous.stable !== true || current.stable !== true)
+  );
 }
 
 function isDuplicateAdjacentMessage(

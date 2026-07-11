@@ -55,11 +55,14 @@ records in the compatibility fixtures.
 
 ## LangSmith adapter
 
-The LangSmith adapter is covered with synthetic runs matching the published
-LangSmith Run and Messages-view formats. Fixtures exercise LangChain
-constructor messages, Vercel AI SDK content blocks, repeated history snapshots,
-tool-result matching by ID and tool name, run ordering, metadata, and
-missing-timestamp repair.
+The LangSmith adapter is covered with synthetic edge cases and canonical Run
+trees adapted from LangSmith's published Messages-view examples. The official
+OpenAI Responses and Anthropic examples are stored with root spans, UUIDs,
+timestamps, `extra.metadata`, and hierarchical `dotted_order` values so their
+normalized fixtures require no repairs or diagnostics. Fixtures also exercise
+LangChain constructor messages, Vercel AI SDK content blocks, repeated history
+snapshots, excluded internal runs, bare tool outputs, tool-result matching by ID
+and tool name, run ordering, metadata, and missing-timestamp repair.
 
 Read-only validation was also run against two user-provided LangSmith projects
 without retaining raw traces or normalized content in the repository. The
@@ -69,8 +72,15 @@ native variants not present in the original synthetic fixtures: an Anthropic
 SSE event stream stored in string-valued `outputs.output`, and a tool call
 repeated in both content blocks and the message-level `tool_calls` field.
 
-After those repairs, the combined thread normalized to 16 records with native
+After those repairs, the combined thread normalized to 15 records with native
 tool linkage preserved; its only diagnostic was the expected configured
 tool-result truncation. The standalone LLM run normalized to three records
-without diagnostics. No reference implementation was provided for differential
-testing.
+without diagnostics.
+
+The official examples were taken from LangSmith's
+[Messages-view trace format reference](https://docs.langchain.com/langsmith/messages-view-trace-format).
+All five published integration traces were also exercised directly: LangChain,
+OpenAI Chat Completions, OpenAI Responses, Vercel AI SDK, and Anthropic
+Messages. This differential check caught Responses item-ID versus call-ID
+linkage, mixed stable/semantic message deduplication, bare tool-output objects,
+and `ls_message_view_exclude` handling.

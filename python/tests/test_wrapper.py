@@ -19,6 +19,8 @@ FIXTURES = (
     ("codex", "codex/cleanup", "input.jsonl"),
     ("langsmith", "langsmith/tool-call", "input.json"),
     ("langsmith", "langsmith/cleanup", "input.json"),
+    ("langsmith", "langsmith/official-openai-responses", "input.json"),
+    ("langsmith", "langsmith/official-anthropic", "input.json"),
     ("letta", "letta/tool-call", "input.json"),
     ("letta", "letta/cleanup", "input.json"),
     ("openhands", "openhands/tool-calls", "input.json"),

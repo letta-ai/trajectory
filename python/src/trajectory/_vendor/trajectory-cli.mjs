@@ -398,6 +398,8 @@ var langSmithAdapter = {
     let createdAt;
     for (const { run } of runs) {
       const metadata = runMetadata(run);
+      if (Object.hasOwn(metadata, "ls_message_view_exclude"))
+        continue;
       model ??= firstString(metadata.ls_model_name, metadata.model);
       cwd ??= firstString(metadata.cwd, metadata.working_directory);
       gitBranch ??= firstString(metadata.git_branch, metadata.gitBranch);
@@ -703,11 +705,14 @@ function decodeContentBlock(block, role, stableId, index, timestamp, model) {
 }
 function messageItem(role, content, stableId, index, timestamp, model) {
   const canonical = role === "assistant" ? "assistant" : role === "user" ? "user" : role;
-  const key = stableId ? `message:${stableId}:${index}` : `message:${canonical}:${jsonString(content)}`;
-  if (canonical !== "user" && canonical !== "assistant")
-    return { key };
+  const semanticKey = `message:${canonical}:${jsonString(content)}`;
+  const key = stableId ? `message:${stableId}:${index}` : semanticKey;
+  if (canonical !== "user" && canonical !== "assistant") {
+    return { key, semanticKey };
+  }
   return {
     key,
+    semanticKey,
     ...stableId ? { stable: true } : {},
     event: {
       type: "message",
@@ -732,7 +737,7 @@ function reasoningItem(content, stableId, index, timestamp, model) {
 }
 function toolCallItem(value, stableId, index, timestamp, model) {
   const fn = isObject(value.function) ? value.function : {};
-  const id = firstString(value.id, value.call_id, value.toolCallId);
+  const id = value.type === "function_call" ? firstString(value.call_id, value.id, value.toolCallId) : firstString(value.id, value.call_id, value.toolCallId);
   const name = firstString(value.name, value.toolName, fn.name);
   const rawArgs = firstDefined(value.arguments, value.args, value.input, fn.arguments);
   const args = typeof rawArgs === "string" ? rawArgs : jsonString(rawArgs);
@@ -772,7 +777,7 @@ function decodeToolRun(run, timestamp, pendingCalls) {
   const name = firstString(inputs.toolName, inputs.tool_name, run.name);
   const call = matchPendingCall(pendingCalls, explicitId, name);
   const callId = explicitId ?? call?.id;
-  const rawResult = firstDefined(embedded?.content, embedded?.output, embedded?.result, outputs.result, outputs.output, outputs.content, run.error);
+  const rawResult = firstDefined(embedded?.content, embedded?.output, embedded?.result, outputs.result, outputs.output, outputs.content, run.error, Object.keys(outputs).length > 0 ? outputs : undefined);
   if (rawResult === undefined)
     return;
   let content = resultText(rawResult);
@@ -814,7 +819,7 @@ function mergeItems(state, items) {
     let matches = true;
     const historyStart = state.history.length - overlap;
     for (let index = 0;index < overlap; index += 1) {
-      if (state.history[historyStart + index] !== items[index]?.key) {
+      if (!conversationItemsMatch(state.history[historyStart + index], items[index])) {
         matches = false;
         break;
       }
@@ -823,16 +828,18 @@ function mergeItems(state, items) {
       break;
     overlap -= 1;
   }
-  const repeatedSnapshot = overlap === 0 && items.some((item) => item.stable === true && state.history.includes(item.key));
+  const repeatedSnapshot = overlap === 0 && items.some((item) => item.stable === true && state.history.some((historyItem) => historyItem.key === item.key));
   for (let index = overlap;index < items.length; index += 1) {
     const item = items[index];
     if (!item)
       continue;
-    if (item.stable === true && state.history.includes(item.key))
+    if (item.stable === true && state.history.some((historyItem) => historyItem.key === item.key)) {
       continue;
-    if (repeatedSnapshot && state.history.includes(item.key))
+    }
+    if (repeatedSnapshot && state.history.some((historyItem) => conversationItemsMatch(historyItem, item))) {
       continue;
-    state.history.push(item.key);
+    }
+    state.history.push(item);
     if (!item.event)
       continue;
     if (isDuplicateAdjacentMessage(state.events.at(-1), item.event))
@@ -848,6 +855,13 @@ function mergeItems(state, items) {
       matchPendingCall(state.pendingCalls, item.event.callId, undefined);
     }
   }
+}
+function conversationItemsMatch(previous, current) {
+  if (!previous || !current)
+    return false;
+  if (previous.key === current.key)
+    return true;
+  return previous.semanticKey !== undefined && previous.semanticKey === current.semanticKey && (previous.stable !== true || current.stable !== true);
 }
 function isDuplicateAdjacentMessage(previous, current) {
   return previous?.type === "message" && current.type === "message" && previous.role === current.role && previous.content === current.content && previous.timestamp?.getTime() === current.timestamp?.getTime();

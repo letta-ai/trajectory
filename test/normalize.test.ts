@@ -16,6 +16,8 @@ const fixtures = [
   { source: "codex", name: "codex/cleanup" },
   { source: "langsmith", name: "langsmith/tool-call" },
   { source: "langsmith", name: "langsmith/cleanup" },
+  { source: "langsmith", name: "langsmith/official-openai-responses" },
+  { source: "langsmith", name: "langsmith/official-anthropic" },
   { source: "letta", name: "letta/tool-call" },
   { source: "letta", name: "letta/cleanup" },
   { source: "openhands", name: "openhands/tool-calls" },
@@ -284,6 +286,79 @@ describe("public API", () => {
         (record) => record.role === "user" && record.content === "retry",
       ),
     ).toHaveLength(2);
+  });
+
+  test("serializes a bare LangSmith tool output object", () => {
+    const transcript = JSON.stringify([
+      canonicalLangSmithRun({
+        id: "llm",
+        start_time: "2026-07-10T00:00:00Z",
+        end_time: "2026-07-10T00:00:01Z",
+        inputs: { input: [{ role: "user", content: "weather?" }] },
+        outputs: {
+          output: [
+            {
+              type: "function_call",
+              id: "fc-item",
+              call_id: "call-1",
+              name: "weather",
+              arguments: "{}",
+            },
+          ],
+        },
+      }),
+      canonicalLangSmithRun({
+        id: "tool",
+        name: "weather",
+        run_type: "tool",
+        start_time: "2026-07-10T00:00:02Z",
+        end_time: "2026-07-10T00:00:03Z",
+        inputs: {},
+        outputs: { call_id: "call-1", temperature: 22 },
+      }),
+    ]);
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records).toContainEqual(
+      expect.objectContaining({
+        role: "tool",
+        tool_call_id: "call-1",
+        content: '{"call_id":"call-1","temperature":22}',
+      }),
+    );
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("excludes LangSmith runs marked for exclusion from Messages view", () => {
+    const transcript = JSON.stringify([
+      canonicalLangSmithRun({
+        id: "internal",
+        start_time: "2026-07-10T00:00:00Z",
+        end_time: "2026-07-10T00:00:01Z",
+        extra: { metadata: { ls_message_view_exclude: false } },
+        inputs: { messages: [{ role: "user", content: "Classify this" }] },
+        outputs: { role: "assistant", content: "billing" },
+      }),
+      canonicalLangSmithRun({
+        id: "visible",
+        start_time: "2026-07-10T00:00:02Z",
+        end_time: "2026-07-10T00:00:03Z",
+        inputs: { messages: [{ role: "user", content: "Help me" }] },
+        outputs: { role: "assistant", content: "Sure" },
+      }),
+    ]);
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+    expect(result.records).not.toContainEqual(
+      expect.objectContaining({ content: "Classify this" }),
+    );
   });
 
   test("decodes Anthropic reasoning and tool blocks from LangSmith runs", () => {

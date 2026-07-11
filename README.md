@@ -113,15 +113,61 @@ and is empty when the transcript required no recoverable cleanup.
 | --- | --- | --- |
 | `claude-code` | Native Claude Code JSONL | `claude-code` |
 | `codex` | Native Codex rollout JSONL | `codex` |
-| `deepagents-code` | Version 1 safe JSON envelope of a reconstructed Deep Agents Code thread | `deepagents-code` |
+| `deepagents-code` | Local default database via `normalizeDeepAgentsCode`, or a version 1 safe JSON envelope via `normalizeTranscript` | `deepagents-code` |
 | `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | `deepagents` | User-supplied Python LangGraph `SqliteSaver` database plus `threadId` | `deepagents` |
 
-### Deep Agents Code envelopes
+### Deep Agents Code
+
+Deep Agents Code stores its LangGraph sessions at
+`~/.deepagents/.state/sessions.db`. Normalize one explicitly selected thread
+with the async convenience wrapper:
+
+```ts
+import {
+  DEEP_AGENTS_CODE_DEFAULT_DATABASE_PATH,
+  normalizeDeepAgentsCode,
+} from "@letta-ai/trajectory";
+
+const result = await normalizeDeepAgentsCode({
+  threadId: "thread-123",
+  checkpointNamespace: "", // optional; root namespace by default
+  // checkpointId: "...",  // optional; latest checkpoint by default
+  // pythonExecutable: "/path/to/venv/bin/python",
+});
+```
+
+`threadId` is always required; the wrapper does not list or guess threads and
+does not accept a custom database path. The exported display constant is
+`DEEP_AGENTS_CODE_DEFAULT_DATABASE_PATH` (`~/.deepagents/.state/sessions.db`).
+The actual home directory is resolved when the function is called. Internally,
+the wrapper delegates to `normalizeCheckpoint({ source: "deepagents", ... })`,
+so checkpoint selection, serializer decoding, parent traversal, and reducer
+semantics stay in the shared official-Python helper. Only the leading
+`meta.source` is changed from `deepagents` to `deepagents-code`.
+
+The Python wrapper uses the same fixed path and its current Python interpreter
+by default:
+
+```python
+from trajectory import normalize_deepagents_code
+
+result = normalize_deepagents_code(
+    thread_id="thread-123",
+    checkpoint_namespace="",  # optional
+    checkpoint_id=None,         # optional; latest when omitted
+)
+```
+
+Install the Python `deepagents` extra, or select a Python environment containing
+`langgraph` and `langgraph-checkpoint-sqlite`, as described below.
+
+#### Safe envelope transcripts
 
 `deepagents-code` accepts a JSON string containing a safe, already-decoded
-thread envelope:
+thread envelope through `normalizeTranscript`. This is separate from the local
+database convenience wrapper:
 
 ```json
 {
@@ -175,15 +221,12 @@ timestamps are preserved. System messages are omitted with a diagnostic because
 trajectory-v1 has no system role. Removal records are expected to have already
 been applied while reconstructing checkpoint state and are ignored defensively.
 
-This package does **not** read `~/.deepagents/.state/sessions.db` or deserialize
-LangGraph blobs. Deep Agents Code uses the Python LangGraph SQLite checkpointer
-and MessagePack serializer; the official JavaScript SQLite checkpointer cannot
-read that representation. Thread discovery, selection, checkpoint-namespace
-handling, and reducer replay will therefore delegate to the upcoming shared
-official-Python helper, which will emit this envelope. Until that helper is
-available, callers must supply an envelope from a trusted exporter. Do not use
-ad hoc object construction, pickle, or executable deserialization on checkpoint
-blobs.
+The envelope adapter performs no database access or blob deserialization.
+Callers using this lower-level form must supply an envelope from a trusted
+exporter. Do not use ad hoc object construction, pickle, or executable
+deserialization on checkpoint blobs. For the standard Deep Agents Code local
+database, prefer `normalizeDeepAgentsCode`, which delegates to the shared
+official-Python helper instead.
 
 Letta messages use native `message_type` values such as `user_message`,
 `reasoning_message`, `assistant_message`, `tool_call_message`,
@@ -266,10 +309,11 @@ result = normalize_checkpoint(
 )
 ```
 
-`loadDeepAgentsCheckpoint(location)` is also exported for integrations such as
-Deep Agents Code that need to discover a location before reusing the same
-decoder. `FilesystemBackend` is unrelated to this trajectory: it persists
-agent-created files, not the LangGraph message/checkpoint state.
+`loadDeepAgentsCheckpoint(location)` is also exported for integrations that
+need decoded checkpoint data before normalization. `normalizeDeepAgentsCode`
+is the fixed-path convenience layer over this generic implementation.
+`FilesystemBackend` is unrelated to this trajectory: it persists agent-created
+files, not the LangGraph message/checkpoint state.
 
 An unknown source, an invalid source-level container, or a transcript that
 cannot form a valid trajectory throws `NormalizationError`. Recoverable

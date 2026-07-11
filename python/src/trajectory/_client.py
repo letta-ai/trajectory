@@ -25,6 +25,7 @@ from ._types import (
 _PROTOCOL_VERSION = 1
 _MINIMUM_NODE_MAJOR = 20
 _CLI_PATH = Path(__file__).parent / "_vendor" / "trajectory-cli.mjs"
+DEEP_AGENTS_CODE_DEFAULT_DATABASE_PATH = "~/.deepagents/.state/sessions.db"
 
 
 def normalize_transcript(
@@ -67,6 +68,35 @@ def normalize_checkpoint(
     if bounds is not None:
         request["bounds"] = bounds
     return normalize_many([request])[0]
+
+
+def normalize_deepagents_code(
+    *,
+    thread_id: str,
+    checkpoint_namespace: str = "",
+    checkpoint_id: str | None = None,
+    bounds: NormalizationBounds | None = None,
+    python_executable: str | None = None,
+) -> NormalizeResult:
+    """Normalize one explicitly selected Deep Agents Code local thread."""
+
+    if not isinstance(thread_id, str) or not thread_id:
+        raise NormalizationError(
+            "invalid_input", "Deep Agents Code thread_id must be a non-empty string."
+        )
+    result = normalize_checkpoint(
+        path=Path.home() / ".deepagents" / ".state" / "sessions.db",
+        thread_id=thread_id,
+        checkpoint_namespace=checkpoint_namespace,
+        checkpoint_id=checkpoint_id,
+        bounds=bounds,
+        python_executable=python_executable,
+    )
+    meta, *records = result["records"]
+    return {
+        "records": [{**meta, "source": "deepagents-code"}, *records],
+        "diagnostics": result["diagnostics"],
+    }
 
 
 def normalize_many(inputs: Iterable[NormalizeRequest]) -> list[NormalizeResult]:

@@ -81,7 +81,15 @@ An interoperability probe confirmed that a database written by the official
 Python `SqliteSaver` `3.1.0` is not readable by the official JavaScript
 `SqliteSaver` `1.0.3`: the JavaScript implementation rejects Python's
 `msgpack` serialization tag. Consequently, this package does not decode the
-SQLite store or its blobs. The `deepagents-code` adapter normalizes a versioned,
-plain-JSON envelope after the shared official-Python helper performs thread
-selection, namespace-aware reconstruction, and reducer replay. Deterministic
-fixtures cover the envelope boundary.
+SQLite store or its blobs. `normalizeDeepAgentsCode` is a thin fixed-path wrapper
+over the generic official-Python checkpoint adapter: it selects an explicit
+thread from `~/.deepagents/.state/sessions.db`, forwards namespace/checkpoint
+options and bounds, and retags only the leading metadata source. Integration
+tests copy the generic Python-generated fixture beneath a temporary redirected
+`HOME`; they cover latest and explicit checkpoint selection, non-root
+namespaces, default-path resolution, and metadata retagging without touching a
+user database.
+
+The separate `deepagents-code` transcript adapter continues to normalize a
+versioned plain-JSON envelope when callers already have reconstructed message
+dictionaries. It performs no local database access.

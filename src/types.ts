@@ -56,6 +56,18 @@ export interface DeepAgentsCheckpointInput {
   bounds?: NormalizationBounds;
 }
 
+export interface NormalizeDeepAgentsCodeInput {
+  /** Deep Agents Code LangGraph thread_id. */
+  threadId: string;
+  /** LangGraph checkpoint_ns. Defaults to the root namespace (empty string). */
+  checkpointNamespace?: string;
+  /** Select one checkpoint. When omitted, selects the latest checkpoint. */
+  checkpointId?: string;
+  /** Python interpreter containing LangGraph and langgraph-checkpoint-sqlite. */
+  pythonExecutable?: string;
+  bounds?: NormalizationBounds;
+}
+
 export interface DeepAgentsToolCall {
   id?: string;
   name?: string;

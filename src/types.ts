@@ -1,4 +1,16 @@
-export type TrajectorySource = "claude-code" | "codex" | "letta" | "openhands";
+export type TrajectorySource =
+  | "claude-code"
+  | "codex"
+  | "letta"
+  | "openhands";
+
+export type TranscriptTrajectorySource = TrajectorySource;
+
+export type CheckpointTrajectorySource = "deepagents";
+
+export type AnyTrajectorySource =
+  | TranscriptTrajectorySource
+  | CheckpointTrajectorySource;
 
 export interface ToolArgumentBounds {
   /** Maximum Unicode code points in the serialized arguments object. */
@@ -19,9 +31,70 @@ export interface NormalizationBounds {
 }
 
 export interface NormalizeInput {
-  source: TrajectorySource;
+  source: TranscriptTrajectorySource;
   transcript: string;
   bounds?: NormalizationBounds;
+}
+
+export interface DeepAgentsCheckpointLocation {
+  /** Path to a SQLite database created by Python LangGraph SqliteSaver. */
+  path: string;
+  /** LangGraph thread_id. Required because Deep Agents has no standard local store. */
+  threadId: string;
+  /** LangGraph checkpoint_ns. Defaults to the root namespace (empty string). */
+  checkpointNamespace?: string;
+  /** Select one checkpoint. When omitted, SqliteSaver selects the latest checkpoint. */
+  checkpointId?: string;
+  /** Python interpreter containing LangGraph and langgraph-checkpoint-sqlite. */
+  pythonExecutable?: string;
+}
+
+export interface DeepAgentsCheckpointInput {
+  source: "deepagents";
+  checkpoint: DeepAgentsCheckpointLocation;
+  bounds?: NormalizationBounds;
+}
+
+export interface DeepAgentsToolCall {
+  id?: string;
+  name?: string;
+  args: unknown;
+}
+
+export interface DeepAgentsHumanMessageData {
+  role: "human";
+  content: string;
+  timestamp?: string;
+}
+
+export interface DeepAgentsAIMessageData {
+  role: "ai";
+  content: string;
+  reasoning: string[];
+  toolCalls: DeepAgentsToolCall[];
+  model?: string;
+  timestamp?: string;
+}
+
+export interface DeepAgentsToolMessageData {
+  role: "tool";
+  content: string;
+  toolCallId: string;
+  timestamp?: string;
+}
+
+export type DeepAgentsMessageData =
+  | DeepAgentsHumanMessageData
+  | DeepAgentsAIMessageData
+  | DeepAgentsToolMessageData;
+
+export interface DeepAgentsCheckpointData {
+  checkpointId: string;
+  checkpointNamespace: string;
+  checkpointTimestamp: string;
+  cwd?: string;
+  model?: string;
+  messages: DeepAgentsMessageData[];
 }
 
 export type DiagnosticCode =
@@ -113,6 +186,14 @@ export interface NormalizeResult {
 export type NormalizationErrorCode =
   | "invalid_input"
   | "unknown_source"
+  | "python_unavailable"
+  | "python_dependency_missing"
+  | "checkpoint_database_not_found"
+  | "checkpoint_database_unreadable"
+  | "checkpoint_read_failed"
+  | "checkpoint_not_found"
+  | "checkpoint_messages_missing"
+  | "invalid_checkpoint_state"
   | "missing_user_records"
   | "missing_assistant_records"
   | "invalid_normalized_transcript";

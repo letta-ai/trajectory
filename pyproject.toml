@@ -24,8 +24,14 @@ classifiers = [
 [project.urls]
 Repository = "https://github.com/letta-ai/trajectory"
 
+[project.optional-dependencies]
+deepagents = [
+  "langgraph>=1.1,<2",
+  "langgraph-checkpoint-sqlite>=3,<4",
+]
+
 [tool.setuptools]
 package-dir = { "" = "python/src" }
 
 [tool.setuptools.package-data]
-trajectory = ["py.typed", "_vendor/*.mjs"]
+trajectory = ["py.typed", "_vendor/*.mjs", "_vendor/*.py"]

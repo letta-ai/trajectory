@@ -1,4 +1,4 @@
-import type { NormalizedRecord, ToolCall } from "./types.js";
+import type { NormalizedRecord } from "./types.js";
 import { NormalizationError } from "./types.js";
 
 const TIMESTAMP_PATTERN =

@@ -46,6 +46,19 @@ jobs:
       - name: Test Python parity
         run: PYTHONPATH=python/src python -m unittest discover -s python/tests -v
 
+      - name: Set up Python for Deep Agents SDK
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Test real Deep Agents SDK checkpoint
+        shell: bash
+        run: |
+          python -m pip install ".[deepagents]" "deepagents>=0.6,<0.7"
+          DEEPAGENTS_TEST_PYTHON=python DEEPAGENTS_SDK_TEST_PYTHON=python \
+            bun test test/deepagents.test.ts test/deepagents-sdk.test.ts
+          PYTHONPATH=python/src python -m unittest discover -s python/tests -v
+
       - name: Pack and install as a consumer
         shell: bash
         run: |

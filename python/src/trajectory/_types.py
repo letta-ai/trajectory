@@ -3,6 +3,10 @@
 from typing import Literal, TypedDict, Union
 
 TrajectorySource = Literal["claude-code", "codex", "letta", "openhands"]
+CheckpointTrajectorySource = Literal["deepagents"]
+AnyTrajectorySource = Literal[
+    "claude-code", "codex", "letta", "openhands", "deepagents"
+]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 DiagnosticCode = Literal[
     "invalid_json_line",
@@ -24,6 +28,14 @@ DiagnosticCode = Literal[
 NormalizationErrorCode = Literal[
     "invalid_input",
     "unknown_source",
+    "python_unavailable",
+    "python_dependency_missing",
+    "checkpoint_database_not_found",
+    "checkpoint_database_unreadable",
+    "checkpoint_read_failed",
+    "checkpoint_not_found",
+    "checkpoint_messages_missing",
+    "invalid_checkpoint_state",
     "missing_user_records",
     "missing_assistant_records",
     "invalid_normalized_transcript",
@@ -51,6 +63,25 @@ class _NormalizeInputOptional(TypedDict, total=False):
 class NormalizeInput(_NormalizeInputOptional):
     source: TrajectorySource
     transcript: str
+
+
+class _DeepAgentsCheckpointLocationOptional(TypedDict, total=False):
+    checkpointNamespace: str
+    checkpointId: str
+    pythonExecutable: str
+
+
+class DeepAgentsCheckpointLocation(_DeepAgentsCheckpointLocationOptional):
+    path: str
+    threadId: str
+
+
+class DeepAgentsCheckpointInput(_NormalizeInputOptional):
+    source: Literal["deepagents"]
+    checkpoint: DeepAgentsCheckpointLocation
+
+
+NormalizeRequest = Union[NormalizeInput, DeepAgentsCheckpointInput]
 
 
 class _DiagnosticOptional(TypedDict, total=False):

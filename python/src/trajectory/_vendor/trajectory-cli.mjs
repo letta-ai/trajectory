@@ -550,7 +550,10 @@ function inputMessages(value) {
 }
 function outputMessages(value) {
   if (!isObject(value)) {
-    return typeof value === "string" ? [{ role: "assistant", content: value }] : [];
+    if (typeof value !== "string")
+      return [];
+    const streamed = anthropicStreamMessages(value);
+    return streamed.length > 0 ? streamed : [{ role: "assistant", content: value }];
   }
   if (Array.isArray(value.generations)) {
     const firstBatch = Array.isArray(value.generations[0]) ? value.generations[0] : value.generations;
@@ -579,7 +582,8 @@ function outputMessages(value) {
   if (Array.isArray(value.output))
     return value.output;
   if (typeof value.output === "string") {
-    return [{ role: "assistant", content: value.output }];
+    const streamed = anthropicStreamMessages(value.output);
+    return streamed.length > 0 ? streamed : [{ role: "assistant", content: value.output }];
   }
   if (isObject(value.output)) {
     if (Array.isArray(value.output.messages))
@@ -594,6 +598,82 @@ function outputMessages(value) {
     return [{ role: "assistant", content: value.content }];
   }
   return [];
+}
+function anthropicStreamMessages(output) {
+  if (!output.includes("event:") || !output.includes(`
+data:`))
+    return [];
+  const blocks = new Map;
+  for (const line of output.split(`
+`)) {
+    if (!line.startsWith("data:"))
+      continue;
+    const raw = line.slice("data:".length).trim();
+    if (!raw || raw === "[DONE]")
+      continue;
+    let event;
+    try {
+      event = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isObject(event) || typeof event.index !== "number")
+      continue;
+    if (event.type === "content_block_start" && isObject(event.content_block)) {
+      const content2 = event.content_block;
+      if (typeof content2.type !== "string")
+        continue;
+      blocks.set(event.index, {
+        type: content2.type,
+        ...typeof content2.text === "string" ? { text: content2.text } : {},
+        ...typeof content2.thinking === "string" ? { thinking: content2.thinking } : {},
+        ...typeof content2.id === "string" ? { id: content2.id } : {},
+        ...typeof content2.name === "string" ? { name: content2.name } : {},
+        ...content2.input !== undefined ? { input: content2.input } : {},
+        partialJson: ""
+      });
+      continue;
+    }
+    if (event.type !== "content_block_delta" || !isObject(event.delta)) {
+      continue;
+    }
+    const delta = event.delta;
+    const block = blocks.get(event.index);
+    if (!block)
+      continue;
+    if (delta.type === "text_delta" && typeof delta.text === "string") {
+      block.text = (block.text ?? "") + delta.text;
+    } else if (delta.type === "thinking_delta" && typeof delta.thinking === "string") {
+      block.thinking = (block.thinking ?? "") + delta.thinking;
+    } else if (delta.type === "input_json_delta" && typeof delta.partial_json === "string") {
+      block.partialJson += delta.partial_json;
+    }
+  }
+  const content = [];
+  for (const [, block] of [...blocks].sort(([left], [right]) => left - right)) {
+    if (block.type === "text" && block.text) {
+      content.push({ type: "text", text: block.text });
+    } else if (block.type === "thinking" && block.thinking) {
+      content.push({ type: "thinking", thinking: block.thinking });
+    } else if (block.type === "tool_use") {
+      content.push({
+        type: "tool_use",
+        ...block.id ? { id: block.id } : {},
+        ...block.name ? { name: block.name } : {},
+        input: streamedToolInput(block)
+      });
+    }
+  }
+  return content.length > 0 ? [{ role: "assistant", content }] : [];
+}
+function streamedToolInput(block) {
+  if (!block.partialJson)
+    return block.input ?? {};
+  try {
+    return JSON.parse(block.partialJson);
+  } catch {
+    return { _raw: block.partialJson };
+  }
 }
 function messageArray(value, fallbackRole) {
   if (typeof value === "string")

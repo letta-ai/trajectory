@@ -124,7 +124,8 @@ directly as one transcript per exported JSONL file. Runs are ordered by
 `dotted_order` and `start_time`; nested `child_runs` are flattened. The adapter
 decodes the LangChain/LangGraph, OpenAI Chat Completions and Responses,
 Anthropic Messages, and Vercel AI SDK message envelopes documented by
-LangSmith. Repeated message-history snapshots from successive LLM runs are
+LangSmith. String-valued Anthropic SSE outputs are reconstructed from their
+text, thinking, and tool-input deltas. Repeated message-history snapshots are
 deduplicated, while tool runs are linked to the earlier model tool call by call
 ID and then by tool name when an integration omits the ID. Fetching or exporting
 runs from LangSmith remains the caller's responsibility.

@@ -148,6 +148,47 @@ describe("public API", () => {
     );
   });
 
+  test("reconstructs Anthropic SSE stored as string output", () => {
+    const output = [
+      "event: message_start",
+      'data: {"type":"message_start","message":{"role":"assistant","content":[]}}',
+      "",
+      "event: content_block_start",
+      'data: {"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}',
+      "",
+      "event: content_block_delta",
+      'data: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Check first."}}',
+      "",
+      "event: content_block_start",
+      'data: {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}',
+      "",
+      "event: content_block_delta",
+      'data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Hello "}}',
+      "",
+      "event: content_block_delta",
+      'data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"world."}}',
+      "",
+      "event: message_stop",
+      'data: {"type":"message_stop"}',
+      "",
+    ].join("\n");
+    const transcript = JSON.stringify({
+      id: "run-1",
+      run_type: "llm",
+      inputs: { messages: [{ role: "user", content: "hello" }] },
+      outputs: { output },
+    });
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records).toContainEqual(
+      expect.objectContaining({ role: "reasoning", content: "Check first." }),
+    );
+    expect(result.records).toContainEqual(
+      expect.objectContaining({ role: "assistant", content: "Hello world." }),
+    );
+  });
+
   test("deduplicates a tool call repeated in native message fields", () => {
     const call = {
       id: "call-1",

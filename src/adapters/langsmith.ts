@@ -29,6 +29,16 @@ interface PendingCall {
   consumed: boolean;
 }
 
+interface AnthropicStreamBlock {
+  type: string;
+  text?: string;
+  thinking?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+  partialJson: string;
+}
+
 interface DecodeState {
   events: DecodedEvent[];
   history: string[];
@@ -225,7 +235,11 @@ function inputMessages(value: unknown): unknown[] {
 
 function outputMessages(value: unknown): unknown[] {
   if (!isObject(value)) {
-    return typeof value === "string" ? [{ role: "assistant", content: value }] : [];
+    if (typeof value !== "string") return [];
+    const streamed = anthropicStreamMessages(value);
+    return streamed.length > 0
+      ? streamed
+      : [{ role: "assistant", content: value }];
   }
 
   if (Array.isArray(value.generations)) {
@@ -254,7 +268,10 @@ function outputMessages(value: unknown): unknown[] {
   if (isObject(value.message)) return [value.message];
   if (Array.isArray(value.output)) return value.output;
   if (typeof value.output === "string") {
-    return [{ role: "assistant", content: value.output }];
+    const streamed = anthropicStreamMessages(value.output);
+    return streamed.length > 0
+      ? streamed
+      : [{ role: "assistant", content: value.output }];
   }
   if (isObject(value.output)) {
     if (Array.isArray(value.output.messages)) return value.output.messages;
@@ -267,6 +284,87 @@ function outputMessages(value: unknown): unknown[] {
     return [{ role: "assistant", content: value.content }];
   }
   return [];
+}
+
+function anthropicStreamMessages(output: string): unknown[] {
+  if (!output.includes("event:") || !output.includes("\ndata:")) return [];
+  const blocks = new Map<number, AnthropicStreamBlock>();
+
+  for (const line of output.split("\n")) {
+    if (!line.startsWith("data:")) continue;
+    const raw = line.slice("data:".length).trim();
+    if (!raw || raw === "[DONE]") continue;
+    let event: unknown;
+    try {
+      event = JSON.parse(raw);
+    } catch {
+      continue;
+    }
+    if (!isObject(event) || typeof event.index !== "number") continue;
+
+    if (event.type === "content_block_start" && isObject(event.content_block)) {
+      const content = event.content_block;
+      if (typeof content.type !== "string") continue;
+      blocks.set(event.index, {
+        type: content.type,
+        ...(typeof content.text === "string" ? { text: content.text } : {}),
+        ...(typeof content.thinking === "string"
+          ? { thinking: content.thinking }
+          : {}),
+        ...(typeof content.id === "string" ? { id: content.id } : {}),
+        ...(typeof content.name === "string" ? { name: content.name } : {}),
+        ...(content.input !== undefined ? { input: content.input } : {}),
+        partialJson: "",
+      });
+      continue;
+    }
+
+    if (event.type !== "content_block_delta" || !isObject(event.delta)) {
+      continue;
+    }
+    const delta = event.delta;
+    const block = blocks.get(event.index);
+    if (!block) continue;
+    if (delta.type === "text_delta" && typeof delta.text === "string") {
+      block.text = (block.text ?? "") + delta.text;
+    } else if (
+      delta.type === "thinking_delta" &&
+      typeof delta.thinking === "string"
+    ) {
+      block.thinking = (block.thinking ?? "") + delta.thinking;
+    } else if (
+      delta.type === "input_json_delta" &&
+      typeof delta.partial_json === "string"
+    ) {
+      block.partialJson += delta.partial_json;
+    }
+  }
+
+  const content: Record<string, unknown>[] = [];
+  for (const [, block] of [...blocks].sort(([left], [right]) => left - right)) {
+    if (block.type === "text" && block.text) {
+      content.push({ type: "text", text: block.text });
+    } else if (block.type === "thinking" && block.thinking) {
+      content.push({ type: "thinking", thinking: block.thinking });
+    } else if (block.type === "tool_use") {
+      content.push({
+        type: "tool_use",
+        ...(block.id ? { id: block.id } : {}),
+        ...(block.name ? { name: block.name } : {}),
+        input: streamedToolInput(block),
+      });
+    }
+  }
+  return content.length > 0 ? [{ role: "assistant", content }] : [];
+}
+
+function streamedToolInput(block: AnthropicStreamBlock): unknown {
+  if (!block.partialJson) return block.input ?? {};
+  try {
+    return JSON.parse(block.partialJson);
+  } catch {
+    return { _raw: block.partialJson };
+  }
 }
 
 function messageArray(value: unknown, fallbackRole: string): unknown[] {

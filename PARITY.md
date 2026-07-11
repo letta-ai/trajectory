@@ -65,9 +65,9 @@ Read-only validation was also run against two user-provided LangSmith projects
 without retaining raw traces or normalized content in the repository. The
 sample comprised one two-trace thread with 17 total runs (13 chain, two LLM,
 and two tool runs) and one standalone LLM run. This surfaced and fixed two
-native variants not present in the synthetic fixtures: string-valued
-`outputs.output` completions and a tool call repeated in both content blocks
-and the message-level `tool_calls` field.
+native variants not present in the original synthetic fixtures: an Anthropic
+SSE event stream stored in string-valued `outputs.output`, and a tool call
+repeated in both content blocks and the message-level `tool_calls` field.
 
 After those repairs, the combined thread normalized to 16 records with native
 tool linkage preserved; its only diagnostic was the expected configured

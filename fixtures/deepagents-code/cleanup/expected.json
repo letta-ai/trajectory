@@ -1,0 +1,62 @@
+{
+  "records": [
+    { "role": "meta", "source": "deepagents-code" },
+    {
+      "role": "user",
+      "content": "Continue safely.",
+      "timestamp": "2026-02-02T08:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_2",
+          "name": "unknown_tool",
+          "args": "{\"_raw\":\"[\\\"unexpected\\\",\\\"shape\\\"]\"}"
+        }
+      ],
+      "timestamp": "2026-02-02T08:00:15.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Done.",
+      "timestamp": "2026-02-02T08:00:30.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "system_message_dropped",
+      "message": "Dropped a Deep Agents Code system message because trajectory-v1 has no system role."
+    },
+    {
+      "code": "system_message_dropped",
+      "message": "Dropped a synthetic Deep Agents Code system notification."
+    },
+    {
+      "code": "tool_call_id_synthesized",
+      "message": "Synthesized tool-call ID \"call_2\".",
+      "recordIndex": 2
+    },
+    {
+      "code": "unknown_tool_name",
+      "message": "Substituted \"unknown_tool\" for a missing tool name.",
+      "recordIndex": 2
+    },
+    {
+      "code": "tool_arguments_reshaped",
+      "message": "Reshaped arguments for tool call \"call_2\" into a JSON object.",
+      "recordIndex": 2
+    },
+    {
+      "code": "orphan_tool_result",
+      "message": "Dropped a tool result without a preceding call for \"\".",
+      "recordIndex": 3
+    },
+    {
+      "code": "timestamps_synthesized",
+      "message": "Synthesized timestamps for 3 normalized records.",
+      "count": 3
+    }
+  ]
+}

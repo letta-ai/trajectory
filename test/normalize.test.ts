@@ -10,17 +10,23 @@ import {
 import type { NormalizeResult, TrajectorySource } from "../src/index.js";
 
 const fixtures = [
-  { source: "claude-code", name: "claude-code/tool-call" },
-  { source: "claude-code", name: "claude-code/cleanup" },
-  { source: "codex", name: "codex/tool-calls" },
-  { source: "codex", name: "codex/cleanup" },
-  { source: "letta", name: "letta/tool-call" },
-  { source: "letta", name: "letta/cleanup" },
-  { source: "letta", name: "letta/local-v3" },
-  { source: "letta", name: "letta/local-legacy" },
-  { source: "openhands", name: "openhands/tool-calls" },
-  { source: "openhands", name: "openhands/cleanup" },
-] as const satisfies ReadonlyArray<{ source: TrajectorySource; name: string }>;
+  { source: "claude-code", name: "claude-code/tool-call", input: "input.jsonl" },
+  { source: "claude-code", name: "claude-code/cleanup", input: "input.jsonl" },
+  { source: "codex", name: "codex/tool-calls", input: "input.jsonl" },
+  { source: "codex", name: "codex/cleanup", input: "input.jsonl" },
+  { source: "deepagents-code", name: "deepagents-code/tool-calls", input: "input.json" },
+  { source: "deepagents-code", name: "deepagents-code/cleanup", input: "input.json" },
+  { source: "letta", name: "letta/tool-call", input: "input.json" },
+  { source: "letta", name: "letta/cleanup", input: "input.json" },
+  { source: "letta", name: "letta/local-v3", input: "input.jsonl" },
+  { source: "letta", name: "letta/local-legacy", input: "input.jsonl" },
+  { source: "openhands", name: "openhands/tool-calls", input: "input.json" },
+  { source: "openhands", name: "openhands/cleanup", input: "input.json" },
+] as const satisfies ReadonlyArray<{
+  source: TrajectorySource;
+  name: string;
+  input: string;
+}>;
 
 const schema = JSON.parse(
   readFileSync(
@@ -33,13 +39,7 @@ const validateSchema = new Ajv2020().compile(schema);
 describe("golden fixtures", () => {
   for (const fixture of fixtures) {
     test(fixture.name, () => {
-      const input = fixtureText(
-        fixture.name,
-        fixture.source === "openhands" ||
-          (fixture.source === "letta" && !fixture.name.startsWith("letta/local-"))
-          ? "input.json"
-          : "input.jsonl",
-      );
+      const input = fixtureText(fixture.name, fixture.input);
       const expected = JSON.parse(
         fixtureText(fixture.name, "expected.json"),
       ) as NormalizeResult;
@@ -100,6 +100,36 @@ describe("public API", () => {
       normalizeTranscript({
         source: "openhands",
         transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects an invalid Deep Agents Code envelope", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "deepagents-code",
+        transcript: JSON.stringify({
+          type: "deepagents-code-thread",
+          version: 2,
+          thread_id: "thread-1",
+          checkpoint_ns: "",
+          messages: [],
+        }),
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects unsafe non-dictionary Deep Agents Code messages", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "deepagents-code",
+        transcript: JSON.stringify({
+          type: "deepagents-code-thread",
+          version: 1,
+          thread_id: "thread-1",
+          checkpoint_ns: "",
+          messages: [{ message: "not decoded" }],
+        }),
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });

@@ -1,6 +1,7 @@
 export type TrajectorySource =
   | "claude-code"
   | "codex"
+  | "deepagents-code"
   | "letta"
   | "openhands";
 
@@ -55,6 +56,18 @@ export interface DeepAgentsCheckpointInput {
   bounds?: NormalizationBounds;
 }
 
+export interface NormalizeDeepAgentsCodeInput {
+  /** Deep Agents Code LangGraph thread_id. */
+  threadId: string;
+  /** LangGraph checkpoint_ns. Defaults to the root namespace (empty string). */
+  checkpointNamespace?: string;
+  /** Select one checkpoint. When omitted, selects the latest checkpoint. */
+  checkpointId?: string;
+  /** Python interpreter containing LangGraph and langgraph-checkpoint-sqlite. */
+  pythonExecutable?: string;
+  bounds?: NormalizationBounds;
+}
+
 export interface DeepAgentsToolCall {
   id?: string;
   name?: string;
@@ -103,6 +116,7 @@ export type DiagnosticCode =
   | "injected_context_dropped"
   | "noise_record_dropped"
   | "sidechain_record_dropped"
+  | "system_message_dropped"
   | "tool_call_id_synthesized"
   | "duplicate_tool_call_id"
   | "orphan_tool_result"

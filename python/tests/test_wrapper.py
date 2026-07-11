@@ -1,5 +1,6 @@
 import json
 import importlib.util
+import os
 import shutil
 import tempfile
 import unittest
@@ -8,9 +9,11 @@ from unittest.mock import patch
 
 import trajectory._client as client
 from trajectory import (
+    DEEP_AGENTS_CODE_DEFAULT_DATABASE_PATH,
     NodeUnavailableError,
     NormalizationError,
     normalize_checkpoint,
+    normalize_deepagents_code,
     normalize_many,
     normalize_transcript,
 )
@@ -25,6 +28,8 @@ FIXTURES = (
     ("claude-code", "claude-code/cleanup", "input.jsonl"),
     ("codex", "codex/tool-calls", "input.jsonl"),
     ("codex", "codex/cleanup", "input.jsonl"),
+    ("deepagents-code", "deepagents-code/tool-calls", "input.json"),
+    ("deepagents-code", "deepagents-code/cleanup", "input.json"),
     ("letta", "letta/tool-call", "input.json"),
     ("letta", "letta/cleanup", "input.json"),
     ("letta", "letta/local-v3", "input.jsonl"),
@@ -88,6 +93,66 @@ class WrapperTests(unittest.TestCase):
         finally:
             client._node_executable.cache_clear()
 
+    def test_deepagents_code_requires_explicit_thread_id(self) -> None:
+        with self.assertRaises(NormalizationError) as raised:
+            normalize_deepagents_code(thread_id="")
+
+        self.assertEqual(raised.exception.code, "invalid_input")
+
+    def test_deepagents_code_delegates_fixed_path_and_retags_meta(self) -> None:
+        generic = {
+            "records": [
+                {"role": "meta", "source": "deepagents", "cwd": "/workspace"},
+                {
+                    "role": "user",
+                    "content": "Hello",
+                    "timestamp": "2026-01-02T03:04:05.000Z",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Hi",
+                    "timestamp": "2026-01-02T03:04:06.000Z",
+                },
+            ],
+            "diagnostics": [],
+        }
+        bounds = {"toolResults": {"maxCharacters": 20, "strategy": "head"}}
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            database = home / ".deepagents" / ".state" / "sessions.db"
+            database.parent.mkdir(parents=True)
+            shutil.copyfile(ROOT / "fixtures/deepagents/checkpoint.db", database)
+            with patch.dict(os.environ, {"HOME": str(home)}):
+                with patch.object(
+                    client, "normalize_checkpoint", return_value=generic
+                ) as delegated:
+                    result = normalize_deepagents_code(
+                        thread_id="thread-123",
+                        checkpoint_namespace="sdk",
+                        checkpoint_id="checkpoint-1",
+                        bounds=bounds,  # type: ignore[arg-type]
+                        python_executable="/test/python",
+                    )
+
+        delegated.assert_called_once_with(
+            path=database,
+            thread_id="thread-123",
+            checkpoint_namespace="sdk",
+            checkpoint_id="checkpoint-1",
+            bounds=bounds,
+            python_executable="/test/python",
+        )
+        self.assertEqual(
+            result["records"][0],
+            {
+                "role": "meta",
+                "source": "deepagents-code",
+                "cwd": "/workspace",
+            },
+        )
+        self.assertEqual(result["records"][1:], generic["records"][1:])
+        self.assertEqual(result["diagnostics"], generic["diagnostics"])
+
     @unittest.skipUnless(HAS_LANGGRAPH_SQLITE, "LangGraph SQLite extra not installed")
     def test_normalizes_deepagents_checkpoint_with_current_python(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -119,6 +184,50 @@ class WrapperTests(unittest.TestCase):
         )
         self.assertEqual(result["records"][-1]["content"], "It is sunny and 22 C in Paris.")
         self.assertEqual(batch[0]["records"][1]["content"], "Other namespace")
+
+    @unittest.skipUnless(HAS_LANGGRAPH_SQLITE, "LangGraph SQLite extra not installed")
+    def test_normalizes_deepagents_code_from_default_local_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory) / "home"
+            database = home / ".deepagents" / ".state" / "sessions.db"
+            database.parent.mkdir(parents=True)
+            shutil.copyfile(ROOT / "fixtures/deepagents/checkpoint.db", database)
+            with patch.dict(os.environ, {"HOME": str(home)}):
+                generic = normalize_checkpoint(
+                    path=database,
+                    thread_id="thread-123",
+                    checkpoint_namespace="sdk",
+                )
+                result = normalize_deepagents_code(
+                    thread_id="thread-123",
+                    checkpoint_namespace="sdk",
+                )
+                historical = normalize_deepagents_code(
+                    thread_id="thread-123",
+                    checkpoint_namespace="sdk",
+                    checkpoint_id="00000000-0000-6000-8000-000000000001",
+                )
+                other = normalize_deepagents_code(
+                    thread_id="thread-123",
+                    checkpoint_namespace="other",
+                )
+
+        expected = dict(generic)
+        expected["records"] = [
+            {**generic["records"][0], "source": "deepagents-code"},
+            *generic["records"][1:],
+        ]
+        self.assertEqual(
+            DEEP_AGENTS_CODE_DEFAULT_DATABASE_PATH,
+            "~/.deepagents/.state/sessions.db",
+        )
+        self.assertEqual(result, expected)
+        self.assertEqual(historical["records"][0]["source"], "deepagents-code")
+        self.assertNotEqual(
+            historical["records"][-1].get("content"),
+            "It is sunny and 22 C in Paris.",
+        )
+        self.assertEqual(other["records"][1]["content"], "Other namespace")
 
 
 if __name__ == "__main__":

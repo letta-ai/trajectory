@@ -2,10 +2,12 @@
 
 from typing import Literal, TypedDict, Union
 
-TrajectorySource = Literal["claude-code", "codex", "letta", "openhands"]
+TrajectorySource = Literal[
+    "claude-code", "codex", "deepagents-code", "letta", "openhands"
+]
 CheckpointTrajectorySource = Literal["deepagents"]
 AnyTrajectorySource = Literal[
-    "claude-code", "codex", "letta", "openhands", "deepagents"
+    "claude-code", "codex", "deepagents-code", "letta", "openhands", "deepagents"
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 DiagnosticCode = Literal[
@@ -14,6 +16,7 @@ DiagnosticCode = Literal[
     "injected_context_dropped",
     "noise_record_dropped",
     "sidechain_record_dropped",
+    "system_message_dropped",
     "tool_call_id_synthesized",
     "duplicate_tool_call_id",
     "orphan_tool_result",
@@ -82,6 +85,34 @@ class DeepAgentsCheckpointInput(_NormalizeInputOptional):
 
 
 NormalizeRequest = Union[NormalizeInput, DeepAgentsCheckpointInput]
+
+
+class _DeepAgentsCodeMessageOptional(TypedDict, total=False):
+    timestamp: str
+
+
+class DeepAgentsCodeMessage(_DeepAgentsCodeMessageOptional):
+    message: dict[str, object]
+
+
+class DeepAgentsCodeMetadata(TypedDict, total=False):
+    cwd: str
+    git_branch: str
+    agent_name: str
+    created_at: str
+    updated_at: str
+
+
+class _DeepAgentsCodeTranscriptEnvelopeOptional(TypedDict, total=False):
+    metadata: DeepAgentsCodeMetadata
+
+
+class DeepAgentsCodeTranscriptEnvelope(_DeepAgentsCodeTranscriptEnvelopeOptional):
+    type: Literal["deepagents-code-thread"]
+    version: Literal[1]
+    thread_id: str
+    checkpoint_ns: str
+    messages: list[DeepAgentsCodeMessage]
 
 
 class _DiagnosticOptional(TypedDict, total=False):

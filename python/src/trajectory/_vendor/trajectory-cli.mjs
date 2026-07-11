@@ -382,6 +382,522 @@ class NormalizationError extends Error {
   }
 }
 
+// src/adapters/langsmith.ts
+var langSmithAdapter = {
+  source: "langsmith",
+  decode(transcript) {
+    const diagnostics = [];
+    const runs = parseRuns(transcript, diagnostics).sort(compareRuns);
+    const state = {
+      events: [],
+      history: [],
+      pendingCalls: []
+    };
+    let model;
+    let cwd;
+    let gitBranch;
+    let createdAt;
+    for (const { run } of runs) {
+      const metadata = runMetadata(run);
+      model ??= firstString(metadata.ls_model_name, metadata.model);
+      cwd ??= firstString(metadata.cwd, metadata.working_directory);
+      gitBranch ??= firstString(metadata.git_branch, metadata.gitBranch);
+      const start = parseTimestamp(run.start_time);
+      const end = parseTimestamp(run.end_time) ?? start;
+      createdAt ??= start;
+      if (run.run_type === "llm") {
+        const runModel = firstString(metadata.ls_model_name, metadata.model, model);
+        mergeItems(state, decodeMessages(inputMessages(run.inputs), start, runModel));
+        mergeItems(state, decodeMessages(outputMessages(run.outputs), end, runModel, "assistant"));
+        continue;
+      }
+      if (run.run_type === "tool") {
+        const result = decodeToolRun(run, end, state.pendingCalls);
+        if (result)
+          mergeItems(state, [result]);
+      }
+    }
+    return {
+      events: state.events,
+      context: {
+        source: "langsmith",
+        ...cwd ? { cwd } : {},
+        ...gitBranch ? { gitBranch } : {},
+        ...model ? { model } : {},
+        ...createdAt ? { createdAt } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function parseRuns(transcript, diagnostics) {
+  let parsed;
+  try {
+    parsed = JSON.parse(transcript);
+  } catch {
+    return parseRunJsonLines(transcript, diagnostics);
+  }
+  const roots = runContainer(parsed);
+  if (!roots)
+    throw invalidTranscript();
+  const flattened = [];
+  for (const root of roots)
+    flattenRun(root, flattened);
+  if (flattened.length === 0)
+    throw invalidTranscript();
+  return flattened.map((run, index) => ({ run, index }));
+}
+function parseRunJsonLines(transcript, diagnostics) {
+  const flattened = [];
+  for (const [index, raw] of transcript.split(`
+`).entries()) {
+    if (!raw.trim())
+      continue;
+    let value;
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      diagnostics.push({
+        code: "invalid_json_line",
+        message: `Skipped invalid JSON on line ${index + 1}.`,
+        inputLine: index + 1
+      });
+      continue;
+    }
+    const roots = runContainer(value);
+    if (!roots) {
+      diagnostics.push({
+        code: "non_object_json_line",
+        message: `Skipped a non-run JSON value on line ${index + 1}.`,
+        inputLine: index + 1
+      });
+      continue;
+    }
+    for (const root of roots)
+      flattenRun(root, flattened);
+  }
+  if (flattened.length === 0)
+    throw invalidTranscript();
+  return flattened.map((run, index) => ({ run, index }));
+}
+function runContainer(value) {
+  if (Array.isArray(value)) {
+    return value.every(isObject) ? value : undefined;
+  }
+  if (!isObject(value))
+    return;
+  if (Array.isArray(value.runs)) {
+    return value.runs.every(isObject) ? value.runs : undefined;
+  }
+  if (typeof value.run_type === "string")
+    return [value];
+  return;
+}
+function flattenRun(run, output) {
+  output.push(run);
+  if (!Array.isArray(run.child_runs))
+    return;
+  for (const child of run.child_runs) {
+    if (isObject(child))
+      flattenRun(child, output);
+  }
+}
+function invalidTranscript() {
+  return new NormalizationError("invalid_input", "LangSmith transcript must be a run object, a JSON run array, an object with a runs array, or JSONL containing runs.");
+}
+function compareRuns(left, right) {
+  const leftOrder = left.run.dotted_order;
+  const rightOrder = right.run.dotted_order;
+  if (typeof leftOrder === "string" && typeof rightOrder === "string") {
+    const order = leftOrder.localeCompare(rightOrder);
+    if (order !== 0)
+      return order;
+  }
+  const leftTime = parseTimestamp(left.run.start_time)?.getTime();
+  const rightTime = parseTimestamp(right.run.start_time)?.getTime();
+  if (leftTime !== undefined && rightTime !== undefined && leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+  return left.index - right.index;
+}
+function runMetadata(run) {
+  const topLevel = isObject(run.metadata) ? run.metadata : {};
+  const custom = isObject(run.custom_metadata) ? run.custom_metadata : {};
+  const extra = isObject(run.extra) ? run.extra : {};
+  const nested = isObject(extra.metadata) ? extra.metadata : {};
+  return { ...topLevel, ...custom, ...nested };
+}
+function inputMessages(value) {
+  if (!isObject(value))
+    return [];
+  const messages = [];
+  if (value.system !== undefined) {
+    messages.push({ role: "system", content: value.system });
+  }
+  if (value.instructions !== undefined) {
+    messages.push({ role: "system", content: value.instructions });
+  }
+  const candidate = firstNonEmpty(value.messages, value.input, value.prompt);
+  if (candidate !== undefined) {
+    messages.push(...messageArray(candidate, "user"));
+  } else if (Array.isArray(value.prompts)) {
+    for (const prompt of value.prompts) {
+      if (typeof prompt === "string")
+        messages.push({ role: "user", content: prompt });
+    }
+  }
+  return messages;
+}
+function outputMessages(value) {
+  if (!isObject(value)) {
+    return typeof value === "string" ? [{ role: "assistant", content: value }] : [];
+  }
+  if (Array.isArray(value.generations)) {
+    const firstBatch = Array.isArray(value.generations[0]) ? value.generations[0] : value.generations;
+    const messages = [];
+    for (const generation of firstBatch) {
+      if (!isObject(generation))
+        continue;
+      if (generation.message !== undefined)
+        messages.push(generation.message);
+      else if (typeof generation.text === "string") {
+        messages.push({ role: "assistant", content: generation.text });
+      }
+    }
+    if (messages.length > 0)
+      return messages;
+  }
+  if (Array.isArray(value.choices)) {
+    const messages = value.choices.map((choice) => isObject(choice) ? choice.message : undefined).filter((message) => message !== undefined);
+    if (messages.length > 0)
+      return messages;
+  }
+  if (Array.isArray(value.messages))
+    return value.messages;
+  if (isObject(value.message))
+    return [value.message];
+  if (Array.isArray(value.output))
+    return value.output;
+  if (typeof value.output === "string") {
+    return [{ role: "assistant", content: value.output }];
+  }
+  if (isObject(value.output)) {
+    if (Array.isArray(value.output.messages))
+      return value.output.messages;
+    if (isObject(value.output.update) && Array.isArray(value.output.update.messages)) {
+      return value.output.update.messages;
+    }
+  }
+  if (value.role !== undefined || value.type === "message")
+    return [value];
+  if (typeof value.content === "string" || Array.isArray(value.content)) {
+    return [{ role: "assistant", content: value.content }];
+  }
+  return [];
+}
+function messageArray(value, fallbackRole) {
+  if (typeof value === "string")
+    return [{ role: fallbackRole, content: value }];
+  if (isObject(value))
+    return [value];
+  if (!Array.isArray(value))
+    return [];
+  if (value.length === 1 && Array.isArray(value[0]))
+    return value[0];
+  return value;
+}
+function decodeMessages(messages, timestamp, model, fallbackRole) {
+  const items = [];
+  for (const message of messages) {
+    items.push(...decodeMessage(message, timestamp, model, fallbackRole));
+  }
+  return items;
+}
+function decodeMessage(value, timestamp, model, fallbackRole) {
+  if (typeof value === "string") {
+    return [messageItem(fallbackRole ?? "assistant", value, undefined, 0, timestamp, model)];
+  }
+  if (!isObject(value))
+    return [];
+  const constructorClass = constructorName(value);
+  const body = isObject(value.kwargs) ? value.kwargs : value;
+  const stableId = firstString(body.id, value.id);
+  const role = canonicalRole(firstString(body.role, body.type, fallbackRole), constructorClass);
+  const type = firstString(body.type, value.type);
+  if (type === "function_call") {
+    return [toolCallItem(body, stableId, 0, timestamp, model)];
+  }
+  if (type === "function_call_output") {
+    return [toolResultItem(body, stableId, 0, timestamp)];
+  }
+  if (type === "reasoning") {
+    const text = reasoningText(body);
+    return text ? [reasoningItem(text, stableId, 0, timestamp, model)] : [];
+  }
+  if (role === "tool") {
+    return [toolResultItem(body, stableId, 0, timestamp)];
+  }
+  const items = [];
+  const content = body.content;
+  if (Array.isArray(content)) {
+    for (let index = 0;index < content.length; index += 1) {
+      const block = content[index];
+      if (typeof block === "string") {
+        items.push(messageItem(role, block, stableId, index, timestamp, model));
+      } else if (isObject(block)) {
+        items.push(...decodeContentBlock(block, role, stableId, index, timestamp, model));
+      }
+    }
+  } else {
+    const text = contentText(content);
+    if (text)
+      items.push(messageItem(role, text, stableId, 0, timestamp, model));
+  }
+  if (role === "assistant" && Array.isArray(body.tool_calls)) {
+    for (let index = 0;index < body.tool_calls.length; index += 1) {
+      const call = body.tool_calls[index];
+      if (isObject(call)) {
+        items.push(toolCallItem(call, stableId, index + items.length, timestamp, model));
+      }
+    }
+  }
+  return items;
+}
+function decodeContentBlock(block, role, stableId, index, timestamp, model) {
+  const type = block.type;
+  if (type === "tool_use" || type === "tool-call" || type === "function_call") {
+    return [toolCallItem(block, stableId, index, timestamp, model)];
+  }
+  if (type === "tool_result" || type === "tool-result" || type === "function_call_output") {
+    return [toolResultItem(block, stableId, index, timestamp)];
+  }
+  if (type === "thinking" || type === "reasoning" || type === "redacted_thinking") {
+    const text2 = reasoningText(block);
+    return text2 ? [reasoningItem(text2, stableId, index, timestamp, model)] : [];
+  }
+  if (type === "image" || type === "image_url") {
+    return [messageItem(role, "[image]", stableId, index, timestamp, model)];
+  }
+  const text = contentText(block.text ?? block.content);
+  return text ? [messageItem(role, text, stableId, index, timestamp, model)] : [];
+}
+function messageItem(role, content, stableId, index, timestamp, model) {
+  const canonical = role === "assistant" ? "assistant" : role === "user" ? "user" : role;
+  const key = stableId ? `message:${stableId}:${index}` : `message:${canonical}:${jsonString(content)}`;
+  if (canonical !== "user" && canonical !== "assistant")
+    return { key };
+  return {
+    key,
+    ...stableId ? { stable: true } : {},
+    event: {
+      type: "message",
+      role: canonical,
+      content,
+      ...timestamp ? { timestamp } : {},
+      ...model ? { model } : {}
+    }
+  };
+}
+function reasoningItem(content, stableId, index, timestamp, model) {
+  return {
+    key: stableId ? `reasoning:${stableId}:${index}` : `reasoning:${jsonString(content)}`,
+    ...stableId ? { stable: true } : {},
+    event: {
+      type: "reasoning",
+      content,
+      ...timestamp ? { timestamp } : {},
+      ...model ? { model } : {}
+    }
+  };
+}
+function toolCallItem(value, stableId, index, timestamp, model) {
+  const fn = isObject(value.function) ? value.function : {};
+  const id = firstString(value.id, value.call_id, value.toolCallId);
+  const name = firstString(value.name, value.toolName, fn.name);
+  const rawArgs = firstDefined(value.arguments, value.args, value.input, fn.arguments);
+  const args = typeof rawArgs === "string" ? rawArgs : jsonString(rawArgs);
+  return {
+    key: id ? `tool-call:${id}` : `tool-call:${stableId ?? ""}:${index}:${name ?? ""}:${args}`,
+    ...id || stableId ? { stable: true } : {},
+    event: {
+      type: "tool_call",
+      args,
+      ...id ? { id } : {},
+      ...name ? { name } : {},
+      ...timestamp ? { timestamp } : {},
+      ...model ? { model } : {}
+    }
+  };
+}
+function toolResultItem(value, stableId, index, timestamp) {
+  const id = firstString(value.tool_call_id, value.tool_use_id, value.call_id, value.toolCallId);
+  const raw = firstDefined(value.output, value.result, value.content);
+  const content = resultText(raw);
+  return {
+    key: id ? `tool-result:${id}` : `tool-result:${stableId ?? ""}:${index}:${content}`,
+    ...id || stableId ? { stable: true } : {},
+    event: {
+      type: "tool_result",
+      content,
+      ...id ? { callId: id } : {},
+      ...timestamp ? { timestamp } : {}
+    }
+  };
+}
+function decodeToolRun(run, timestamp, pendingCalls) {
+  const inputs = isObject(run.inputs) ? run.inputs : {};
+  const outputs = isObject(run.outputs) ? run.outputs : {};
+  const embedded = embeddedToolMessage(outputs);
+  const explicitId = firstString(inputs.toolCallId, inputs.tool_call_id, inputs.call_id, outputs.toolCallId, outputs.tool_call_id, outputs.call_id, embedded?.tool_call_id, embedded?.tool_use_id, embedded?.call_id);
+  const name = firstString(inputs.toolName, inputs.tool_name, run.name);
+  const call = matchPendingCall(pendingCalls, explicitId, name);
+  const callId = explicitId ?? call?.id;
+  const rawResult = firstDefined(embedded?.content, embedded?.output, embedded?.result, outputs.result, outputs.output, outputs.content, run.error);
+  if (rawResult === undefined)
+    return;
+  let content = resultText(rawResult);
+  if (run.error && rawResult === run.error && !/^error/i.test(content)) {
+    content = `Error: ${content}`;
+  }
+  return {
+    key: callId ? `tool-result:${callId}` : `tool-run:${firstString(run.id, run.run_id) ?? "unknown"}`,
+    stable: true,
+    event: {
+      type: "tool_result",
+      content,
+      ...callId ? { callId } : {},
+      ...timestamp ? { timestamp } : {}
+    }
+  };
+}
+function embeddedToolMessage(outputs) {
+  const output = isObject(outputs.output) ? outputs.output : undefined;
+  const candidate = output ?? (isObject(outputs.message) ? outputs.message : undefined);
+  if (!candidate)
+    return;
+  return isObject(candidate.kwargs) ? candidate.kwargs : candidate;
+}
+function matchPendingCall(pendingCalls, id, name) {
+  let match = id ? pendingCalls.find((call) => !call.consumed && call.id === id) : undefined;
+  match ??= name ? pendingCalls.find((call) => !call.consumed && call.name === name) : undefined;
+  const remaining = pendingCalls.filter((call) => !call.consumed);
+  match ??= remaining.length === 1 ? remaining[0] : undefined;
+  if (match)
+    match.consumed = true;
+  return match;
+}
+function mergeItems(state, items) {
+  if (items.length === 0)
+    return;
+  let overlap = Math.min(state.history.length, items.length);
+  while (overlap > 0) {
+    let matches = true;
+    const historyStart = state.history.length - overlap;
+    for (let index = 0;index < overlap; index += 1) {
+      if (state.history[historyStart + index] !== items[index]?.key) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches)
+      break;
+    overlap -= 1;
+  }
+  const repeatedSnapshot = overlap === 0 && items.some((item) => item.stable === true && state.history.includes(item.key));
+  for (let index = overlap;index < items.length; index += 1) {
+    const item = items[index];
+    if (!item)
+      continue;
+    if (item.stable === true && state.history.includes(item.key))
+      continue;
+    if (repeatedSnapshot && state.history.includes(item.key))
+      continue;
+    state.history.push(item.key);
+    if (!item.event)
+      continue;
+    state.events.push(item.event);
+    if (item.event.type === "tool_call") {
+      state.pendingCalls.push({
+        ...item.event.id ? { id: item.event.id } : {},
+        ...item.event.name ? { name: item.event.name } : {},
+        consumed: false
+      });
+    } else if (item.event.type === "tool_result" && item.event.callId) {
+      matchPendingCall(state.pendingCalls, item.event.callId, undefined);
+    }
+  }
+}
+function canonicalRole(value, constructorClass) {
+  if (constructorClass === "HumanMessage" || constructorClass === "ChatMessage") {
+    return "user";
+  }
+  if (constructorClass === "AIMessage")
+    return "assistant";
+  if (constructorClass === "ToolMessage" || constructorClass === "FunctionMessage") {
+    return "tool";
+  }
+  if (constructorClass === "SystemMessage")
+    return "system";
+  if (value === "human")
+    return "user";
+  if (value === "ai")
+    return "assistant";
+  if (value === "function")
+    return "tool";
+  return value ?? "assistant";
+}
+function constructorName(value) {
+  if (!Array.isArray(value.id))
+    return;
+  const last = value.id[value.id.length - 1];
+  return typeof last === "string" ? last : undefined;
+}
+function contentText(value) {
+  if (typeof value === "string")
+    return value;
+  if (value === null || value === undefined)
+    return "";
+  if (Array.isArray(value))
+    return blocksText(value);
+  if (isObject(value) && typeof value.value === "string")
+    return value.value;
+  return "";
+}
+function reasoningText(value) {
+  const direct = firstString(value.thinking, value.text, value.content);
+  if (direct)
+    return direct;
+  if (Array.isArray(value.summary)) {
+    return value.summary.map((item) => isObject(item) ? contentText(item.text ?? item.content) : "").filter(Boolean).join(`
+`);
+  }
+  return "";
+}
+function resultText(value) {
+  if (typeof value === "string")
+    return value;
+  if (value === undefined || value === null)
+    return "";
+  if (Array.isArray(value))
+    return blocksText(value) || jsonString(value);
+  if (isObject(value)) {
+    if (isObject(value.kwargs))
+      return resultText(value.kwargs.content);
+    if (typeof value.content === "string")
+      return value.content;
+  }
+  return jsonString(value);
+}
+function firstString(...values) {
+  return values.find((value) => typeof value === "string" && value.length > 0);
+}
+function firstDefined(...values) {
+  return values.find((value) => value !== undefined && value !== null);
+}
+function firstNonEmpty(...values) {
+  return values.find((value) => value !== undefined && value !== null && (!Array.isArray(value) || value.length > 0));
+}
+
 // src/adapters/letta.ts
 var lettaAdapter = {
   source: "letta",
@@ -1299,6 +1815,7 @@ function sliceCodePoints(text, start, end) {
 var ADAPTERS = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  langsmith: langSmithAdapter,
   letta: lettaAdapter,
   openhands: openHandsAdapter
 };

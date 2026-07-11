@@ -1,0 +1,40 @@
+{
+  "type": "deepagents-code-thread",
+  "version": 1,
+  "thread_id": "cleanup-thread",
+  "checkpoint_ns": "task:subagent-1",
+  "metadata": { "created_at": "2026-02-02T08:00:00Z" },
+  "messages": [
+    {
+      "message": {
+        "__langgraph_class": "SystemMessage",
+        "content": "Subagent system prompt"
+      }
+    },
+    {
+      "message": {
+        "type": "human",
+        "content": "[SYSTEM] Tool execution was cancelled."
+      }
+    },
+    {
+      "message": { "type": "human", "content": "Continue safely." }
+    },
+    {
+      "message": {
+        "type": "ai",
+        "content": "",
+        "tool_calls": [{ "args": ["unexpected", "shape"] }]
+      }
+    },
+    {
+      "message": { "type": "tool", "content": "unlinked output" }
+    },
+    {
+      "message": { "type": "remove", "id": "old-message" }
+    },
+    {
+      "message": { "type": "ai", "content": "Done." }
+    }
+  ]
+}

@@ -67,3 +67,21 @@ A Python-generated fixture was also opened with the official JavaScript
 JavaScript saver rejected Python's `msgpack` serializer type. The production
 adapter therefore delegates to the official Python saver and message reducer
 instead of decoding SQLite blobs or assuming cross-language wire compatibility.
+
+## Deep Agents Code boundary
+
+Deep Agents Code `0.1.36` was inspected against its official persistence code
+and pinned `langgraph-checkpoint-sqlite` `3.1.0` / `langgraph-checkpoint`
+`4.1.1` dependencies. Root and subagent conversations share a thread ID and
+are separated by `checkpoint_ns`; current message state may require replaying
+the parent chain and `messages` writes through the Deep Agents reducer rather
+than reading only the latest checkpoint blob.
+
+An interoperability probe confirmed that a database written by the official
+Python `SqliteSaver` `3.1.0` is not readable by the official JavaScript
+`SqliteSaver` `1.0.3`: the JavaScript implementation rejects Python's
+`msgpack` serialization tag. Consequently, this package does not decode the
+SQLite store or its blobs. The `deepagents-code` adapter normalizes a versioned,
+plain-JSON envelope after the shared official-Python helper performs thread
+selection, namespace-aware reconstruction, and reducer replay. Deterministic
+fixtures cover the envelope boundary.

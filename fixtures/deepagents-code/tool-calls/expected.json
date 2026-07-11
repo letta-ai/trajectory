@@ -1,0 +1,73 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "deepagents-code",
+      "cwd": "/workspace/deep-agent",
+      "git_branch": "feature/checkpoints",
+      "model": "example-model"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the project and the screenshot.\n[image]",
+      "timestamp": "2026-02-01T12:00:00.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "First inspect the manifest and source.",
+      "timestamp": "2026-02-01T12:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I will inspect both files.",
+      "timestamp": "2026-02-01T12:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-read",
+          "name": "read_file",
+          "args": "{\"file_path\":\"package.json\"}"
+        }
+      ],
+      "timestamp": "2026-02-01T12:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-search",
+          "name": "search_files",
+          "args": "{\"query\":\"checkpoint\",\"path\":\"src\"}"
+        }
+      ],
+      "timestamp": "2026-02-01T12:00:01.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-read",
+      "content": "{\"name\":\"trajectory\"}",
+      "timestamp": "2026-02-01T12:00:02.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-search",
+      "content": "src/core.ts",
+      "timestamp": "2026-02-01T12:00:03.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The project contains the checkpoint integration point.",
+      "timestamp": "2026-02-01T12:00:04.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "system_message_dropped",
+      "message": "Dropped a Deep Agents Code system message because trajectory-v1 has no system role."
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 export type TrajectorySource =
   | "claude-code"
   | "codex"
+  | "deepagents-code"
   | "letta"
   | "openhands";
 
@@ -103,6 +104,7 @@ export type DiagnosticCode =
   | "injected_context_dropped"
   | "noise_record_dropped"
   | "sidechain_record_dropped"
+  | "system_message_dropped"
   | "tool_call_id_synthesized"
   | "duplicate_tool_call_id"
   | "orphan_tool_result"

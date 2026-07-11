@@ -1,5 +1,6 @@
 import { claudeCodeAdapter } from "./adapters/claude-code.js";
 import { codexAdapter } from "./adapters/codex.js";
+import { deepAgentsCodeAdapter } from "./adapters/deepagents-code.js";
 import { lettaAdapter } from "./adapters/letta.js";
 import { openHandsAdapter } from "./adapters/openhands.js";
 import { decodeDeepAgentsCheckpoint } from "./adapters/deepagents.js";
@@ -18,6 +19,7 @@ import { NormalizationError } from "./types.js";
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  "deepagents-code": deepAgentsCodeAdapter,
   letta: lettaAdapter,
   openhands: openHandsAdapter,
 };
@@ -68,6 +70,11 @@ export async function normalizeCheckpoint(
 export { loadDeepAgentsCheckpoint } from "./deepagents-checkpoint.js";
 
 export { DEFAULT_NORMALIZATION_BOUNDS } from "./bounds.js";
+export type {
+  DeepAgentsCodeMessage,
+  DeepAgentsCodeMetadata,
+  DeepAgentsCodeTranscriptEnvelope,
+} from "./adapters/deepagents-code.js";
 export { validateTranscript } from "./validate.js";
 export {
   NormalizationError,

@@ -113,9 +113,77 @@ and is empty when the transcript required no recoverable cleanup.
 | --- | --- | --- |
 | `claude-code` | Native Claude Code JSONL | `claude-code` |
 | `codex` | Native Codex rollout JSONL | `codex` |
+| `deepagents-code` | Version 1 safe JSON envelope of a reconstructed Deep Agents Code thread | `deepagents-code` |
 | `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | `deepagents` | User-supplied Python LangGraph `SqliteSaver` database plus `threadId` | `deepagents` |
+
+### Deep Agents Code envelopes
+
+`deepagents-code` accepts a JSON string containing a safe, already-decoded
+thread envelope:
+
+```json
+{
+  "type": "deepagents-code-thread",
+  "version": 1,
+  "thread_id": "019b0000-0000-7000-8000-000000000001",
+  "checkpoint_ns": "",
+  "metadata": {
+    "cwd": "/workspace/project",
+    "git_branch": "feature/example",
+    "created_at": "2026-02-01T12:00:00Z",
+    "updated_at": "2026-02-01T12:00:04Z"
+  },
+  "messages": [
+    {
+      "message": {
+        "type": "human",
+        "content": "Inspect the project.",
+        "id": "human-1"
+      },
+      "timestamp": "2026-02-01T12:00:00Z"
+    },
+    {
+      "message": {
+        "type": "ai",
+        "content": "I will inspect it.",
+        "id": "ai-1"
+      },
+      "timestamp": "2026-02-01T12:00:01Z"
+    }
+  ]
+}
+```
+
+Pass the serialized envelope through the regular API:
+
+```ts
+const result = normalizeTranscript({
+  source: "deepagents-code",
+  transcript: JSON.stringify(envelope),
+});
+```
+
+`checkpoint_ns` identifies the selected root (`""`) or subagent namespace.
+Each `message` is an ordinary JSON dictionary in LangChain message shape;
+`human`, `ai`, `system`, `tool`, `function`, and `remove` types are recognized.
+Decoded class names may also be supplied as `__langgraph_class` (for example,
+`"AIMessage"`). AI reasoning in `additional_kwargs.reasoning_content`, prose,
+tool calls, linked tool results, model metadata, and optional per-message
+timestamps are preserved. System messages are omitted with a diagnostic because
+trajectory-v1 has no system role. Removal records are expected to have already
+been applied while reconstructing checkpoint state and are ignored defensively.
+
+This package does **not** read `~/.deepagents/.state/sessions.db` or deserialize
+LangGraph blobs. Deep Agents Code uses the Python LangGraph SQLite checkpointer
+and MessagePack serializer; the official JavaScript SQLite checkpointer cannot
+read that representation. Thread discovery, selection, checkpoint-namespace
+handling, and reducer replay will therefore delegate to the upcoming shared
+official-Python helper, which will emit this envelope. Until that helper is
+available, callers must supply an envelope from a trusted exporter. Do not use
+ad hoc object construction, pickle, or executable deserialization on checkpoint
+blobs.
 
 Letta messages use native `message_type` values such as `user_message`,
 `reasoning_message`, `assistant_message`, `tool_call_message`,

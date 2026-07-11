@@ -398,6 +398,7 @@ var langSmithAdapter = {
   source: "langsmith",
   decode(transcript) {
     const runs = parseRuns(transcript).sort(compareRuns);
+    const deepAgentsRoots = findDeepAgentsRoots(runs);
     const state = {
       events: [],
       history: [],
@@ -408,15 +409,27 @@ var langSmithAdapter = {
     let gitBranch;
     let createdAt;
     for (const { run } of runs) {
+      const traceId = firstString(run.trace_id);
+      const deepAgentsRoot = traceId ? deepAgentsRoots.get(traceId) : undefined;
+      if (deepAgentsRoot && run !== deepAgentsRoot)
+        continue;
       const metadata = runMetadata(run);
       if (Object.hasOwn(metadata, "ls_message_view_exclude"))
         continue;
-      model ??= firstString(metadata.ls_model_name, metadata.model);
+      const aggregateOutputs = deepAgentsRoot ? outputMessages(run.outputs) : [];
+      const aggregateModel = deepAgentsRoot ? modelFromMessages(aggregateOutputs) : undefined;
+      model ??= firstString(metadata.ls_model_name, metadata.model, aggregateModel);
       cwd ??= firstString(metadata.cwd, metadata.working_directory);
       gitBranch ??= firstString(metadata.git_branch, metadata.gitBranch);
       const start = parseTimestamp(run.start_time);
       const end = parseTimestamp(run.end_time) ?? start;
       createdAt ??= start;
+      if (deepAgentsRoot) {
+        const runModel = firstString(metadata.ls_model_name, metadata.model, aggregateModel, model);
+        mergeItems(state, decodeMessages(inputMessages(run.inputs), start, runModel));
+        mergeItems(state, decodeMessages(aggregateOutputs, end, runModel, "assistant"));
+        continue;
+      }
       if (run.run_type === "llm") {
         const runModel = firstString(metadata.ls_model_name, metadata.model, model);
         mergeItems(state, decodeMessages(inputMessages(run.inputs), start, runModel));
@@ -442,6 +455,26 @@ var langSmithAdapter = {
     };
   }
 };
+function findDeepAgentsRoots(runs) {
+  const roots = new Map;
+  for (const { run } of runs) {
+    const traceId = firstString(run.trace_id);
+    if (!traceId || roots.has(traceId) || !isRootRun(run))
+      continue;
+    if (!isDeepAgentsIntegration(runMetadata(run)))
+      continue;
+    if (outputMessages(run.outputs).length === 0)
+      continue;
+    roots.set(traceId, run);
+  }
+  return roots;
+}
+function isRootRun(run) {
+  return run.id === run.trace_id || run.parent_run_id == null;
+}
+function isDeepAgentsIntegration(metadata) {
+  return metadata.ls_integration === "deepagents" || metadata.ls_integration === "deepagents-code";
+}
 function parseRuns(transcript) {
   let parsed;
   try {
@@ -638,6 +671,19 @@ function messageArray(value, fallbackRole) {
   if (value.length === 1 && Array.isArray(value[0]))
     return value[0];
   return value;
+}
+function modelFromMessages(messages) {
+  for (const message of messages) {
+    if (!isObject(message))
+      continue;
+    const body = isObject(message.kwargs) ? message.kwargs : message;
+    const responseMetadata = isObject(body.response_metadata) ? body.response_metadata : {};
+    const additional = isObject(body.additional_kwargs) ? body.additional_kwargs : {};
+    const model = firstString(body.model, body.model_name, responseMetadata.model_name, responseMetadata.model, additional.model_name, additional.model);
+    if (model)
+      return model;
+  }
+  return;
 }
 function decodeMessages(messages, timestamp, model, fallbackRole) {
   const items = [];
@@ -914,7 +960,7 @@ function contentText(value) {
   return "";
 }
 function reasoningText(value) {
-  const direct = firstString(value.thinking, value.text, value.content);
+  const direct = firstString(value.reasoning, value.thinking, value.text, value.content);
   if (direct)
     return direct;
   if (Array.isArray(value.summary)) {

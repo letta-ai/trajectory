@@ -1,0 +1,144 @@
+[
+  {
+    "id": "trace-deepagents-1",
+    "trace_id": "trace-deepagents-1",
+    "name": "LangGraph",
+    "run_type": "chain",
+    "start_time": "2026-07-11T12:00:00.000Z",
+    "end_time": "2026-07-11T12:00:05.000Z",
+    "dotted_order": "20260711T120000000000Ztrace-deepagents-1",
+    "inputs": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the weather in Paris?"
+        }
+      ]
+    },
+    "outputs": {
+      "messages": [
+        {
+          "id": "human-1",
+          "type": "human",
+          "content": "What is the weather in Paris?"
+        },
+        {
+          "id": "ai-1",
+          "type": "ai",
+          "content": [
+            {
+              "type": "reasoning",
+              "reasoning": "I should check the weather tool."
+            },
+            {
+              "type": "text",
+              "text": "I’ll check."
+            },
+            {
+              "type": "tool_use",
+              "id": "call-weather-1",
+              "name": "get_weather",
+              "input": {
+                "city": "Paris"
+              }
+            }
+          ],
+          "tool_calls": [
+            {
+              "id": "call-weather-1",
+              "name": "get_weather",
+              "args": {
+                "city": "Paris"
+              },
+              "type": "tool_call"
+            }
+          ],
+          "response_metadata": {
+            "model_name": "claude-sonnet-4-6"
+          }
+        },
+        {
+          "id": "tool-1",
+          "type": "tool",
+          "name": "get_weather",
+          "tool_call_id": "call-weather-1",
+          "content": "Sunny, 22 C"
+        },
+        {
+          "id": "ai-2",
+          "type": "ai",
+          "content": "It is sunny and 22 C in Paris.",
+          "tool_calls": [],
+          "response_metadata": {
+            "model_name": "claude-sonnet-4-6"
+          }
+        }
+      ]
+    },
+    "extra": {
+      "metadata": {
+        "ls_integration": "deepagents",
+        "cwd": "/workspace/deepagents"
+      }
+    }
+  },
+  {
+    "id": "child-llm-1",
+    "trace_id": "trace-deepagents-1",
+    "parent_run_id": "trace-deepagents-1",
+    "name": "ChatAnthropic",
+    "run_type": "llm",
+    "start_time": "2026-07-11T12:00:01.000Z",
+    "end_time": "2026-07-11T12:00:02.000Z",
+    "dotted_order": "20260711T120000000000Ztrace-deepagents-1.20260711T120001000000Zchild-llm-1",
+    "inputs": {
+      "messages": [
+        [
+          {
+            "role": "user",
+            "content": "This accumulated child history must be ignored."
+          }
+        ]
+      ]
+    },
+    "outputs": {
+      "generations": [
+        [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "This child output must be ignored."
+            }
+          }
+        ]
+      ]
+    },
+    "extra": {
+      "metadata": {
+        "ls_integration": "langchain_chat_model",
+        "ls_model_name": "claude-sonnet-4-6"
+      }
+    }
+  },
+  {
+    "id": "child-tool-1",
+    "trace_id": "trace-deepagents-1",
+    "parent_run_id": "trace-deepagents-1",
+    "name": "get_weather",
+    "run_type": "tool",
+    "start_time": "2026-07-11T12:00:02.000Z",
+    "end_time": "2026-07-11T12:00:03.000Z",
+    "dotted_order": "20260711T120000000000Ztrace-deepagents-1.20260711T120002000000Zchild-tool-1",
+    "inputs": {
+      "city": "Paris"
+    },
+    "outputs": {
+      "output": "This child tool output must be ignored."
+    },
+    "extra": {
+      "metadata": {
+        "ls_integration": "deepagents"
+      }
+    }
+  }
+]

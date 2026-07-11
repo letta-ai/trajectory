@@ -148,6 +148,13 @@ omits the ID. Runs carrying the `ls_message_view_exclude` metadata key are
 ignored, matching LangSmith's Messages-view behavior. Fetching or exporting
 runs from LangSmith remains the caller's responsibility.
 
+Traces whose root metadata sets `ls_integration` to `deepagents` or
+`deepagents-code` use the LangGraph aggregate stored in the root run's
+`outputs.messages`. Their redundant child LLM and tool spans are ignored, which
+prevents accumulated message history from appearing more than once. No other
+integration receives this aggregate-root special case; all other traces use the
+generic LangSmith run decoder described above.
+
 LangSmith's Anthropic wrapper aggregates stream events before storing outputs,
 but that reducer is not exported as a public SDK utility. When canonical Run
 data contains a raw Anthropic SSE string in `outputs.output`, the adapter

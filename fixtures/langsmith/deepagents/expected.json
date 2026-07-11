@@ -1,0 +1,49 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "langsmith",
+      "cwd": "/workspace/deepagents",
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "role": "user",
+      "content": "What is the weather in Paris?",
+      "timestamp": "2026-07-11T12:00:00.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I should check the weather tool.",
+      "timestamp": "2026-07-11T12:00:05.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I’ll check.",
+      "timestamp": "2026-07-11T12:00:05.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-weather-1",
+          "name": "get_weather",
+          "args": "{\"city\":\"Paris\"}"
+        }
+      ],
+      "timestamp": "2026-07-11T12:00:05.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-weather-1",
+      "content": "Sunny, 22 C",
+      "timestamp": "2026-07-11T12:00:05.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "It is sunny and 22 C in Paris.",
+      "timestamp": "2026-07-11T12:00:05.000Z"
+    }
+  ],
+  "diagnostics": []
+}

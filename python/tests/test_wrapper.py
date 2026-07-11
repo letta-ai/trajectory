@@ -29,6 +29,8 @@ FIXTURES = (
     ("langsmith", "langsmith/cleanup", "input.json"),
     ("langsmith", "langsmith/official-openai-responses", "input.json"),
     ("langsmith", "langsmith/official-anthropic", "input.json"),
+    ("langsmith", "langsmith/deepagents", "input.json"),
+    ("langsmith", "langsmith/deepagents-code", "input.json"),
     ("letta", "letta/tool-call", "input.json"),
     ("letta", "letta/cleanup", "input.json"),
     ("letta", "letta/local-v3", "input.jsonl"),

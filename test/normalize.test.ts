@@ -18,6 +18,8 @@ const fixtures = [
   { source: "langsmith", name: "langsmith/cleanup" },
   { source: "langsmith", name: "langsmith/official-openai-responses" },
   { source: "langsmith", name: "langsmith/official-anthropic" },
+  { source: "langsmith", name: "langsmith/deepagents" },
+  { source: "langsmith", name: "langsmith/deepagents-code" },
   { source: "letta", name: "letta/tool-call" },
   { source: "letta", name: "letta/cleanup" },
   { source: "letta", name: "letta/local-v3" },
@@ -134,6 +136,45 @@ describe("public API", () => {
       expect.objectContaining({ role: "assistant", content: "hi" }),
     );
   });
+
+  for (const integration of ["claude-code", "openai-codex"] as const) {
+    test(`keeps ${integration} LangSmith traces on the generic path`, () => {
+      const root = canonicalLangSmithRun({
+        id: "trace-test",
+        trace_id: "trace-test",
+        run_type: "chain",
+        inputs: { messages: [{ role: "user", content: "root input" }] },
+        outputs: {
+          messages: [
+            { role: "user", content: "root input" },
+            { role: "assistant", content: "root aggregate" },
+          ],
+        },
+        extra: { metadata: { ls_integration: integration } },
+      });
+      const child = canonicalLangSmithRun({
+        id: "child-llm",
+        trace_id: "trace-test",
+        parent_run_id: "trace-test",
+        inputs: { messages: [{ role: "user", content: "generic input" }] },
+        outputs: { message: { role: "assistant", content: "generic output" } },
+      });
+
+      const result = normalizeTranscript({
+        source: "langsmith",
+        transcript: JSON.stringify([root, child]),
+      });
+      const contents = result.records.flatMap((record) =>
+        "content" in record && typeof record.content === "string"
+          ? [record.content]
+          : [],
+      );
+
+      expect(contents).toContain("generic input");
+      expect(contents).toContain("generic output");
+      expect(contents).not.toContain("root aggregate");
+    });
+  }
 
   test("reconstructs Anthropic SSE stored as string output", () => {
     const output = [

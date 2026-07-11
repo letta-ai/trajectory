@@ -835,6 +835,8 @@ function mergeItems(state, items) {
     state.history.push(item.key);
     if (!item.event)
       continue;
+    if (isDuplicateAdjacentMessage(state.events.at(-1), item.event))
+      continue;
     state.events.push(item.event);
     if (item.event.type === "tool_call") {
       state.pendingCalls.push({
@@ -846,6 +848,9 @@ function mergeItems(state, items) {
       matchPendingCall(state.pendingCalls, item.event.callId, undefined);
     }
   }
+}
+function isDuplicateAdjacentMessage(previous, current) {
+  return previous?.type === "message" && current.type === "message" && previous.role === current.role && previous.content === current.content && previous.timestamp?.getTime() === current.timestamp?.getTime();
 }
 function canonicalRole(value, constructorClass) {
   if (constructorClass === "HumanMessage" || constructorClass === "ChatMessage") {

@@ -233,6 +233,59 @@ describe("public API", () => {
     ]);
   });
 
+  test("deduplicates identical adjacent LangSmith messages with different IDs", () => {
+    const transcript = JSON.stringify([
+      canonicalLangSmithRun({
+        id: "llm",
+        start_time: "2026-07-10T00:00:00Z",
+        inputs: {
+          messages: [
+            { id: "message-1", role: "user", content: "hello" },
+            { id: "message-2", role: "user", content: "hello" },
+          ],
+        },
+        outputs: { role: "assistant", content: "hi" },
+      }),
+    ]);
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+  });
+
+  test("preserves identical LangSmith messages from different turns", () => {
+    const transcript = JSON.stringify([
+      canonicalLangSmithRun({
+        id: "llm-1",
+        start_time: "2026-07-10T00:00:00Z",
+        inputs: {
+          messages: [{ id: "message-1", role: "user", content: "retry" }],
+        },
+        outputs: { role: "assistant", content: "first" },
+      }),
+      canonicalLangSmithRun({
+        id: "llm-2",
+        start_time: "2026-07-10T00:00:02Z",
+        inputs: {
+          messages: [{ id: "message-2", role: "user", content: "retry" }],
+        },
+        outputs: { role: "assistant", content: "second" },
+      }),
+    ]);
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(
+      result.records.filter(
+        (record) => record.role === "user" && record.content === "retry",
+      ),
+    ).toHaveLength(2);
+  });
+
   test("decodes Anthropic reasoning and tool blocks from LangSmith runs", () => {
     const firstAssistant = {
       id: "msg-1",

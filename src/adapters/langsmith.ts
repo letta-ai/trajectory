@@ -639,6 +639,7 @@ function mergeItems(state: DecodeState, items: ConversationItem[]): void {
     if (repeatedSnapshot && state.history.includes(item.key)) continue;
     state.history.push(item.key);
     if (!item.event) continue;
+    if (isDuplicateAdjacentMessage(state.events.at(-1), item.event)) continue;
     state.events.push(item.event);
     if (item.event.type === "tool_call") {
       state.pendingCalls.push({
@@ -650,6 +651,19 @@ function mergeItems(state: DecodeState, items: ConversationItem[]): void {
       matchPendingCall(state.pendingCalls, item.event.callId, undefined);
     }
   }
+}
+
+function isDuplicateAdjacentMessage(
+  previous: DecodedEvent | undefined,
+  current: DecodedEvent,
+): boolean {
+  return (
+    previous?.type === "message" &&
+    current.type === "message" &&
+    previous.role === current.role &&
+    previous.content === current.content &&
+    previous.timestamp?.getTime() === current.timestamp?.getTime()
+  );
 }
 
 function canonicalRole(value: string | undefined, constructorClass?: string): string {

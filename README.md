@@ -113,6 +113,7 @@ and is empty when the transcript required no recoverable cleanup.
 | --- | --- | --- |
 | `claude-code` | Native Claude Code JSONL | `claude-code` |
 | `codex` | Native Codex rollout JSONL | `codex` |
+| `langsmith` | Canonical LangSmith `Run` records as JSON array or `{ "runs": [...] }` | `langsmith` |
 | `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | `deepagents` | User-supplied Python LangGraph `SqliteSaver` database plus `threadId` | `deepagents` |
@@ -129,6 +130,40 @@ The separate `~/.letta/transcripts` tree contains reflection artifacts and is
 not a supported native input. OpenHands inputs are serialized exports; when a
 native store uses individual event files, assembling the event array remains
 the caller's responsibility.
+
+The LangSmith input is the canonical public `Run` span format returned by the
+SDK or `/runs/query`: a JSON array of runs, or the API's `{ "runs": [...] }`
+envelope, for one trace or chronological thread. Each run must include `id`,
+`trace_id`, `name`, `run_type`, and `inputs`. A trace is represented by a root
+run and child runs linked through `trace_id`, `parent_run_id`, and
+`dotted_order`; LangSmith does not define a separate flattened-conversation
+schema. Runs are ordered by `dotted_order` and `start_time`.
+
+Run `inputs` and `outputs` remain integration-specific. The adapter follows the
+LangSmith Messages-view formats for LangChain/LangGraph, OpenAI Chat
+Completions and Responses, Anthropic Messages, and the Vercel AI SDK. Repeated
+message-history snapshots are deduplicated, while tool runs are linked to the
+earlier model tool call by call ID and then by tool name when an integration
+omits the ID. Runs carrying the `ls_message_view_exclude` metadata key are
+ignored, matching LangSmith's Messages-view behavior. Fetching or exporting
+runs from LangSmith remains the caller's responsibility.
+
+Traces whose root metadata sets `ls_integration` to `deepagents` or
+`deepagents-code` use the LangGraph aggregate stored in the root run's
+`outputs.messages`. Their redundant child LLM and tool spans are ignored, which
+prevents accumulated message history from appearing more than once. No other
+integration receives this aggregate-root special case; all other traces use the
+generic LangSmith run decoder described above.
+
+LangSmith's Anthropic wrapper aggregates stream events before storing outputs,
+but that reducer is not exported as a public SDK utility. When canonical Run
+data contains a raw Anthropic SSE string in `outputs.output`, the adapter
+reconstructs its text, thinking, and tool-input deltas locally.
+
+For a multi-turn thread, combine the runs from each member trace into one input
+container before normalization. This preserves history and tool linkage that
+cross trace boundaries; normalizing each trace separately can correctly report
+an initial tool result as orphaned when its call occurred in the prior trace.
 
 ## Normalized records
 

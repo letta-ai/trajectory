@@ -1,0 +1,10 @@
+{
+  "records": [
+    { "role": "meta", "source": "langsmith", "model": "gpt-4o" },
+    { "role": "user", "content": "What is the weather?", "timestamp": "2026-07-10T12:00:00.000Z" },
+    { "role": "assistant", "content": null, "tool_calls": [{ "id": "call-weather", "name": "get_weather", "args": "{\"city\":\"Paris\"}" }], "timestamp": "2026-07-10T12:00:01.000Z" },
+    { "role": "tool", "tool_call_id": "call-weather", "content": "Sunny, 22C", "timestamp": "2026-07-10T12:00:03.000Z" },
+    { "role": "assistant", "content": "It is sunny and 22C in Paris.", "timestamp": "2026-07-10T12:00:05.000Z" }
+  ],
+  "diagnostics": []
+}

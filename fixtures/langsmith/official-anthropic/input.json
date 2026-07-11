@@ -1,0 +1,73 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "trace_id": "00000000-0000-4000-8000-000000000004",
+    "name": "Weather Agent",
+    "run_type": "chain",
+    "start_time": "2026-07-10T12:00:00Z",
+    "end_time": "2026-07-10T12:00:07Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000004",
+    "inputs": { "input": "what is the weather in paris?" },
+    "outputs": { "output": "It's sunny and 22°C in Paris." }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "trace_id": "00000000-0000-4000-8000-000000000004",
+    "parent_run_id": "00000000-0000-4000-8000-000000000004",
+    "name": "ChatAnthropic",
+    "run_type": "llm",
+    "start_time": "2026-07-10T12:00:01Z",
+    "end_time": "2026-07-10T12:00:02Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000004.20260710T120001000000Z00000000-0000-4000-8000-000000000001",
+    "extra": { "metadata": { "ls_provider": "anthropic", "ls_model_name": "claude-opus-4-7", "ls_message_format": "anthropic" } },
+    "inputs": {
+      "system": "You are a helpful assistant.",
+      "messages": [{ "role": "user", "content": "what is the weather in paris?" }]
+    },
+    "outputs": {
+      "message": {
+        "id": "msg_01",
+        "role": "assistant",
+        "type": "message",
+        "content": [
+          { "type": "text", "text": "Let me check." },
+          { "type": "tool_use", "id": "toolu_01", "name": "get_weather", "input": { "city": "Paris" } }
+        ]
+      }
+    }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "trace_id": "00000000-0000-4000-8000-000000000004",
+    "parent_run_id": "00000000-0000-4000-8000-000000000004",
+    "name": "get_weather",
+    "run_type": "tool",
+    "start_time": "2026-07-10T12:00:03Z",
+    "end_time": "2026-07-10T12:00:04Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000004.20260710T120003000000Z00000000-0000-4000-8000-000000000002",
+    "inputs": { "city": "Paris" },
+    "outputs": { "output": { "temperature": 22, "condition": "Sunny" } }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000003",
+    "trace_id": "00000000-0000-4000-8000-000000000004",
+    "parent_run_id": "00000000-0000-4000-8000-000000000004",
+    "name": "ChatAnthropic",
+    "run_type": "llm",
+    "start_time": "2026-07-10T12:00:05Z",
+    "end_time": "2026-07-10T12:00:06Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000004.20260710T120005000000Z00000000-0000-4000-8000-000000000003",
+    "extra": { "metadata": { "ls_provider": "anthropic", "ls_model_name": "claude-opus-4-7", "ls_message_format": "anthropic" } },
+    "inputs": {
+      "system": "You are a helpful assistant.",
+      "messages": [
+        { "role": "user", "content": "what is the weather in paris?" },
+        { "role": "assistant", "content": [{ "type": "text", "text": "Let me check." }, { "type": "tool_use", "id": "toolu_01", "name": "get_weather", "input": { "city": "Paris" } }] },
+        { "role": "user", "content": [{ "type": "tool_result", "tool_use_id": "toolu_01", "content": "Sunny, 22C" }] }
+      ]
+    },
+    "outputs": {
+      "message": { "id": "msg_02", "role": "assistant", "type": "message", "content": [{ "type": "text", "text": "It's sunny and 22°C in Paris." }] }
+    }
+  }
+]

@@ -1,6 +1,7 @@
 export type TrajectorySource =
   | "claude-code"
   | "codex"
+  | "langsmith"
   | "letta"
   | "openhands";
 

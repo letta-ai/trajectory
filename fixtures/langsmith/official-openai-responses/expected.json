@@ -1,0 +1,10 @@
+{
+  "records": [
+    { "role": "meta", "source": "langsmith", "model": "gpt-4.1" },
+    { "role": "user", "content": "what time is it in san francisco?", "timestamp": "2026-07-10T12:00:01.000Z" },
+    { "role": "assistant", "content": null, "tool_calls": [{ "id": "call_LVsl", "name": "get_time", "args": "{\"timezone\":\"America/Los_Angeles\"}" }], "timestamp": "2026-07-10T12:00:02.000Z" },
+    { "role": "tool", "tool_call_id": "call_LVsl", "content": "12:00 PM (America/Los_Angeles)", "timestamp": "2026-07-10T12:00:04.000Z" },
+    { "role": "assistant", "content": "It is currently 12:00 PM in San Francisco.", "timestamp": "2026-07-10T12:00:06.000Z" }
+  ],
+  "diagnostics": []
+}

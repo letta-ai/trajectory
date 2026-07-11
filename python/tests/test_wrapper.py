@@ -25,6 +25,12 @@ FIXTURES = (
     ("claude-code", "claude-code/cleanup", "input.jsonl"),
     ("codex", "codex/tool-calls", "input.jsonl"),
     ("codex", "codex/cleanup", "input.jsonl"),
+    ("langsmith", "langsmith/tool-call", "input.json"),
+    ("langsmith", "langsmith/cleanup", "input.json"),
+    ("langsmith", "langsmith/official-openai-responses", "input.json"),
+    ("langsmith", "langsmith/official-anthropic", "input.json"),
+    ("langsmith", "langsmith/deepagents", "input.json"),
+    ("langsmith", "langsmith/deepagents-code", "input.json"),
     ("letta", "letta/tool-call", "input.json"),
     ("letta", "letta/cleanup", "input.json"),
     ("letta", "letta/local-v3", "input.jsonl"),
@@ -68,7 +74,7 @@ class WrapperTests(unittest.TestCase):
             "source": "codex",
             "transcript": fixture_text("codex/cleanup", "input.jsonl"),
         }
-        invalid = {"source": "langsmith", "transcript": "{}"}
+        invalid = {"source": "not-a-source", "transcript": "{}"}
 
         with self.assertRaises(NormalizationError) as raised:
             normalize_many([valid, invalid])

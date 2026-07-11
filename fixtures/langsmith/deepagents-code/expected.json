@@ -1,0 +1,21 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "langsmith",
+      "cwd": "/workspace/deepagents-code",
+      "model": "gpt-5.5"
+    },
+    {
+      "role": "user",
+      "content": "Reply briefly.",
+      "timestamp": "2026-07-11T13:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Done.",
+      "timestamp": "2026-07-11T13:00:02.000Z"
+    }
+  ],
+  "diagnostics": []
+}

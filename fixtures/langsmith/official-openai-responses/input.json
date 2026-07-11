@@ -1,0 +1,65 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000010",
+    "trace_id": "00000000-0000-4000-8000-000000000010",
+    "name": "Helpful Assistant",
+    "run_type": "chain",
+    "start_time": "2026-07-10T12:00:00Z",
+    "end_time": "2026-07-10T12:00:07Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000010",
+    "inputs": { "input": "what time is it in san francisco?" },
+    "outputs": { "output": "It is currently 12:00 PM in San Francisco." }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000011",
+    "trace_id": "00000000-0000-4000-8000-000000000010",
+    "parent_run_id": "00000000-0000-4000-8000-000000000010",
+    "name": "Helpful Assistant Response",
+    "run_type": "llm",
+    "start_time": "2026-07-10T12:00:01Z",
+    "end_time": "2026-07-10T12:00:02Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000010.20260710T120001000000Z00000000-0000-4000-8000-000000000011",
+    "extra": { "metadata": { "ls_integration": "openai-agents-sdk", "ls_model_name": "gpt-4.1" } },
+    "inputs": {
+      "instructions": "You are a helpful assistant.",
+      "input": [{ "role": "user", "content": "what time is it in san francisco?" }]
+    },
+    "outputs": {
+      "output": [{ "type": "function_call", "call_id": "call_LVsl", "name": "get_time", "arguments": "{\"timezone\":\"America/Los_Angeles\"}", "id": "fc_0ed8" }]
+    }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000012",
+    "trace_id": "00000000-0000-4000-8000-000000000010",
+    "parent_run_id": "00000000-0000-4000-8000-000000000010",
+    "name": "get_time",
+    "run_type": "tool",
+    "start_time": "2026-07-10T12:00:03Z",
+    "end_time": "2026-07-10T12:00:04Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000010.20260710T120003000000Z00000000-0000-4000-8000-000000000012",
+    "inputs": { "timezone": "America/Los_Angeles" },
+    "outputs": { "output": "12:00 PM (America/Los_Angeles)", "call_id": "call_LVsl" }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000013",
+    "trace_id": "00000000-0000-4000-8000-000000000010",
+    "parent_run_id": "00000000-0000-4000-8000-000000000010",
+    "name": "Helpful Assistant Response",
+    "run_type": "llm",
+    "start_time": "2026-07-10T12:00:05Z",
+    "end_time": "2026-07-10T12:00:06Z",
+    "dotted_order": "20260710T120000000000Z00000000-0000-4000-8000-000000000010.20260710T120005000000Z00000000-0000-4000-8000-000000000013",
+    "extra": { "metadata": { "ls_integration": "openai-agents-sdk", "ls_model_name": "gpt-4.1" } },
+    "inputs": {
+      "instructions": "You are a helpful assistant.",
+      "input": [
+        { "role": "user", "content": "what time is it in san francisco?" },
+        { "type": "function_call", "call_id": "call_LVsl", "name": "get_time", "arguments": "{\"timezone\":\"America/Los_Angeles\"}", "id": "fc_0ed8" },
+        { "type": "function_call_output", "call_id": "call_LVsl", "output": "12:00 PM (America/Los_Angeles)" }
+      ]
+    },
+    "outputs": {
+      "output": [{ "type": "message", "role": "assistant", "status": "completed", "content": [{ "type": "output_text", "text": "It is currently 12:00 PM in San Francisco.", "annotations": [] }] }]
+    }
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "trace-deepagents-code-1",
+    "trace_id": "trace-deepagents-code-1",
+    "name": "LangGraph",
+    "run_type": "chain",
+    "start_time": "2026-07-11T13:00:00.000Z",
+    "end_time": "2026-07-11T13:00:02.000Z",
+    "dotted_order": "20260711T130000000000Ztrace-deepagents-code-1",
+    "inputs": {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Reply briefly."
+        }
+      ]
+    },
+    "outputs": {
+      "messages": [
+        {
+          "id": "human-code-1",
+          "type": "human",
+          "content": "Reply briefly."
+        },
+        {
+          "id": "ai-code-1",
+          "type": "ai",
+          "content": "Done.",
+          "response_metadata": {
+            "model_name": "gpt-5.5"
+          }
+        }
+      ]
+    },
+    "extra": {
+      "metadata": {
+        "ls_agent_kind": "coding_agent",
+        "ls_integration": "deepagents-code",
+        "ls_trace_schema_version": "coding-agent-v1",
+        "cwd": "/workspace/deepagents-code"
+      }
+    }
+  },
+  {
+    "id": "child-code-llm-1",
+    "trace_id": "trace-deepagents-code-1",
+    "parent_run_id": "trace-deepagents-code-1",
+    "name": "ChatOpenAI",
+    "run_type": "llm",
+    "start_time": "2026-07-11T13:00:00.500Z",
+    "end_time": "2026-07-11T13:00:01.500Z",
+    "dotted_order": "20260711T130000000000Ztrace-deepagents-code-1.20260711T130000500000Zchild-code-llm-1",
+    "inputs": {
+      "messages": [
+        [
+          {
+            "role": "user",
+            "content": "Duplicated child input"
+          }
+        ]
+      ]
+    },
+    "outputs": {
+      "generations": [
+        [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Duplicated child output"
+            }
+          }
+        ]
+      ]
+    },
+    "extra": {
+      "metadata": {
+        "ls_integration": "deepagents-code",
+        "ls_model_name": "gpt-5.5"
+      }
+    }
+  }
+]

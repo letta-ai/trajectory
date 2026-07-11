@@ -1,4 +1,9 @@
-export type TrajectorySource = "claude-code" | "codex" | "letta" | "openhands";
+export type TrajectorySource =
+  | "claude-code"
+  | "codex"
+  | "langsmith"
+  | "letta"
+  | "openhands";
 
 export interface ToolArgumentBounds {
   /** Maximum Unicode code points in the serialized arguments object. */

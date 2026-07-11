@@ -52,3 +52,12 @@ OpenHands message, action, observation, agent-error, and user-rejection event
 shapes were checked against the `dream-pipeline` OpenHands source. Both the
 array and `{items: [...]}` input forms produced exact production-equivalent
 records in the compatibility fixtures.
+
+## LangSmith adapter
+
+The LangSmith adapter is covered with synthetic runs matching the published
+LangSmith run and Messages-view formats. Fixtures exercise LangChain
+constructor messages, Vercel AI SDK content blocks, repeated history snapshots,
+tool-result matching by ID and tool name, run ordering, metadata, malformed
+JSONL cleanup, and missing-timestamp repair. No private LangSmith corpus or
+reference implementation was provided for differential testing.

@@ -1,0 +1,43 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "letta",
+      "model": "letta/auto"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the local entry point.",
+      "timestamp": "2026-07-02T10:00:01.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I should read the file.",
+      "timestamp": "2026-07-02T10:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-local-1",
+          "name": "read_file",
+          "args": "{\"path\":\"src/app.ts\"}"
+        }
+      ],
+      "timestamp": "2026-07-02T10:00:02.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-local-1",
+      "content": "export const value = 1;",
+      "timestamp": "2026-07-02T10:00:03.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The entry point exports value 1.",
+      "timestamp": "2026-07-02T10:00:04.000Z"
+    }
+  ],
+  "diagnostics": []
+}

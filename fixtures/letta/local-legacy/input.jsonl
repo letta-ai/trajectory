@@ -1,0 +1,2 @@
+{"id":"legacy-1","role":"user","content":[{"type":"text","text":"Check the legacy transcript."}],"timestamp":1782986501000,"metadata":{}}
+{"id":"legacy-2","role":"assistant","content":[{"type":"thinking","thinking":"I should inspect it."},{"type":"text","text":"The legacy transcript is valid."}],"timestamp":1782986502000,"metadata":{}}

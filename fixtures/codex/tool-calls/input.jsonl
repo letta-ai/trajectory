@@ -7,4 +7,6 @@
 {"timestamp":"2026-03-30T05:38:50.585Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_A","output":"Plan updated"}}
 {"timestamp":"2026-03-30T05:39:00.000Z","type":"response_item","payload":{"type":"custom_tool_call","name":"apply_patch","call_id":"call_B","input":"*** Begin Patch\n*** End Patch"}}
 {"timestamp":"2026-03-30T05:39:00.100Z","type":"response_item","payload":{"type":"custom_tool_call_output","call_id":"call_B","output":"Done"}}
+{"timestamp":"2026-03-30T05:39:30.000Z","type":"response_item","payload":{"type":"tool_search_call","call_id":"call_C","arguments":{"query":"filesystem tools"},"status":"completed"}}
+{"timestamp":"2026-03-30T05:39:30.100Z","type":"response_item","payload":{"type":"tool_search_output","call_id":"call_C","tools":[{"name":"read_file"}],"status":"completed"}}
 {"timestamp":"2026-03-30T05:40:43.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Created one focused commit."}]}}

@@ -1,4 +1,4 @@
-import type { Diagnostic, TrajectorySource } from "./types.js";
+import type { Diagnostic, TranscriptTrajectorySource } from "./types.js";
 
 interface DecodedEventBase {
   timestamp?: Date;
@@ -52,6 +52,6 @@ export interface DecodedSession {
 }
 
 export interface SourceAdapter {
-  source: TrajectorySource;
+  source: TranscriptTrajectorySource;
   decode(transcript: string): DecodedSession;
 }

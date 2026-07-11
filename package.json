@@ -23,18 +23,21 @@
   },
   "files": [
     "dist",
+    "helpers",
     "schema",
     "prompts",
     "README.md",
-    "PARITY.md"
+    "PARITY.md",
+    "SOURCE_VERSION_AUDIT.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "build:python-cli": "bun build ./src/python-cli.ts --target=node --format=esm --outfile=python/src/trajectory/_vendor/trajectory-cli.mjs",
+    "build:python-cli": "bun build ./src/python-cli.ts --target=node --format=esm --outfile=python/src/trajectory/_vendor/trajectory-cli.mjs && cp helpers/deepagents_checkpoint.py python/src/trajectory/_vendor/deepagents_checkpoint.py",
+    "audit:versions": "bun scripts/audit-source-versions.ts",
     "prepare": "npm run build",
     "typecheck": "tsc -p tsconfig.json",
     "test": "bun test",
-    "check": "bun run build:python-cli && git diff --exit-code -- python/src/trajectory/_vendor/trajectory-cli.mjs && bun run typecheck && bun test && bun run build"
+    "check": "bun run build:python-cli && git diff --exit-code -- python/src/trajectory/_vendor/trajectory-cli.mjs python/src/trajectory/_vendor/deepagents_checkpoint.py && bun run typecheck && bun test && bun run build"
   },
   "devDependencies": {
     "@types/bun": "^1.3.0",

@@ -148,13 +148,32 @@ export const codexAdapter: SourceAdapter = {
         continue;
       }
 
+      if (payloadType === "tool_search_call") {
+        events.push({
+          type: "tool_call",
+          name: "tool_search",
+          args:
+            typeof payload.arguments === "string" && payload.arguments
+              ? payload.arguments
+              : jsonString(payload.arguments),
+          inputLine: line,
+          ...(typeof payload.call_id === "string" ? { id: payload.call_id } : {}),
+          ...(timestamp ? { timestamp } : {}),
+        });
+        continue;
+      }
+
       if (
         payloadType === "function_call_output" ||
-        payloadType === "custom_tool_call_output"
+        payloadType === "custom_tool_call_output" ||
+        payloadType === "tool_search_output"
       ) {
         events.push({
           type: "tool_result",
-          content: outputText(payload.output),
+          content:
+            payloadType === "tool_search_output"
+              ? jsonString(payload.tools ?? [])
+              : outputText(payload.output),
           inputLine: line,
           ...(typeof payload.call_id === "string" ? { callId: payload.call_id } : {}),
           ...(timestamp ? { timestamp } : {}),

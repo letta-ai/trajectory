@@ -20,6 +20,8 @@ const fixtures = [
   { source: "langsmith", name: "langsmith/official-anthropic" },
   { source: "letta", name: "letta/tool-call" },
   { source: "letta", name: "letta/cleanup" },
+  { source: "letta", name: "letta/local-v3" },
+  { source: "letta", name: "letta/local-legacy" },
   { source: "openhands", name: "openhands/tool-calls" },
   { source: "openhands", name: "openhands/cleanup" },
 ] as const satisfies ReadonlyArray<{ source: TrajectorySource; name: string }>;
@@ -38,8 +40,8 @@ describe("golden fixtures", () => {
       const input = fixtureText(
         fixture.name,
         fixture.source === "openhands" ||
-          fixture.source === "letta" ||
-          fixture.source === "langsmith"
+          fixture.source === "langsmith" ||
+          (fixture.source === "letta" && !fixture.name.startsWith("letta/local-"))
           ? "input.json"
           : "input.jsonl",
       );
@@ -511,6 +513,15 @@ describe("public API", () => {
       normalizeTranscript({
         source: "letta",
         transcript: '[[{"message_type":"user_message"}]]',
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects an unsupported Letta local transcript version", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "letta",
+        transcript: '{"type":"session","version":4}',
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });

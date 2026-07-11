@@ -6,6 +6,7 @@ import json
 import re
 import shutil
 import subprocess
+import sys
 from collections.abc import Iterable, Mapping
 from functools import lru_cache
 from pathlib import Path
@@ -16,6 +17,7 @@ from ._types import (
     NormalizationBounds,
     NormalizationErrorCode,
     NormalizeInput,
+    NormalizeRequest,
     NormalizeResult,
     TrajectorySource,
 )
@@ -39,19 +41,56 @@ def normalize_transcript(
     return normalize_many([request])[0]
 
 
-def normalize_many(inputs: Iterable[NormalizeInput]) -> list[NormalizeResult]:
-    """Normalize multiple transcripts in one Node.js subprocess.
+def normalize_checkpoint(
+    *,
+    path: str | Path,
+    thread_id: str,
+    checkpoint_namespace: str = "",
+    checkpoint_id: str | None = None,
+    bounds: NormalizationBounds | None = None,
+    python_executable: str | None = None,
+) -> NormalizeResult:
+    """Normalize a Python Deep Agents SDK LangGraph SQLite checkpoint."""
+
+    checkpoint: dict[str, str] = {
+        "path": str(path),
+        "threadId": thread_id,
+        "checkpointNamespace": checkpoint_namespace,
+        "pythonExecutable": python_executable or sys.executable,
+    }
+    if checkpoint_id is not None:
+        checkpoint["checkpointId"] = checkpoint_id
+    request: NormalizeRequest = {
+        "source": "deepagents",
+        "checkpoint": checkpoint,
+    }
+    if bounds is not None:
+        request["bounds"] = bounds
+    return normalize_many([request])[0]
+
+
+def normalize_many(inputs: Iterable[NormalizeRequest]) -> list[NormalizeResult]:
+    """Normalize multiple transcript or checkpoint requests in one Node.js subprocess.
 
     Results preserve input order. If a transcript fails, ``NormalizationError``
     identifies its zero-based ``input_index``.
     """
 
-    requests = list(inputs)
-    if not requests:
+    raw_requests = list(inputs)
+    if not raw_requests:
         return []
-    for index, request in enumerate(requests):
+    requests: list[dict[str, object]] = []
+    for index, request in enumerate(raw_requests):
         if not isinstance(request, Mapping):
             raise TypeError(f"Input {index} must be a mapping.")
+        normalized_request = dict(request)
+        if normalized_request.get("source") == "deepagents":
+            checkpoint = normalized_request.get("checkpoint")
+            if isinstance(checkpoint, Mapping):
+                normalized_checkpoint = dict(checkpoint)
+                normalized_checkpoint.setdefault("pythonExecutable", sys.executable)
+                normalized_request["checkpoint"] = normalized_checkpoint
+        requests.append(normalized_request)
 
     payload = json.dumps(
         {"version": _PROTOCOL_VERSION, "requests": requests},

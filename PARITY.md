@@ -59,5 +59,18 @@ The LangSmith adapter is covered with synthetic runs matching the published
 LangSmith run and Messages-view formats. Fixtures exercise LangChain
 constructor messages, Vercel AI SDK content blocks, repeated history snapshots,
 tool-result matching by ID and tool name, run ordering, metadata, malformed
-JSONL cleanup, and missing-timestamp repair. No private LangSmith corpus or
-reference implementation was provided for differential testing.
+JSONL cleanup, and missing-timestamp repair.
+
+Read-only validation was also run against two user-provided LangSmith projects
+without retaining raw traces or normalized content in the repository. The
+sample comprised one two-trace thread with 17 total runs (13 chain, two LLM,
+and two tool runs) and one standalone LLM run. This surfaced and fixed two
+native variants not present in the synthetic fixtures: string-valued
+`outputs.output` completions and a tool call repeated in both content blocks
+and the message-level `tool_calls` field.
+
+After those repairs, the combined thread normalized to 16 records with native
+tool linkage preserved; its only diagnostic was the expected configured
+tool-result truncation. The standalone LLM run normalized to three records
+without diagnostics. No reference implementation was provided for differential
+testing.

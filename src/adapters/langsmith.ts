@@ -253,6 +253,9 @@ function outputMessages(value: unknown): unknown[] {
   if (Array.isArray(value.messages)) return value.messages;
   if (isObject(value.message)) return [value.message];
   if (Array.isArray(value.output)) return value.output;
+  if (typeof value.output === "string") {
+    return [{ role: "assistant", content: value.output }];
+  }
   if (isObject(value.output)) {
     if (Array.isArray(value.output.messages)) return value.output.messages;
     if (isObject(value.output.update) && Array.isArray(value.output.update.messages)) {
@@ -581,6 +584,7 @@ function mergeItems(state: DecodeState, items: ConversationItem[]): void {
   for (let index = overlap; index < items.length; index += 1) {
     const item = items[index];
     if (!item) continue;
+    if (item.stable === true && state.history.includes(item.key)) continue;
     if (repeatedSnapshot && state.history.includes(item.key)) continue;
     state.history.push(item.key);
     if (!item.event) continue;

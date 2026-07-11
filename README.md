@@ -117,7 +117,8 @@ ignores system and approval-control records. OpenHands inputs are serialized
 exports; when a native store uses individual event files, assembling the event
 array remains the caller's responsibility.
 
-LangSmith inputs contain the runs for one trace. The output of
+LangSmith inputs contain the runs for one trace or one chronological thread.
+The output of
 `langsmith trace export <directory> --project <project> --full` can be passed
 directly as one transcript per exported JSONL file. Runs are ordered by
 `dotted_order` and `start_time`; nested `child_runs` are flattened. The adapter
@@ -127,6 +128,11 @@ LangSmith. Repeated message-history snapshots from successive LLM runs are
 deduplicated, while tool runs are linked to the earlier model tool call by call
 ID and then by tool name when an integration omits the ID. Fetching or exporting
 runs from LangSmith remains the caller's responsibility.
+
+For a multi-turn thread, combine the runs from each member trace into one input
+container before normalization. This preserves history and tool linkage that
+cross trace boundaries; normalizing each trace separately can correctly report
+an initial tool result as orphaned when its call occurred in the prior trace.
 
 ## Normalized records
 

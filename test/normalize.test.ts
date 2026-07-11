@@ -133,6 +133,57 @@ describe("public API", () => {
     ]);
   });
 
+  test("accepts string output from a LangSmith LLM run", () => {
+    const transcript = JSON.stringify({
+      id: "run-1",
+      run_type: "llm",
+      inputs: { messages: [{ role: "user", content: "hello" }] },
+      outputs: { output: "hi" },
+    });
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(result.records).toContainEqual(
+      expect.objectContaining({ role: "assistant", content: "hi" }),
+    );
+  });
+
+  test("deduplicates a tool call repeated in native message fields", () => {
+    const call = {
+      id: "call-1",
+      name: "weather",
+      args: { city: "Paris" },
+    };
+    const transcript = JSON.stringify({
+      id: "run-1",
+      run_type: "llm",
+      inputs: { messages: [{ role: "user", content: "weather?" }] },
+      outputs: {
+        role: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            id: call.id,
+            name: call.name,
+            input: call.args,
+          },
+        ],
+        tool_calls: [call],
+      },
+    });
+
+    const result = normalizeTranscript({ source: "langsmith", transcript });
+
+    expect(
+      result.records.filter(
+        (record) => record.role === "assistant" && record.content === null,
+      ),
+    ).toHaveLength(1);
+    expect(result.diagnostics).not.toContainEqual(
+      expect.objectContaining({ code: "duplicate_tool_call_id" }),
+    );
+  });
+
   test("flattens nested LangSmith runs envelopes", () => {
     const transcript = JSON.stringify({
       runs: [

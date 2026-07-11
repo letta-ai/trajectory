@@ -287,6 +287,9 @@ function outputMessages(value: unknown): unknown[] {
 }
 
 function anthropicStreamMessages(output: string): unknown[] {
+  // LangSmith's wrapAnthropic performs equivalent aggregation before ingest,
+  // but its messageAggregator is private. This handles traces produced by
+  // custom HTTP instrumentation that stored the raw Anthropic SSE response.
   if (!output.includes("event:") || !output.includes("\ndata:")) return [];
   const blocks = new Map<number, AnthropicStreamBlock>();
 

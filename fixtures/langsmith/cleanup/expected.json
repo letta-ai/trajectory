@@ -8,7 +8,6 @@
     { "role": "assistant", "content": "It is sunny in Paris.", "timestamp": "2026-07-10T13:00:04.000Z" }
   ],
   "diagnostics": [
-    { "code": "invalid_json_line", "message": "Skipped invalid JSON on line 1.", "inputLine": 1 },
     { "code": "timestamps_interpolated", "message": "Interpolated timestamps for 1 normalized records.", "count": 1 }
   ]
 }

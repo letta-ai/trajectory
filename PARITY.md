@@ -56,10 +56,10 @@ records in the compatibility fixtures.
 ## LangSmith adapter
 
 The LangSmith adapter is covered with synthetic runs matching the published
-LangSmith run and Messages-view formats. Fixtures exercise LangChain
+LangSmith Run and Messages-view formats. Fixtures exercise LangChain
 constructor messages, Vercel AI SDK content blocks, repeated history snapshots,
-tool-result matching by ID and tool name, run ordering, metadata, malformed
-JSONL cleanup, and missing-timestamp repair.
+tool-result matching by ID and tool name, run ordering, metadata, and
+missing-timestamp repair.
 
 Read-only validation was also run against two user-provided LangSmith projects
 without retaining raw traces or normalized content in the repository. The

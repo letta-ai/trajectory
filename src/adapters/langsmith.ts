@@ -3,7 +3,6 @@ import type {
   DecodedSession,
   SourceAdapter,
 } from "../internal.js";
-import type { Diagnostic } from "../types.js";
 import { NormalizationError } from "../types.js";
 import {
   blocksText,
@@ -49,8 +48,7 @@ export const langSmithAdapter: SourceAdapter = {
   source: "langsmith",
 
   decode(transcript: string): DecodedSession {
-    const diagnostics: Diagnostic[] = [];
-    const runs = parseRuns(transcript, diagnostics).sort(compareRuns);
+    const runs = parseRuns(transcript).sort(compareRuns);
     const state: DecodeState = {
       events: [],
       history: [],
@@ -102,90 +100,45 @@ export const langSmithAdapter: SourceAdapter = {
         ...(model ? { model } : {}),
         ...(createdAt ? { createdAt } : {}),
       },
-      diagnostics,
+      diagnostics: [],
     };
   },
 };
 
-function parseRuns(
-  transcript: string,
-  diagnostics: Diagnostic[],
-): OrderedRun[] {
+function parseRuns(transcript: string): OrderedRun[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(transcript);
   } catch {
-    return parseRunJsonLines(transcript, diagnostics);
+    throw invalidTranscript();
   }
 
-  const roots = runContainer(parsed);
-  if (!roots) throw invalidTranscript();
-  const flattened: Record<string, unknown>[] = [];
-  for (const root of roots) flattenRun(root, flattened);
-  if (flattened.length === 0) throw invalidTranscript();
-  return flattened.map((run, index) => ({ run, index }));
+  const runs = Array.isArray(parsed)
+    ? parsed
+    : isObject(parsed) && Array.isArray(parsed.runs)
+      ? parsed.runs
+      : undefined;
+  if (!runs || runs.length === 0 || !runs.every(isCanonicalRun)) {
+    throw invalidTranscript();
+  }
+  return runs.map((run, index) => ({ run, index }));
 }
 
-function parseRunJsonLines(
-  transcript: string,
-  diagnostics: Diagnostic[],
-): OrderedRun[] {
-  const flattened: Record<string, unknown>[] = [];
-  for (const [index, raw] of transcript.split("\n").entries()) {
-    if (!raw.trim()) continue;
-    let value: unknown;
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      diagnostics.push({
-        code: "invalid_json_line",
-        message: `Skipped invalid JSON on line ${index + 1}.`,
-        inputLine: index + 1,
-      });
-      continue;
-    }
-    const roots = runContainer(value);
-    if (!roots) {
-      diagnostics.push({
-        code: "non_object_json_line",
-        message: `Skipped a non-run JSON value on line ${index + 1}.`,
-        inputLine: index + 1,
-      });
-      continue;
-    }
-    for (const root of roots) flattenRun(root, flattened);
-  }
-  if (flattened.length === 0) throw invalidTranscript();
-  return flattened.map((run, index) => ({ run, index }));
-}
-
-function runContainer(value: unknown): Record<string, unknown>[] | undefined {
-  if (Array.isArray(value)) {
-    return value.every(isObject) ? value : undefined;
-  }
-  if (!isObject(value)) return undefined;
-  if (Array.isArray(value.runs)) {
-    return value.runs.every(isObject) ? value.runs : undefined;
-  }
-  if (typeof value.run_type === "string") return [value];
-  return undefined;
-}
-
-function flattenRun(
-  run: Record<string, unknown>,
-  output: Record<string, unknown>[],
-): void {
-  output.push(run);
-  if (!Array.isArray(run.child_runs)) return;
-  for (const child of run.child_runs) {
-    if (isObject(child)) flattenRun(child, output);
-  }
+function isCanonicalRun(value: unknown): value is Record<string, unknown> {
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.trace_id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.run_type === "string" &&
+    isObject(value.inputs)
+  );
 }
 
 function invalidTranscript(): NormalizationError {
   return new NormalizationError(
     "invalid_input",
-    "LangSmith transcript must be a run object, a JSON run array, an object with a runs array, or JSONL containing runs.",
+    "LangSmith transcript must be a non-empty JSON array of canonical Run records or an object with a runs array.",
   );
 }
 
@@ -205,11 +158,8 @@ function compareRuns(left: OrderedRun, right: OrderedRun): number {
 }
 
 function runMetadata(run: Record<string, unknown>): Record<string, unknown> {
-  const topLevel = isObject(run.metadata) ? run.metadata : {};
-  const custom = isObject(run.custom_metadata) ? run.custom_metadata : {};
   const extra = isObject(run.extra) ? run.extra : {};
-  const nested = isObject(extra.metadata) ? extra.metadata : {};
-  return { ...topLevel, ...custom, ...nested };
+  return isObject(extra.metadata) ? extra.metadata : {};
 }
 
 function inputMessages(value: unknown): unknown[] {
@@ -625,7 +575,7 @@ function decodeToolRun(
   return {
     key: callId
       ? `tool-result:${callId}`
-      : `tool-run:${firstString(run.id, run.run_id) ?? "unknown"}`,
+      : `tool-run:${firstString(run.id) ?? "unknown"}`,
     stable: true,
     event: {
       type: "tool_result",

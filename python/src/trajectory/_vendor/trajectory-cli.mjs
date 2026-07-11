@@ -386,8 +386,7 @@ class NormalizationError extends Error {
 var langSmithAdapter = {
   source: "langsmith",
   decode(transcript) {
-    const diagnostics = [];
-    const runs = parseRuns(transcript, diagnostics).sort(compareRuns);
+    const runs = parseRuns(transcript).sort(compareRuns);
     const state = {
       events: [],
       history: [],
@@ -426,84 +425,28 @@ var langSmithAdapter = {
         ...model ? { model } : {},
         ...createdAt ? { createdAt } : {}
       },
-      diagnostics
+      diagnostics: []
     };
   }
 };
-function parseRuns(transcript, diagnostics) {
+function parseRuns(transcript) {
   let parsed;
   try {
     parsed = JSON.parse(transcript);
   } catch {
-    return parseRunJsonLines(transcript, diagnostics);
-  }
-  const roots = runContainer(parsed);
-  if (!roots)
     throw invalidTranscript();
-  const flattened = [];
-  for (const root of roots)
-    flattenRun(root, flattened);
-  if (flattened.length === 0)
+  }
+  const runs = Array.isArray(parsed) ? parsed : isObject(parsed) && Array.isArray(parsed.runs) ? parsed.runs : undefined;
+  if (!runs || runs.length === 0 || !runs.every(isCanonicalRun)) {
     throw invalidTranscript();
-  return flattened.map((run, index) => ({ run, index }));
+  }
+  return runs.map((run, index) => ({ run, index }));
 }
-function parseRunJsonLines(transcript, diagnostics) {
-  const flattened = [];
-  for (const [index, raw] of transcript.split(`
-`).entries()) {
-    if (!raw.trim())
-      continue;
-    let value;
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      diagnostics.push({
-        code: "invalid_json_line",
-        message: `Skipped invalid JSON on line ${index + 1}.`,
-        inputLine: index + 1
-      });
-      continue;
-    }
-    const roots = runContainer(value);
-    if (!roots) {
-      diagnostics.push({
-        code: "non_object_json_line",
-        message: `Skipped a non-run JSON value on line ${index + 1}.`,
-        inputLine: index + 1
-      });
-      continue;
-    }
-    for (const root of roots)
-      flattenRun(root, flattened);
-  }
-  if (flattened.length === 0)
-    throw invalidTranscript();
-  return flattened.map((run, index) => ({ run, index }));
-}
-function runContainer(value) {
-  if (Array.isArray(value)) {
-    return value.every(isObject) ? value : undefined;
-  }
-  if (!isObject(value))
-    return;
-  if (Array.isArray(value.runs)) {
-    return value.runs.every(isObject) ? value.runs : undefined;
-  }
-  if (typeof value.run_type === "string")
-    return [value];
-  return;
-}
-function flattenRun(run, output) {
-  output.push(run);
-  if (!Array.isArray(run.child_runs))
-    return;
-  for (const child of run.child_runs) {
-    if (isObject(child))
-      flattenRun(child, output);
-  }
+function isCanonicalRun(value) {
+  return isObject(value) && typeof value.id === "string" && typeof value.trace_id === "string" && typeof value.name === "string" && typeof value.run_type === "string" && isObject(value.inputs);
 }
 function invalidTranscript() {
-  return new NormalizationError("invalid_input", "LangSmith transcript must be a run object, a JSON run array, an object with a runs array, or JSONL containing runs.");
+  return new NormalizationError("invalid_input", "LangSmith transcript must be a non-empty JSON array of canonical Run records or an object with a runs array.");
 }
 function compareRuns(left, right) {
   const leftOrder = left.run.dotted_order;
@@ -521,11 +464,8 @@ function compareRuns(left, right) {
   return left.index - right.index;
 }
 function runMetadata(run) {
-  const topLevel = isObject(run.metadata) ? run.metadata : {};
-  const custom = isObject(run.custom_metadata) ? run.custom_metadata : {};
   const extra = isObject(run.extra) ? run.extra : {};
-  const nested = isObject(extra.metadata) ? extra.metadata : {};
-  return { ...topLevel, ...custom, ...nested };
+  return isObject(extra.metadata) ? extra.metadata : {};
 }
 function inputMessages(value) {
   if (!isObject(value))
@@ -840,7 +780,7 @@ function decodeToolRun(run, timestamp, pendingCalls) {
     content = `Error: ${content}`;
   }
   return {
-    key: callId ? `tool-result:${callId}` : `tool-run:${firstString(run.id, run.run_id) ?? "unknown"}`,
+    key: callId ? `tool-result:${callId}` : `tool-run:${firstString(run.id) ?? "unknown"}`,
     stable: true,
     event: {
       type: "tool_result",

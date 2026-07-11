@@ -117,18 +117,13 @@ ignores system and approval-control records. OpenHands inputs are serialized
 exports; when a native store uses individual event files, assembling the event
 array remains the caller's responsibility.
 
-The canonical LangSmith input is the public `Run` span format returned by the
+The LangSmith input is the canonical public `Run` span format returned by the
 SDK or `/runs/query`: a JSON array of runs, or the API's `{ "runs": [...] }`
-envelope, for one trace or chronological thread. A trace is represented by a
-root run and child runs linked through `trace_id`, `parent_run_id`, and
+envelope, for one trace or chronological thread. Each run must include `id`,
+`trace_id`, `name`, `run_type`, and `inputs`. A trace is represented by a root
+run and child runs linked through `trace_id`, `parent_run_id`, and
 `dotted_order`; LangSmith does not define a separate flattened-conversation
-schema. Runs are ordered by `dotted_order` and `start_time`, and SDK trees with
-nested `child_runs` are flattened.
-
-For compatibility, the adapter also accepts a single `Run`, the JSONL written
-by `langsmith trace export <directory> --project <project> --full`, and the
-CLI's `run_id` / `custom_metadata` field aliases. These are alternate
-serializations of Run data, not a trajectory-specific LangSmith format.
+schema. Runs are ordered by `dotted_order` and `start_time`.
 
 Run `inputs` and `outputs` remain integration-specific. The adapter follows the
 LangSmith Messages-view formats for LangChain/LangGraph, OpenAI Chat
@@ -139,10 +134,9 @@ omits the ID. Fetching or exporting runs from LangSmith remains the caller's
 responsibility.
 
 LangSmith's Anthropic wrapper aggregates stream events before storing outputs,
-but that reducer is not exported as a public SDK utility. As a compatibility
-fallback for traces recorded outside the wrapper, string-valued Anthropic SSE
-outputs are reconstructed locally from their text, thinking, and tool-input
-deltas.
+but that reducer is not exported as a public SDK utility. When canonical Run
+data contains a raw Anthropic SSE string in `outputs.output`, the adapter
+reconstructs its text, thinking, and tool-input deltas locally.
 
 For a multi-turn thread, combine the runs from each member trace into one input
 container before normalization. This preserves history and tool linkage that

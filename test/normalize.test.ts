@@ -35,7 +35,9 @@ describe("golden fixtures", () => {
     test(fixture.name, () => {
       const input = fixtureText(
         fixture.name,
-        fixture.source === "openhands" || fixture.source === "letta"
+        fixture.source === "openhands" ||
+          fixture.source === "letta" ||
+          fixture.source === "langsmith"
           ? "input.json"
           : "input.jsonl",
       );
@@ -112,34 +114,15 @@ describe("public API", () => {
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });
 
-  test("accepts a single LangSmith run object", () => {
-    const transcript = JSON.stringify({
-      id: "run-1",
-      run_type: "llm",
-      start_time: "2026-07-10T00:00:00Z",
-      end_time: "2026-07-10T00:00:01Z",
-      inputs: { messages: [{ role: "user", content: "hello" }] },
-      outputs: {
-        choices: [{ message: { role: "assistant", content: "hi" } }],
-      },
-    });
-
-    const result = normalizeTranscript({ source: "langsmith", transcript });
-
-    expect(result.records.map((record) => record.role)).toEqual([
-      "meta",
-      "user",
-      "assistant",
-    ]);
-  });
-
   test("accepts string output from a LangSmith LLM run", () => {
-    const transcript = JSON.stringify({
-      id: "run-1",
-      run_type: "llm",
-      inputs: { messages: [{ role: "user", content: "hello" }] },
-      outputs: { output: "hi" },
-    });
+    const transcript = JSON.stringify([
+      canonicalLangSmithRun({
+        id: "run-1",
+        run_type: "llm",
+        inputs: { messages: [{ role: "user", content: "hello" }] },
+        outputs: { output: "hi" },
+      }),
+    ]);
 
     const result = normalizeTranscript({ source: "langsmith", transcript });
 
@@ -172,12 +155,14 @@ describe("public API", () => {
       'data: {"type":"message_stop"}',
       "",
     ].join("\n");
-    const transcript = JSON.stringify({
-      id: "run-1",
-      run_type: "llm",
-      inputs: { messages: [{ role: "user", content: "hello" }] },
-      outputs: { output },
-    });
+    const transcript = JSON.stringify([
+      canonicalLangSmithRun({
+        id: "run-1",
+        run_type: "llm",
+        inputs: { messages: [{ role: "user", content: "hello" }] },
+        outputs: { output },
+      }),
+    ]);
 
     const result = normalizeTranscript({ source: "langsmith", transcript });
 
@@ -195,23 +180,25 @@ describe("public API", () => {
       name: "weather",
       args: { city: "Paris" },
     };
-    const transcript = JSON.stringify({
-      id: "run-1",
-      run_type: "llm",
-      inputs: { messages: [{ role: "user", content: "weather?" }] },
-      outputs: {
-        role: "assistant",
-        content: [
-          {
-            type: "tool_use",
-            id: call.id,
-            name: call.name,
-            input: call.args,
-          },
-        ],
-        tool_calls: [call],
-      },
-    });
+    const transcript = JSON.stringify([
+      canonicalLangSmithRun({
+        id: "run-1",
+        run_type: "llm",
+        inputs: { messages: [{ role: "user", content: "weather?" }] },
+        outputs: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: call.id,
+              name: call.name,
+              input: call.args,
+            },
+          ],
+          tool_calls: [call],
+        },
+      }),
+    ]);
 
     const result = normalizeTranscript({ source: "langsmith", transcript });
 
@@ -225,21 +212,15 @@ describe("public API", () => {
     );
   });
 
-  test("flattens nested LangSmith runs envelopes", () => {
+  test("accepts a canonical LangSmith runs envelope", () => {
     const transcript = JSON.stringify({
       runs: [
-        {
-          id: "root",
-          run_type: "chain",
-          child_runs: [
-            {
-              id: "llm",
-              run_type: "llm",
-              inputs: { messages: [{ role: "user", content: "hello" }] },
-              outputs: { role: "assistant", content: "hi" },
-            },
-          ],
-        },
+        canonicalLangSmithRun({
+          id: "llm",
+          run_type: "llm",
+          inputs: { messages: [{ role: "user", content: "hello" }] },
+          outputs: { role: "assistant", content: "hi" },
+        }),
       ],
     });
 
@@ -304,7 +285,7 @@ describe("public API", () => {
         },
         outputs: { message: { role: "assistant", content: "It is sunny." } },
       },
-    ]);
+    ].map(canonicalLangSmithRun));
 
     const result = normalizeTranscript({ source: "langsmith", transcript });
 
@@ -383,7 +364,7 @@ describe("public API", () => {
           ],
         },
       },
-    ]);
+    ].map(canonicalLangSmithRun));
 
     const result = normalizeTranscript({ source: "langsmith", transcript });
 
@@ -671,6 +652,20 @@ describe("validation", () => {
 function fixtureText(name: string, file: string): string {
   const url = new URL(`../fixtures/${name}/${file}`, import.meta.url);
   return readFileSync(fileURLToPath(url), "utf8");
+}
+
+function canonicalLangSmithRun(
+  run: Record<string, unknown>,
+): Record<string, unknown> {
+  const id = typeof run.id === "string" ? run.id : "run";
+  return {
+    id,
+    trace_id: "trace-test",
+    name: id,
+    run_type: "llm",
+    inputs: {},
+    ...run,
+  };
 }
 
 function codexMessages(user: string, assistant: string): string {

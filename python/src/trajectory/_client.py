@@ -14,6 +14,7 @@ from typing import cast
 
 from ._errors import NodeUnavailableError, NormalizationError, TrajectoryRuntimeError
 from ._types import (
+    LettaApiInput,
     NormalizationBounds,
     NormalizationErrorCode,
     NormalizeInput,
@@ -36,6 +37,30 @@ def normalize_transcript(
     """Normalize one native transcript."""
 
     request: NormalizeInput = {"source": source, "transcript": transcript}
+    if bounds is not None:
+        request["bounds"] = bounds
+    return normalize_many([request])[0]
+
+
+def normalize_letta_api(
+    *,
+    conversation_id: str | None = None,
+    agent_id: str | None = None,
+    api_key: str | None = None,
+    base_url: str | None = None,
+    bounds: NormalizationBounds | None = None,
+) -> NormalizeResult:
+    """Fetch and normalize a complete remote Letta message history."""
+
+    request: LettaApiInput = {"source": "letta-api"}
+    if conversation_id is not None:
+        request["conversationId"] = conversation_id
+    if agent_id is not None:
+        request["agentId"] = agent_id
+    if api_key is not None:
+        request["apiKey"] = api_key
+    if base_url is not None:
+        request["baseUrl"] = base_url
     if bounds is not None:
         request["bounds"] = bounds
     return normalize_many([request])[0]

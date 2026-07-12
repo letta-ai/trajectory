@@ -114,6 +114,7 @@ and is empty when the transcript required no recoverable cleanup.
 | `claude-code` | Native Claude Code JSONL | `claude-code` |
 | `codex` | Native Codex rollout JSONL | `codex` |
 | `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
+| `letta-api` | Remote Letta conversation or legacy agent message history | `letta` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | `deepagents` | User-supplied Python LangGraph `SqliteSaver` database plus `threadId` | `deepagents` |
 
@@ -126,7 +127,25 @@ local conversation files from `lc-local-backend/conversations/*/messages.jsonl`:
 legacy headerless message rows and version 3 session-entry JSONL. Compaction
 entries are excluded because they summarize existing conversation context.
 The separate `~/.letta/transcripts` tree contains reflection artifacts and is
-not a supported native input. OpenHands inputs are serialized exports; when a
+not a supported native input. To fetch the corresponding server-side history,
+use the asynchronous `letta-api` adapter with exactly one remote identifier:
+
+```ts
+import { normalizeLettaApi } from "@letta-ai/trajectory";
+
+const result = await normalizeLettaApi({
+  source: "letta-api",
+  conversationId: "conv-...",
+  // agentId: "agent-...", // legacy default-conversation endpoint
+  // apiKey: "...",       // defaults to LETTA_API_KEY
+  // baseUrl: "...",      // defaults to LETTA_BASE_URL, then api.letta.com
+});
+```
+
+The adapter follows cursor pagination and feeds the complete API message array
+through the same Letta decoder used for local transcripts, so both paths have
+identical normalization semantics and normalized `meta.source: "letta"`.
+OpenHands inputs are serialized exports; when a
 native store uses individual event files, assembling the event array remains
 the caller's responsibility.
 

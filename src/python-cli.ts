@@ -1,5 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { normalizeCheckpoint, normalizeTranscript } from "./index.js";
+import {
+  normalizeCheckpoint,
+  normalizeLettaApi,
+  normalizeTranscript,
+} from "./index.js";
 import type { NormalizeResult } from "./types.js";
 import { NormalizationError } from "./types.js";
 
@@ -25,17 +29,30 @@ async function main(): Promise<void> {
   const results: WireResult[] = [];
   for (const input of request.requests) {
     try {
-      const result =
+      let result: NormalizeResult;
+      if (
         input !== null &&
         typeof input === "object" &&
         "source" in input &&
         input.source === "deepagents"
-          ? await normalizeCheckpoint(
-              input as Parameters<typeof normalizeCheckpoint>[0],
-            )
-          : normalizeTranscript(
-              input as Parameters<typeof normalizeTranscript>[0],
-            );
+      ) {
+        result = await normalizeCheckpoint(
+          input as Parameters<typeof normalizeCheckpoint>[0],
+        );
+      } else if (
+        input !== null &&
+        typeof input === "object" &&
+        "source" in input &&
+        input.source === "letta-api"
+      ) {
+        result = await normalizeLettaApi(
+          input as Parameters<typeof normalizeLettaApi>[0],
+        );
+      } else {
+        result = normalizeTranscript(
+          input as Parameters<typeof normalizeTranscript>[0],
+        );
+      }
       results.push({
         ok: true,
         result,

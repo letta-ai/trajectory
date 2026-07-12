@@ -8,9 +8,12 @@ export type TranscriptTrajectorySource = TrajectorySource;
 
 export type CheckpointTrajectorySource = "deepagents";
 
+export type ApiTrajectorySource = "letta-api";
+
 export type AnyTrajectorySource =
   | TranscriptTrajectorySource
-  | CheckpointTrajectorySource;
+  | CheckpointTrajectorySource
+  | ApiTrajectorySource;
 
 export interface ToolArgumentBounds {
   /** Maximum Unicode code points in the serialized arguments object. */
@@ -52,6 +55,19 @@ export interface DeepAgentsCheckpointLocation {
 export interface DeepAgentsCheckpointInput {
   source: "deepagents";
   checkpoint: DeepAgentsCheckpointLocation;
+  bounds?: NormalizationBounds;
+}
+
+export interface LettaApiInput {
+  source: "letta-api";
+  /** Fetch this conversation's complete remote message history. */
+  conversationId?: string;
+  /** Fetch the default conversation history for this legacy agent. */
+  agentId?: string;
+  /** Defaults to LETTA_API_KEY. */
+  apiKey?: string;
+  /** Defaults to https://api.letta.com. */
+  baseUrl?: string;
   bounds?: NormalizationBounds;
 }
 
@@ -194,6 +210,9 @@ export type NormalizationErrorCode =
   | "checkpoint_not_found"
   | "checkpoint_messages_missing"
   | "invalid_checkpoint_state"
+  | "letta_api_auth_missing"
+  | "letta_api_request_failed"
+  | "letta_api_response_invalid"
   | "missing_user_records"
   | "missing_assistant_records"
   | "invalid_normalized_transcript";

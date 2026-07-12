@@ -4,8 +4,9 @@ from typing import Literal, TypedDict, Union
 
 TrajectorySource = Literal["claude-code", "codex", "letta", "openhands"]
 CheckpointTrajectorySource = Literal["deepagents"]
+ApiTrajectorySource = Literal["letta-api"]
 AnyTrajectorySource = Literal[
-    "claude-code", "codex", "letta", "openhands", "deepagents"
+    "claude-code", "codex", "letta", "openhands", "deepagents", "letta-api"
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 DiagnosticCode = Literal[
@@ -36,6 +37,9 @@ NormalizationErrorCode = Literal[
     "checkpoint_not_found",
     "checkpoint_messages_missing",
     "invalid_checkpoint_state",
+    "letta_api_auth_missing",
+    "letta_api_request_failed",
+    "letta_api_response_invalid",
     "missing_user_records",
     "missing_assistant_records",
     "invalid_normalized_transcript",
@@ -81,7 +85,19 @@ class DeepAgentsCheckpointInput(_NormalizeInputOptional):
     checkpoint: DeepAgentsCheckpointLocation
 
 
-NormalizeRequest = Union[NormalizeInput, DeepAgentsCheckpointInput]
+class _LettaApiInputOptional(TypedDict, total=False):
+    conversationId: str
+    agentId: str
+    apiKey: str
+    baseUrl: str
+    bounds: NormalizationBounds
+
+
+class LettaApiInput(_LettaApiInputOptional):
+    source: Literal["letta-api"]
+
+
+NormalizeRequest = Union[NormalizeInput, DeepAgentsCheckpointInput, LettaApiInput]
 
 
 class _DiagnosticOptional(TypedDict, total=False):

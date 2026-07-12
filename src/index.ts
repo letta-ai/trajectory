@@ -6,6 +6,7 @@ import { decodeDeepAgentsCheckpoint } from "./adapters/deepagents.js";
 import { resolveBounds } from "./bounds.js";
 import { normalizeDecodedSession } from "./core.js";
 import { loadDeepAgentsCheckpoint } from "./deepagents-checkpoint.js";
+import { normalizeLettaApi } from "./letta-api.js";
 import type { SourceAdapter } from "./internal.js";
 import type {
   DeepAgentsCheckpointInput,
@@ -66,6 +67,7 @@ export async function normalizeCheckpoint(
 }
 
 export { loadDeepAgentsCheckpoint } from "./deepagents-checkpoint.js";
+export { normalizeLettaApi };
 
 export { DEFAULT_NORMALIZATION_BOUNDS } from "./bounds.js";
 export { validateTranscript } from "./validate.js";
@@ -74,6 +76,7 @@ export {
   type AssistantMessageRecord,
   type AssistantToolCallRecord,
   type AnyTrajectorySource,
+  type ApiTrajectorySource,
   type CheckpointTrajectorySource,
   type Diagnostic,
   type DiagnosticCode,
@@ -85,6 +88,7 @@ export {
   type DeepAgentsMessageData,
   type DeepAgentsToolCall,
   type DeepAgentsToolMessageData,
+  type LettaApiInput,
   type MetaRecord,
   type NormalizationBounds,
   type NormalizationErrorCode,

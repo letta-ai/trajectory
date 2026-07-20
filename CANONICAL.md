@@ -73,11 +73,16 @@ confidently it can interpret conflicts:
   record.
 
 `record_id = sha256([source_group_id, stable_source_record_id, componentKey])`,
-where `componentKey` is a semantic key (`message`, `reasoning`,
-`tool-call:<id>`, `tool-result:<id>`, `meta`) plus the within-source-record
-`component_index`. One source record (one line/message) may expand into multiple
-canonical components; each occurrence of the same source record produces
-identical component keys, so exact duplicates collapse to the same `record_id`.
+where `componentKey` is a semantic key: `meta`, `message`, `reasoning`,
+`tool-call:<tool_call_id>`, or `tool-result:<tool_call_id>`. `message` and
+`reasoning` carry a type-local ordinal (`message:1`) only when the source record
+contains more than one component of that type. Keeping the key semantic (rather
+than a global component index) means a conflicting version that inserts an
+unrelated component does not shift the `record_id` of the surrounding records,
+so the worker can still recognize it as a conflicting version of the same
+logical record. Each occurrence of the same source record produces identical
+component keys, so exact duplicates collapse to the same `record_id`.
+`component_index` is retained only as worker sort input.
 
 ## Worker responsibilities (LET-9827 handoff)
 
@@ -108,8 +113,12 @@ identity; `location`/`content` require in-order, append-only assembly):
 
 `record_timestamp` and therefore `record_hash` can vary when timestamps are
 synthesized/interpolated from record position; they are descriptive, not
-identity. Tool call↔result linkage is resolved in source order, so the worker
-must assemble a source's records in logical order before normalizing.
+identity. Tool call↔result linkage is resolved independently of arrival order
+using explicit tool-call ids, so a tool result links to its call even when it
+appears earlier in the transcript (reversed chunks); the worker does not need to
+pre-sort records into source order before normalizing. When a source exposes no
+usable linkage, an orphan/duplicate diagnostic is emitted rather than relying on
+caller order.
 
 Per-adapter golden canonical outputs are pinned under
 [`fixtures/canonical/`](fixtures/canonical) and asserted in

@@ -89,9 +89,13 @@ jobs:
 
           node --input-type=module <<'NODE'
           import {
+            CANONICAL_SCHEMA_VERSION,
             DEFAULT_NORMALIZATION_BOUNDS,
+            NORMALIZER_VERSION,
+            normalizeToCanonical,
             normalizeTranscript,
           } from "@letta-ai/trajectory";
+          import { createRequire } from "node:module";
 
           const transcript = [
             JSON.stringify({
@@ -121,6 +125,35 @@ jobs:
           }
           if (DEFAULT_NORMALIZATION_BOUNDS.toolResults.strategy !== "head-tail") {
             throw new Error("Packaged defaults were not exported correctly.");
+          }
+
+          const require = createRequire(import.meta.url);
+          const version = require("@letta-ai/trajectory/package.json").version;
+          if (NORMALIZER_VERSION !== version) {
+            throw new Error("NORMALIZER_VERSION does not match the published version.");
+          }
+          if (!Number.isInteger(CANONICAL_SCHEMA_VERSION)) {
+            throw new Error("CANONICAL_SCHEMA_VERSION must be an integer.");
+          }
+
+          const canonical = normalizeToCanonical({ source: "codex", transcript });
+          if (canonical.records.length !== 3) {
+            throw new Error(`Expected 3 canonical records, got ${canonical.records.length}.`);
+          }
+          const meta = canonical.records[0];
+          if (meta?.record_type !== "meta" || meta.source_identity_kind !== "synthetic") {
+            throw new Error("Canonical meta record was not exported correctly.");
+          }
+          for (const record of canonical.records) {
+            if (!/^[0-9a-f]{64}$/.test(record.record_id)) {
+              throw new Error("Canonical record_id is not a 64-hex sha256.");
+            }
+          }
+          if (
+            canonical.normalizer_version !== NORMALIZER_VERSION ||
+            canonical.canonical_schema_version !== CANONICAL_SCHEMA_VERSION
+          ) {
+            throw new Error("Canonical result did not carry runtime versions.");
           }
           NODE
 

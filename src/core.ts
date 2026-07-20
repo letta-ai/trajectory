@@ -1,6 +1,8 @@
 import type {
+  CanonicalSourceBasis,
   DecodedEvent,
   DecodedSession,
+  InternalNormalization,
   SessionContext,
 } from "./internal.js";
 import type {
@@ -62,8 +64,22 @@ export function normalizeDecodedSession(
   records: NormalizedRecord[];
   diagnostics: Diagnostic[];
 } {
+  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+  return { records: internal.records, diagnostics: internal.diagnostics };
+}
+
+/**
+ * Full normalization producing the trajectory-v1 records plus the index-aligned
+ * source-identity bases and canonical record timestamps used by the canonical
+ * view. The public {@link normalizeDecodedSession} is a thin projection of this.
+ */
+export function normalizeDecodedSessionInternal(
+  decoded: DecodedSession,
+  bounds: ResolvedNormalizationBounds,
+): InternalNormalization {
   const diagnostics = [...decoded.diagnostics];
   const body: UnstampedBodyRecord[] = [];
+  const bodyBases: CanonicalSourceBasis[] = [];
   const anchors = new Map<number, Date>();
   const openCalls = new Map<string, OpenCall[]>();
   const usedIds = new Set<string>();
@@ -86,10 +102,27 @@ export function normalizeDecodedSession(
       bounds,
     );
     if (!record) continue;
-    if (event.timestamp && !Number.isNaN(event.timestamp.getTime())) {
+    const hasTimestamp =
+      event.timestamp !== undefined && !Number.isNaN(event.timestamp.getTime());
+    if (hasTimestamp && event.timestamp) {
       anchors.set(body.length, event.timestamp);
     }
     body.push(record);
+    bodyBases.push({
+      componentIndex: event.componentIndex ?? 0,
+      ...(event.sourceRecordId !== undefined
+        ? { sourceRecordId: event.sourceRecordId }
+        : {}),
+      ...(event.sourceSequence !== undefined
+        ? { sourceSequence: event.sourceSequence }
+        : {}),
+      ...(event.sourceOffset !== undefined
+        ? { sourceOffset: event.sourceOffset }
+        : {}),
+      ...(hasTimestamp && event.timestamp
+        ? { sourceTimestamp: event.timestamp.toISOString() }
+        : {}),
+    });
   }
 
   const roles = new Set(body.map((record) => record.role));
@@ -126,7 +159,20 @@ export function normalizeDecodedSession(
   const meta = buildMeta(decoded.context, modelCounts);
   const records: NormalizedRecord[] = [meta, ...stampedBody];
   validateTranscript(records);
-  return { records, diagnostics };
+
+  const recordTimestamps: (string | null)[] = [
+    null,
+    ...stampedBody.map((record) => record.timestamp),
+  ];
+  const bases: (CanonicalSourceBasis | null)[] = [null, ...bodyBases];
+  return {
+    records,
+    bases,
+    recordTimestamps,
+    context: decoded.context,
+    diagnostics,
+    bounds,
+  };
 }
 
 function normalizeEvent(

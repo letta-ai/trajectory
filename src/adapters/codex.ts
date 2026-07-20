@@ -29,18 +29,27 @@ export const codexAdapter: SourceAdapter = {
     let gitBranch: string | undefined;
     let model: string | undefined;
     let createdAt: Date | undefined;
+    let sessionId: string | undefined;
 
     for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       const payload = isObject(record.payload) ? record.payload : {};
       const timestamp = parseTimestamp(record.timestamp);
       const payloadType = payload.type;
+      // Codex rollout lines carry no per-record id, so the append-only line
+      // offset is the stable location anchor for identity (kind `location`).
+      const emit = (event: DecodedEvent): void => {
+        events.push({ ...event, sourceOffset: line, componentIndex: 0 });
+      };
 
       if (recordType === "session_meta") {
         if (!cwd && typeof payload.cwd === "string" && payload.cwd) cwd = payload.cwd;
         createdAt ??= parseTimestamp(payload.timestamp) ?? timestamp;
         if (!gitBranch && isObject(payload.git) && typeof payload.git.branch === "string") {
           gitBranch = payload.git.branch;
+        }
+        if (!sessionId && typeof payload.id === "string" && payload.id) {
+          sessionId = payload.id;
         }
         continue;
       }
@@ -59,7 +68,7 @@ export const codexAdapter: SourceAdapter = {
           typeof payload.text === "string" &&
           payload.text.trim()
         ) {
-          events.push({
+          emit({
             type: "reasoning",
             content: payload.text,
             inputLine: line,
@@ -83,7 +92,7 @@ export const codexAdapter: SourceAdapter = {
               inputLine: line,
             });
           } else {
-            events.push({
+            emit({
               type: "message",
               role: "user",
               content,
@@ -92,7 +101,7 @@ export const codexAdapter: SourceAdapter = {
             });
           }
         } else if (role === "assistant") {
-          events.push({
+          emit({
             type: "message",
             role: "assistant",
             content,
@@ -104,7 +113,7 @@ export const codexAdapter: SourceAdapter = {
       }
 
       if (payloadType === "function_call") {
-        events.push({
+        emit({
           type: "tool_call",
           args:
             typeof payload.arguments === "string" && payload.arguments
@@ -119,7 +128,7 @@ export const codexAdapter: SourceAdapter = {
       }
 
       if (payloadType === "custom_tool_call") {
-        events.push({
+        emit({
           type: "tool_call",
           args: jsonString({ input: payload.input ?? "" }),
           inputLine: line,
@@ -137,7 +146,7 @@ export const codexAdapter: SourceAdapter = {
             args[key] = value;
           }
         }
-        events.push({
+        emit({
           type: "tool_call",
           name: "web_search",
           args: jsonString(args),
@@ -149,7 +158,7 @@ export const codexAdapter: SourceAdapter = {
       }
 
       if (payloadType === "tool_search_call") {
-        events.push({
+        emit({
           type: "tool_call",
           name: "tool_search",
           args:
@@ -168,7 +177,7 @@ export const codexAdapter: SourceAdapter = {
         payloadType === "custom_tool_call_output" ||
         payloadType === "tool_search_output"
       ) {
-        events.push({
+        emit({
           type: "tool_result",
           content:
             payloadType === "tool_search_output"
@@ -189,6 +198,7 @@ export const codexAdapter: SourceAdapter = {
         ...(gitBranch ? { gitBranch } : {}),
         ...(model ? { model } : {}),
         ...(createdAt ? { createdAt } : {}),
+        ...(sessionId ? { sourceGroupId: sessionId } : {}),
       },
       diagnostics,
     };

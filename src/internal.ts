@@ -1,9 +1,39 @@
-import type { Diagnostic, TranscriptTrajectorySource } from "./types.js";
+import type { ResolvedNormalizationBounds } from "./bounds.js";
+import type {
+  Diagnostic,
+  NormalizedRecord,
+  TranscriptTrajectorySource,
+} from "./types.js";
 
 interface DecodedEventBase {
   timestamp?: Date;
   inputLine?: number;
   model?: string;
+  /**
+   * Source-native, arrival-order-independent identity of the source record
+   * this event was decoded from (for example a Claude Code line `uuid`, a Letta
+   * message `id`, or an OpenHands event `id`). Adapters set this only when the
+   * source exposes a stable per-record identifier.
+   */
+  sourceRecordId?: string;
+  /**
+   * Source-native monotonic ordering key within the group when the source
+   * exposes one (for example a Letta `seq_id`). Used only as an order tie-break.
+   */
+  sourceSequence?: number;
+  /**
+   * Stable source-native location used as a fallback identity anchor when no
+   * native record id exists but a durable offset does (for example a 1-based
+   * line offset in an append-only transcript).
+   */
+  sourceOffset?: number;
+  /**
+   * Index of this component within its own source record, starting at 0. A
+   * single source record (one line/message) may expand into multiple canonical
+   * components (assistant text plus several tool calls); this disambiguates them
+   * deterministically and identically across duplicate occurrences.
+   */
+  componentIndex?: number;
 }
 
 export interface DecodedMessageEvent extends DecodedEventBase {
@@ -43,6 +73,12 @@ export interface SessionContext {
   model?: string;
   createdAt?: Date;
   durationSeconds?: number;
+  /**
+   * Source-native session/conversation identity shared by every record in this
+   * decode (for example a Claude Code `sessionId`). Falls back to a stable
+   * source-local sentinel downstream when a source has one implicit group.
+   */
+  sourceGroupId?: string;
 }
 
 export interface DecodedSession {
@@ -54,4 +90,32 @@ export interface DecodedSession {
 export interface SourceAdapter {
   source: TranscriptTrajectorySource;
   decode(transcript: string): DecodedSession;
+}
+
+/**
+ * Source-native identity basis captured for a single emitted body record, used
+ * to derive canonical identity fields deterministically. `null` entries (the
+ * leading meta record) receive a synthetic identity.
+ */
+export interface CanonicalSourceBasis {
+  sourceRecordId?: string;
+  sourceSequence?: number;
+  sourceOffset?: number;
+  componentIndex: number;
+  /** ISO-8601 source event time, when the source supplied one. */
+  sourceTimestamp?: string;
+}
+
+/**
+ * Rich normalization output shared by the trajectory-v1 and canonical views.
+ * `bases` and `recordTimestamps` are index-aligned to `records`, whose first
+ * entry is always the meta record.
+ */
+export interface InternalNormalization {
+  records: NormalizedRecord[];
+  bases: (CanonicalSourceBasis | null)[];
+  recordTimestamps: (string | null)[];
+  context: SessionContext;
+  diagnostics: Diagnostic[];
+  bounds: ResolvedNormalizationBounds;
 }

@@ -36,6 +36,7 @@ export const claudeCodeAdapter: SourceAdapter = {
     const events: DecodedEvent[] = [];
     let cwd: string | undefined;
     let gitBranch: string | undefined;
+    let sessionId: string | undefined;
 
     for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
@@ -54,6 +55,9 @@ export const claudeCodeAdapter: SourceAdapter = {
       if (!gitBranch && typeof record.gitBranch === "string" && record.gitBranch) {
         gitBranch = record.gitBranch;
       }
+      if (!sessionId && typeof record.sessionId === "string" && record.sessionId) {
+        sessionId = record.sessionId;
+      }
 
       if (recordType !== "user" && recordType !== "assistant") continue;
       if (!isObject(record.message)) continue;
@@ -62,10 +66,23 @@ export const claudeCodeAdapter: SourceAdapter = {
       const timestamp = parseTimestamp(record.timestamp);
       const model = typeof message.model === "string" ? message.model : undefined;
       const content = message.content;
+      // Native per-record identity: the line `uuid` (falling back to the line
+      // offset). `componentIndex` disambiguates multiple components decoded from
+      // the same line, identically across duplicate occurrences.
+      const uuid = typeof record.uuid === "string" && record.uuid ? record.uuid : undefined;
+      let componentIndex = 0;
+      const emit = (event: DecodedEvent): void => {
+        events.push({
+          ...event,
+          ...(uuid !== undefined ? { sourceRecordId: uuid } : {}),
+          sourceOffset: line,
+          componentIndex: componentIndex++,
+        });
+      };
 
       if (recordType === "user") {
         if (typeof content === "string") {
-          events.push(messageEvent("user", content, line, timestamp));
+          emit(messageEvent("user", content, line, timestamp));
           continue;
         }
 
@@ -73,7 +90,7 @@ export const claudeCodeAdapter: SourceAdapter = {
         for (const block of Array.isArray(content) ? content : []) {
           if (!isObject(block)) continue;
           if (block.type === "tool_result") {
-            events.push(
+            emit(
               toolResultEvent(
                 blocksText(block.content),
                 typeof block.tool_use_id === "string" ? block.tool_use_id : undefined,
@@ -88,14 +105,14 @@ export const claudeCodeAdapter: SourceAdapter = {
           }
         }
         if (textParts.length > 0) {
-          events.push(messageEvent("user", textParts.join("\n"), line, timestamp));
+          emit(messageEvent("user", textParts.join("\n"), line, timestamp));
         }
         continue;
       }
 
       if (typeof content === "string") {
         if (content.trim()) {
-          events.push(messageEvent("assistant", content, line, timestamp, model));
+          emit(messageEvent("assistant", content, line, timestamp, model));
         }
         continue;
       }
@@ -103,7 +120,7 @@ export const claudeCodeAdapter: SourceAdapter = {
       for (const block of Array.isArray(content) ? content : []) {
         if (!isObject(block)) continue;
         if (block.type === "thinking") {
-          events.push(
+          emit(
             reasoningEvent(
               typeof block.thinking === "string" ? block.thinking : "",
               line,
@@ -112,7 +129,7 @@ export const claudeCodeAdapter: SourceAdapter = {
             ),
           );
         } else if (block.type === "text") {
-          events.push(
+          emit(
             messageEvent(
               "assistant",
               typeof block.text === "string" ? block.text : "",
@@ -122,7 +139,7 @@ export const claudeCodeAdapter: SourceAdapter = {
             ),
           );
         } else if (block.type === "tool_use") {
-          events.push(
+          emit(
             toolCallEvent(
               typeof block.id === "string" ? block.id : undefined,
               typeof block.name === "string" ? block.name : undefined,
@@ -142,6 +159,7 @@ export const claudeCodeAdapter: SourceAdapter = {
         source: "claude-code",
         ...(cwd ? { cwd } : {}),
         ...(gitBranch ? { gitBranch } : {}),
+        ...(sessionId ? { sourceGroupId: sessionId } : {}),
       },
       diagnostics,
     };

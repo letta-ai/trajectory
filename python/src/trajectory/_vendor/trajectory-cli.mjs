@@ -99,6 +99,7 @@ var claudeCodeAdapter = {
     const events = [];
     let cwd;
     let gitBranch;
+    let sessionId;
     for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       if (record.isSidechain === true) {
@@ -117,6 +118,9 @@ var claudeCodeAdapter = {
       if (!gitBranch && typeof record.gitBranch === "string" && record.gitBranch) {
         gitBranch = record.gitBranch;
       }
+      if (!sessionId && typeof record.sessionId === "string" && record.sessionId) {
+        sessionId = record.sessionId;
+      }
       if (recordType !== "user" && recordType !== "assistant")
         continue;
       if (!isObject(record.message))
@@ -125,9 +129,19 @@ var claudeCodeAdapter = {
       const timestamp = parseTimestamp(record.timestamp);
       const model = typeof message.model === "string" ? message.model : undefined;
       const content = message.content;
+      const uuid = typeof record.uuid === "string" && record.uuid ? record.uuid : undefined;
+      let componentIndex = 0;
+      const emit = (event) => {
+        events.push({
+          ...event,
+          ...uuid !== undefined ? { sourceRecordId: uuid } : {},
+          sourceOffset: line,
+          componentIndex: componentIndex++
+        });
+      };
       if (recordType === "user") {
         if (typeof content === "string") {
-          events.push(messageEvent("user", content, line, timestamp));
+          emit(messageEvent("user", content, line, timestamp));
           continue;
         }
         const textParts = [];
@@ -135,7 +149,7 @@ var claudeCodeAdapter = {
           if (!isObject(block))
             continue;
           if (block.type === "tool_result") {
-            events.push(toolResultEvent(blocksText(block.content), typeof block.tool_use_id === "string" ? block.tool_use_id : undefined, line, timestamp));
+            emit(toolResultEvent(blocksText(block.content), typeof block.tool_use_id === "string" ? block.tool_use_id : undefined, line, timestamp));
           } else if (block.type === "text" && typeof block.text === "string") {
             textParts.push(block.text);
           } else if (block.type === "image") {
@@ -143,14 +157,14 @@ var claudeCodeAdapter = {
           }
         }
         if (textParts.length > 0) {
-          events.push(messageEvent("user", textParts.join(`
+          emit(messageEvent("user", textParts.join(`
 `), line, timestamp));
         }
         continue;
       }
       if (typeof content === "string") {
         if (content.trim()) {
-          events.push(messageEvent("assistant", content, line, timestamp, model));
+          emit(messageEvent("assistant", content, line, timestamp, model));
         }
         continue;
       }
@@ -158,11 +172,11 @@ var claudeCodeAdapter = {
         if (!isObject(block))
           continue;
         if (block.type === "thinking") {
-          events.push(reasoningEvent(typeof block.thinking === "string" ? block.thinking : "", line, timestamp, model));
+          emit(reasoningEvent(typeof block.thinking === "string" ? block.thinking : "", line, timestamp, model));
         } else if (block.type === "text") {
-          events.push(messageEvent("assistant", typeof block.text === "string" ? block.text : "", line, timestamp, model));
+          emit(messageEvent("assistant", typeof block.text === "string" ? block.text : "", line, timestamp, model));
         } else if (block.type === "tool_use") {
-          events.push(toolCallEvent(typeof block.id === "string" ? block.id : undefined, typeof block.name === "string" ? block.name : undefined, jsonString(block.input), line, timestamp, model));
+          emit(toolCallEvent(typeof block.id === "string" ? block.id : undefined, typeof block.name === "string" ? block.name : undefined, jsonString(block.input), line, timestamp, model));
         }
       }
     }
@@ -171,7 +185,8 @@ var claudeCodeAdapter = {
       context: {
         source: "claude-code",
         ...cwd ? { cwd } : {},
-        ...gitBranch ? { gitBranch } : {}
+        ...gitBranch ? { gitBranch } : {},
+        ...sessionId ? { sourceGroupId: sessionId } : {}
       },
       diagnostics
     };
@@ -233,17 +248,24 @@ var codexAdapter = {
     let gitBranch;
     let model;
     let createdAt;
+    let sessionId;
     for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       const payload = isObject(record.payload) ? record.payload : {};
       const timestamp = parseTimestamp(record.timestamp);
       const payloadType = payload.type;
+      const emit = (event) => {
+        events.push({ ...event, sourceOffset: line, componentIndex: 0 });
+      };
       if (recordType === "session_meta") {
         if (!cwd && typeof payload.cwd === "string" && payload.cwd)
           cwd = payload.cwd;
         createdAt ??= parseTimestamp(payload.timestamp) ?? timestamp;
         if (!gitBranch && isObject(payload.git) && typeof payload.git.branch === "string") {
           gitBranch = payload.git.branch;
+        }
+        if (!sessionId && typeof payload.id === "string" && payload.id) {
+          sessionId = payload.id;
         }
         continue;
       }
@@ -257,7 +279,7 @@ var codexAdapter = {
       }
       if (recordType === "event_msg") {
         if (payloadType === "agent_reasoning" && typeof payload.text === "string" && payload.text.trim()) {
-          events.push({
+          emit({
             type: "reasoning",
             content: payload.text,
             inputLine: line,
@@ -280,7 +302,7 @@ var codexAdapter = {
               inputLine: line
             });
           } else {
-            events.push({
+            emit({
               type: "message",
               role: "user",
               content,
@@ -289,7 +311,7 @@ var codexAdapter = {
             });
           }
         } else if (role === "assistant") {
-          events.push({
+          emit({
             type: "message",
             role: "assistant",
             content,
@@ -300,7 +322,7 @@ var codexAdapter = {
         continue;
       }
       if (payloadType === "function_call") {
-        events.push({
+        emit({
           type: "tool_call",
           args: typeof payload.arguments === "string" && payload.arguments ? payload.arguments : "{}",
           inputLine: line,
@@ -311,7 +333,7 @@ var codexAdapter = {
         continue;
       }
       if (payloadType === "custom_tool_call") {
-        events.push({
+        emit({
           type: "tool_call",
           args: jsonString({ input: payload.input ?? "" }),
           inputLine: line,
@@ -328,7 +350,7 @@ var codexAdapter = {
             args[key] = value;
           }
         }
-        events.push({
+        emit({
           type: "tool_call",
           name: "web_search",
           args: jsonString(args),
@@ -339,7 +361,7 @@ var codexAdapter = {
         continue;
       }
       if (payloadType === "tool_search_call") {
-        events.push({
+        emit({
           type: "tool_call",
           name: "tool_search",
           args: typeof payload.arguments === "string" && payload.arguments ? payload.arguments : jsonString(payload.arguments),
@@ -350,7 +372,7 @@ var codexAdapter = {
         continue;
       }
       if (payloadType === "function_call_output" || payloadType === "custom_tool_call_output" || payloadType === "tool_search_output") {
-        events.push({
+        emit({
           type: "tool_result",
           content: payloadType === "tool_search_output" ? jsonString(payload.tools ?? []) : outputText(payload.output),
           inputLine: line,
@@ -366,7 +388,8 @@ var codexAdapter = {
         ...cwd ? { cwd } : {},
         ...gitBranch ? { gitBranch } : {},
         ...model ? { model } : {},
-        ...createdAt ? { createdAt } : {}
+        ...createdAt ? { createdAt } : {},
+        ...sessionId ? { sourceGroupId: sessionId } : {}
       },
       diagnostics
     };
@@ -400,9 +423,9 @@ var lettaAdapter = {
     const events = [];
     const parsed = parseTranscript(transcript);
     if (parsed.format === "local") {
-      for (const entry of parsed.messages) {
-        decodeLocalMessage(entry.message, entry.timestamp, events);
-      }
+      parsed.messages.forEach((entry, index) => {
+        decodeLocalMessage(entry.message, entry.timestamp, index, events);
+      });
       return {
         events,
         context: {
@@ -414,10 +437,21 @@ var lettaAdapter = {
     }
     for (const message of parsed.messages) {
       const timestamp = parseTimestamp(message.date);
+      const id = typeof message.id === "string" && message.id ? message.id : undefined;
+      const seq = typeof message.seq_id === "number" ? message.seq_id : undefined;
+      let componentIndex = 0;
+      const emit = (event) => {
+        events.push({
+          ...event,
+          ...id !== undefined ? { sourceRecordId: id } : {},
+          ...seq !== undefined ? { sourceSequence: seq } : {},
+          componentIndex: componentIndex++
+        });
+      };
       if (message.message_type === "user_message" || message.message_type === "assistant_message") {
         const content = blocksText(message.content);
         if (content) {
-          events.push({
+          emit({
             type: "message",
             role: message.message_type === "user_message" ? "user" : "assistant",
             content,
@@ -428,7 +462,7 @@ var lettaAdapter = {
       }
       if (message.message_type === "reasoning_message") {
         if (typeof message.reasoning === "string" && message.reasoning) {
-          events.push({
+          emit({
             type: "reasoning",
             content: message.reasoning,
             ...timestamp ? { timestamp } : {}
@@ -438,7 +472,7 @@ var lettaAdapter = {
       }
       if (message.message_type === "tool_call_message" || message.message_type === "approval_request_message") {
         for (const call of messageToolCalls(message)) {
-          events.push({
+          emit({
             type: "tool_call",
             args: toolArguments(call.arguments),
             ...typeof call.tool_call_id === "string" && call.tool_call_id ? { id: call.tool_call_id } : {},
@@ -454,7 +488,7 @@ var lettaAdapter = {
           if ((result.is_err === true || typeof result.status === "string" && result.status !== "success") && !/^error/i.test(content)) {
             content = `Error: ${content}`;
           }
-          events.push({
+          emit({
             type: "tool_result",
             content,
             ...typeof result.tool_call_id === "string" && result.tool_call_id ? { callId: result.tool_call_id } : {},
@@ -559,13 +593,22 @@ function parseLocalJsonLines(transcript) {
     })
   };
 }
-function decodeLocalMessage(message, entryTimestamp, events) {
+function decodeLocalMessage(message, entryTimestamp, offset, events) {
   const timestamp = entryTimestamp ?? messageTimestamp(message);
   const model = typeof message.model === "string" ? message.model : undefined;
+  const id = typeof message.id === "string" && message.id ? message.id : undefined;
+  let componentIndex = 0;
+  const emit = (event) => {
+    events.push({
+      ...event,
+      ...id !== undefined ? { sourceRecordId: id } : { sourceOffset: offset },
+      componentIndex: componentIndex++
+    });
+  };
   if (message.role === "user") {
     const content = blocksText(message.content);
     if (content) {
-      events.push({
+      emit({
         type: "message",
         role: "user",
         content,
@@ -577,7 +620,7 @@ function decodeLocalMessage(message, entryTimestamp, events) {
   if (message.role === "assistant") {
     if (typeof message.content === "string") {
       if (message.content) {
-        events.push({
+        emit({
           type: "message",
           role: "assistant",
           content: message.content,
@@ -591,14 +634,14 @@ function decodeLocalMessage(message, entryTimestamp, events) {
       if (!isObject(part))
         continue;
       if (part.type === "thinking" && typeof part.thinking === "string") {
-        events.push({
+        emit({
           type: "reasoning",
           content: part.thinking,
           ...timestamp ? { timestamp } : {},
           ...model ? { model } : {}
         });
       } else if (part.type === "text" && typeof part.text === "string") {
-        events.push({
+        emit({
           type: "message",
           role: "assistant",
           content: part.text,
@@ -606,7 +649,7 @@ function decodeLocalMessage(message, entryTimestamp, events) {
           ...model ? { model } : {}
         });
       } else if (part.type === "toolCall") {
-        events.push({
+        emit({
           type: "tool_call",
           args: toolArguments(part.arguments),
           ...typeof part.id === "string" && part.id ? { id: part.id } : {},
@@ -624,7 +667,7 @@ function decodeLocalMessage(message, entryTimestamp, events) {
       content = `Error: ${content}`;
     }
     const callId = typeof message.toolCallId === "string" ? message.toolCallId : typeof message.tool_call_id === "string" ? message.tool_call_id : undefined;
-    events.push({
+    emit({
       type: "tool_result",
       content,
       ...callId ? { callId } : {},
@@ -688,6 +731,11 @@ var openHandsAdapter = {
         continue;
       }
       const timestamp = parseTimestamp(event.timestamp);
+      const sourceRecordId = event.id;
+      let componentIndex = 0;
+      const emit = (decoded) => {
+        events.push({ ...decoded, sourceRecordId, componentIndex: componentIndex++ });
+      };
       if (event.kind === "MessageEvent") {
         if (event.source !== "user" && event.source !== "agent")
           continue;
@@ -695,7 +743,7 @@ var openHandsAdapter = {
         const content = joinTextContent(message.content);
         if (!content)
           continue;
-        events.push({
+        emit({
           type: "message",
           role: event.source === "user" ? "user" : "assistant",
           content,
@@ -706,7 +754,7 @@ var openHandsAdapter = {
       if (event.kind === "ActionEvent") {
         const thought = joinTextContent(event.thought);
         if (thought) {
-          events.push({
+          emit({
             type: "reasoning",
             content: thought,
             ...timestamp ? { timestamp } : {}
@@ -714,7 +762,7 @@ var openHandsAdapter = {
         }
         const callId2 = typeof event.tool_call_id === "string" && event.tool_call_id ? event.tool_call_id : `oh_${event.id}`;
         callIdByActionId.set(event.id, callId2);
-        events.push({
+        emit({
           type: "tool_call",
           id: callId2,
           args: actionArgsText(event),
@@ -727,7 +775,7 @@ var openHandsAdapter = {
       if (result === undefined)
         continue;
       const callId = typeof event.tool_call_id === "string" && event.tool_call_id ? event.tool_call_id : typeof event.action_id === "string" ? callIdByActionId.get(event.action_id) : undefined;
-      events.push({
+      emit({
         type: "tool_result",
         content: result,
         ...callId ? { callId } : {},
@@ -796,24 +844,28 @@ function extractToolResultText(event) {
 function decodeDeepAgentsCheckpoint(checkpoint) {
   const events = [];
   const checkpointTimestamp = parseTimestamp(checkpoint.checkpointTimestamp);
-  for (const message of checkpoint.messages) {
+  checkpoint.messages.forEach((message, offset) => {
     const timestamp = parseTimestamp(message.timestamp) ?? checkpointTimestamp;
+    let componentIndex = 0;
+    const emit = (event) => {
+      events.push({ ...event, sourceOffset: offset, componentIndex: componentIndex++ });
+    };
     if (message.role === "human") {
       if (message.content) {
-        events.push({
+        emit({
           type: "message",
           role: "user",
           content: message.content,
           ...timestamp ? { timestamp } : {}
         });
       }
-      continue;
+      return;
     }
     if (message.role === "ai") {
       for (const reasoning of message.reasoning) {
         if (!reasoning)
           continue;
-        events.push({
+        emit({
           type: "reasoning",
           content: reasoning,
           ...timestamp ? { timestamp } : {},
@@ -821,7 +873,7 @@ function decodeDeepAgentsCheckpoint(checkpoint) {
         });
       }
       if (message.content) {
-        events.push({
+        emit({
           type: "message",
           role: "assistant",
           content: message.content,
@@ -830,7 +882,7 @@ function decodeDeepAgentsCheckpoint(checkpoint) {
         });
       }
       for (const call of message.toolCalls) {
-        events.push({
+        emit({
           type: "tool_call",
           args: jsonString(call.args),
           ...call.id ? { id: call.id } : {},
@@ -839,22 +891,23 @@ function decodeDeepAgentsCheckpoint(checkpoint) {
           ...message.model ? { model: message.model } : {}
         });
       }
-      continue;
+      return;
     }
-    events.push({
+    emit({
       type: "tool_result",
       callId: message.toolCallId,
       content: message.content,
       ...timestamp ? { timestamp } : {}
     });
-  }
+  });
   return {
     events,
     context: {
       source: "deepagents",
       ...checkpoint.cwd ? { cwd: checkpoint.cwd } : {},
       ...checkpoint.model ? { model: checkpoint.model } : {},
-      ...checkpointTimestamp ? { createdAt: checkpointTimestamp } : {}
+      ...checkpointTimestamp ? { createdAt: checkpointTimestamp } : {},
+      ...checkpoint.checkpointNamespace ? { sourceGroupId: checkpoint.checkpointNamespace } : {}
     },
     diagnostics: []
   };
@@ -1070,8 +1123,13 @@ var NOISE_PREFIXES = [
   "<task-notification"
 ];
 function normalizeDecodedSession(decoded, bounds) {
+  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+  return { records: internal.records, diagnostics: internal.diagnostics };
+}
+function normalizeDecodedSessionInternal(decoded, bounds) {
   const diagnostics = [...decoded.diagnostics];
   const body = [];
+  const bodyBases = [];
   const anchors = new Map;
   const openCalls = new Map;
   const usedIds = new Set;
@@ -1086,10 +1144,18 @@ function normalizeDecodedSession(decoded, bounds) {
     const record = normalizeEvent(event, eventIndex, body.length + 1, openCalls, usedIds, diagnostics, bounds);
     if (!record)
       continue;
-    if (event.timestamp && !Number.isNaN(event.timestamp.getTime())) {
+    const hasTimestamp = event.timestamp !== undefined && !Number.isNaN(event.timestamp.getTime());
+    if (hasTimestamp && event.timestamp) {
       anchors.set(body.length, event.timestamp);
     }
     body.push(record);
+    bodyBases.push({
+      componentIndex: event.componentIndex ?? 0,
+      ...event.sourceRecordId !== undefined ? { sourceRecordId: event.sourceRecordId } : {},
+      ...event.sourceSequence !== undefined ? { sourceSequence: event.sourceSequence } : {},
+      ...event.sourceOffset !== undefined ? { sourceOffset: event.sourceOffset } : {},
+      ...hasTimestamp && event.timestamp ? { sourceTimestamp: event.timestamp.toISOString() } : {}
+    });
   }
   const roles = new Set(body.map((record) => record.role));
   if (!roles.has("user")) {
@@ -1109,7 +1175,19 @@ function normalizeDecodedSession(decoded, bounds) {
   const meta = buildMeta(decoded.context, modelCounts);
   const records = [meta, ...stampedBody];
   validateTranscript(records);
-  return { records, diagnostics };
+  const recordTimestamps = [
+    null,
+    ...stampedBody.map((record) => record.timestamp)
+  ];
+  const bases = [null, ...bodyBases];
+  return {
+    records,
+    bases,
+    recordTimestamps,
+    context: decoded.context,
+    diagnostics,
+    bounds
+  };
 }
 function normalizeEvent(event, eventIndex, recordIndex, openCalls, usedIds, diagnostics, bounds) {
   if (event.type === "message") {
@@ -1688,7 +1766,7 @@ var ADAPTERS = {
   letta: lettaAdapter,
   openhands: openHandsAdapter
 };
-function normalizeTranscript(input) {
+function decodeTranscript(input) {
   if (!input || typeof input !== "object") {
     throw new NormalizationError("invalid_input", "Input must be an object.");
   }
@@ -1699,10 +1777,17 @@ function normalizeTranscript(input) {
   if (!adapter) {
     throw new NormalizationError("unknown_source", `Unknown trajectory source ${JSON.stringify(input.source)}. Supported sources: ${Object.keys(ADAPTERS).join(", ")}.`);
   }
-  const bounds = resolveBounds(input.bounds);
-  return normalizeDecodedSession(adapter.decode(input.transcript), bounds);
+  return { decoded: adapter.decode(input.transcript), bounds: resolveBounds(input.bounds) };
+}
+function normalizeTranscript(input) {
+  const { decoded, bounds } = decodeTranscript(input);
+  return normalizeDecodedSession(decoded, bounds);
 }
 async function normalizeCheckpoint(input) {
+  const { decoded, bounds } = await decodeCheckpoint(input);
+  return normalizeDecodedSession(decoded, bounds);
+}
+async function decodeCheckpoint(input) {
   if (!input || typeof input !== "object") {
     throw new NormalizationError("invalid_input", "Input must be an object.");
   }
@@ -1710,7 +1795,10 @@ async function normalizeCheckpoint(input) {
     throw new NormalizationError("unknown_source", `Checkpoint source must be "deepagents"; received ${JSON.stringify(input.source)}.`);
   }
   const checkpoint = await loadDeepAgentsCheckpoint(input.checkpoint);
-  return normalizeDecodedSession(decodeDeepAgentsCheckpoint(checkpoint), resolveBounds(input.bounds));
+  return {
+    decoded: decodeDeepAgentsCheckpoint(checkpoint),
+    bounds: resolveBounds(input.bounds)
+  };
 }
 
 // src/python-cli.ts

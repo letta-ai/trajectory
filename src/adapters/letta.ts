@@ -19,9 +19,9 @@ export const lettaAdapter: SourceAdapter = {
     const parsed = parseTranscript(transcript);
 
     if (parsed.format === "local") {
-      for (const entry of parsed.messages) {
-        decodeLocalMessage(entry.message, entry.timestamp, events);
-      }
+      parsed.messages.forEach((entry, index) => {
+        decodeLocalMessage(entry.message, entry.timestamp, index, events);
+      });
       return {
         events,
         context: {
@@ -34,6 +34,20 @@ export const lettaAdapter: SourceAdapter = {
 
     for (const message of parsed.messages) {
       const timestamp = parseTimestamp(message.date);
+      // Native identity: the message `id`, ordered by `seq_id`.
+      const id =
+        typeof message.id === "string" && message.id ? message.id : undefined;
+      const seq =
+        typeof message.seq_id === "number" ? message.seq_id : undefined;
+      let componentIndex = 0;
+      const emit = (event: DecodedEvent): void => {
+        events.push({
+          ...event,
+          ...(id !== undefined ? { sourceRecordId: id } : {}),
+          ...(seq !== undefined ? { sourceSequence: seq } : {}),
+          componentIndex: componentIndex++,
+        });
+      };
 
       if (
         message.message_type === "user_message" ||
@@ -41,7 +55,7 @@ export const lettaAdapter: SourceAdapter = {
       ) {
         const content = blocksText(message.content);
         if (content) {
-          events.push({
+          emit({
             type: "message",
             role:
               message.message_type === "user_message" ? "user" : "assistant",
@@ -54,7 +68,7 @@ export const lettaAdapter: SourceAdapter = {
 
       if (message.message_type === "reasoning_message") {
         if (typeof message.reasoning === "string" && message.reasoning) {
-          events.push({
+          emit({
             type: "reasoning",
             content: message.reasoning,
             ...(timestamp ? { timestamp } : {}),
@@ -68,7 +82,7 @@ export const lettaAdapter: SourceAdapter = {
         message.message_type === "approval_request_message"
       ) {
         for (const call of messageToolCalls(message)) {
-          events.push({
+          emit({
             type: "tool_call",
             args: toolArguments(call.arguments),
             ...(typeof call.tool_call_id === "string" && call.tool_call_id
@@ -94,7 +108,7 @@ export const lettaAdapter: SourceAdapter = {
           ) {
             content = `Error: ${content}`;
           }
-          events.push({
+          emit({
             type: "tool_result",
             content,
             ...(typeof result.tool_call_id === "string" && result.tool_call_id
@@ -226,15 +240,26 @@ function parseLocalJsonLines(transcript: string): ParsedTranscript {
 function decodeLocalMessage(
   message: Record<string, unknown>,
   entryTimestamp: Date | undefined,
+  offset: number,
   events: DecodedEvent[],
 ): void {
   const timestamp = entryTimestamp ?? messageTimestamp(message);
   const model = typeof message.model === "string" ? message.model : undefined;
+  // Prefer a native message id; otherwise anchor identity to the entry offset.
+  const id = typeof message.id === "string" && message.id ? message.id : undefined;
+  let componentIndex = 0;
+  const emit = (event: DecodedEvent): void => {
+    events.push({
+      ...event,
+      ...(id !== undefined ? { sourceRecordId: id } : { sourceOffset: offset }),
+      componentIndex: componentIndex++,
+    });
+  };
 
   if (message.role === "user") {
     const content = blocksText(message.content);
     if (content) {
-      events.push({
+      emit({
         type: "message",
         role: "user",
         content,
@@ -247,7 +272,7 @@ function decodeLocalMessage(
   if (message.role === "assistant") {
     if (typeof message.content === "string") {
       if (message.content) {
-        events.push({
+        emit({
           type: "message",
           role: "assistant",
           content: message.content,
@@ -260,14 +285,14 @@ function decodeLocalMessage(
     for (const part of Array.isArray(message.content) ? message.content : []) {
       if (!isObject(part)) continue;
       if (part.type === "thinking" && typeof part.thinking === "string") {
-        events.push({
+        emit({
           type: "reasoning",
           content: part.thinking,
           ...(timestamp ? { timestamp } : {}),
           ...(model ? { model } : {}),
         });
       } else if (part.type === "text" && typeof part.text === "string") {
-        events.push({
+        emit({
           type: "message",
           role: "assistant",
           content: part.text,
@@ -275,7 +300,7 @@ function decodeLocalMessage(
           ...(model ? { model } : {}),
         });
       } else if (part.type === "toolCall") {
-        events.push({
+        emit({
           type: "tool_call",
           args: toolArguments(part.arguments),
           ...(typeof part.id === "string" && part.id ? { id: part.id } : {}),
@@ -301,7 +326,7 @@ function decodeLocalMessage(
         : typeof message.tool_call_id === "string"
           ? message.tool_call_id
           : undefined;
-    events.push({
+    emit({
       type: "tool_result",
       content,
       ...(callId ? { callId } : {}),

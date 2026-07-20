@@ -24,13 +24,20 @@ export const openHandsAdapter: SourceAdapter = {
         continue;
       }
       const timestamp = parseTimestamp(event.timestamp);
+      // Native identity: the OpenHands event `id`. An ActionEvent may emit a
+      // reasoning component and a tool-call component sharing that id.
+      const sourceRecordId = event.id;
+      let componentIndex = 0;
+      const emit = (decoded: DecodedEvent): void => {
+        events.push({ ...decoded, sourceRecordId, componentIndex: componentIndex++ });
+      };
 
       if (event.kind === "MessageEvent") {
         if (event.source !== "user" && event.source !== "agent") continue;
         const message = isObject(event.llm_message) ? event.llm_message : {};
         const content = joinTextContent(message.content);
         if (!content) continue;
-        events.push({
+        emit({
           type: "message",
           role: event.source === "user" ? "user" : "assistant",
           content,
@@ -42,7 +49,7 @@ export const openHandsAdapter: SourceAdapter = {
       if (event.kind === "ActionEvent") {
         const thought = joinTextContent(event.thought);
         if (thought) {
-          events.push({
+          emit({
             type: "reasoning",
             content: thought,
             ...(timestamp ? { timestamp } : {}),
@@ -54,7 +61,7 @@ export const openHandsAdapter: SourceAdapter = {
             ? event.tool_call_id
             : `oh_${event.id}`;
         callIdByActionId.set(event.id, callId);
-        events.push({
+        emit({
           type: "tool_call",
           id: callId,
           args: actionArgsText(event),
@@ -74,7 +81,7 @@ export const openHandsAdapter: SourceAdapter = {
           : typeof event.action_id === "string"
             ? callIdByActionId.get(event.action_id)
             : undefined;
-      events.push({
+      emit({
         type: "tool_result",
         content: result,
         ...(callId ? { callId } : {}),

@@ -1154,7 +1154,6 @@ function planEvents(events) {
   const calls = new Map;
   const openCalls = new Map;
   const usedIds = new Set;
-  const totals = new Map;
   const occOf = [];
   const bucketOf = [];
   let occurrence = -1;
@@ -1170,8 +1169,6 @@ function planEvents(events) {
     const bucket = semanticBucket(event);
     occOf.push(occurrence);
     bucketOf.push(bucket);
-    const key = `${occurrence}:${bucket}`;
-    totals.set(key, (totals.get(key) ?? 0) + 1);
     if (event.type === "tool_call") {
       const sourceId = event.id || `call_${index + 1}`;
       const synthesized = !event.id;
@@ -1201,7 +1198,7 @@ function planEvents(events) {
     const key = `${occOf[index]}:${bucketOf[index]}`;
     const ordinal = seen.get(key) ?? 0;
     seen.set(key, ordinal + 1);
-    components.push({ typeOrdinal: ordinal, typeTotal: totals.get(key) ?? 1 });
+    components.push({ typeOrdinal: ordinal });
   }
   return { calls, openCalls, components };
 }
@@ -1230,15 +1227,11 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
     if (hasTimestamp && event.timestamp) {
       anchors.set(body.length, event.timestamp);
     }
-    const component = plan.components[eventIndex] ?? {
-      typeOrdinal: 0,
-      typeTotal: 1
-    };
+    const component = plan.components[eventIndex] ?? { typeOrdinal: 0 };
     body.push(record);
     bodyBases.push({
       componentIndex: event.componentIndex ?? 0,
       componentTypeOrdinal: component.typeOrdinal,
-      componentTypeTotal: component.typeTotal,
       ...event.sourceRecordId !== undefined ? { sourceRecordId: event.sourceRecordId } : {},
       ...event.sourceSequence !== undefined ? { sourceSequence: event.sourceSequence } : {},
       ...event.sourceOffset !== undefined ? { sourceOffset: event.sourceOffset } : {},

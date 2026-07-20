@@ -110,8 +110,6 @@ export interface CanonicalSourceBasis {
    * occurrences.
    */
   componentTypeOrdinal: number;
-  /** Total components of this component's canonical type within its source record. */
-  componentTypeTotal: number;
   /** ISO-8601 source event time, when the source supplied one. */
   sourceTimestamp?: string;
 }

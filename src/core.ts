@@ -52,7 +52,6 @@ interface CallPlanEntry {
 
 interface ComponentPlan {
   typeOrdinal: number;
-  typeTotal: number;
 }
 
 interface EventPlan {
@@ -81,7 +80,6 @@ function planEvents(events: DecodedEvent[]): EventPlan {
   const calls = new Map<number, CallPlanEntry>();
   const openCalls = new Map<string, OpenCall[]>();
   const usedIds = new Set<string>();
-  const totals = new Map<string, number>();
   const occOf: number[] = [];
   const bucketOf: string[] = [];
   let occurrence = -1;
@@ -97,8 +95,6 @@ function planEvents(events: DecodedEvent[]): EventPlan {
     const bucket = semanticBucket(event);
     occOf.push(occurrence);
     bucketOf.push(bucket);
-    const key = `${occurrence}:${bucket}`;
-    totals.set(key, (totals.get(key) ?? 0) + 1);
 
     if (event.type === "tool_call") {
       const sourceId = event.id || `call_${index + 1}`;
@@ -129,7 +125,7 @@ function planEvents(events: DecodedEvent[]): EventPlan {
     const key = `${occOf[index]}:${bucketOf[index]}`;
     const ordinal = seen.get(key) ?? 0;
     seen.set(key, ordinal + 1);
-    components.push({ typeOrdinal: ordinal, typeTotal: totals.get(key) ?? 1 });
+    components.push({ typeOrdinal: ordinal });
   }
 
   return { calls, openCalls, components };
@@ -202,15 +198,11 @@ export function normalizeDecodedSessionInternal(
     if (hasTimestamp && event.timestamp) {
       anchors.set(body.length, event.timestamp);
     }
-    const component = plan.components[eventIndex] ?? {
-      typeOrdinal: 0,
-      typeTotal: 1,
-    };
+    const component = plan.components[eventIndex] ?? { typeOrdinal: 0 };
     body.push(record);
     bodyBases.push({
       componentIndex: event.componentIndex ?? 0,
       componentTypeOrdinal: component.typeOrdinal,
-      componentTypeTotal: component.typeTotal,
       ...(event.sourceRecordId !== undefined
         ? { sourceRecordId: event.sourceRecordId }
         : {}),

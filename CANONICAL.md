@@ -73,16 +73,19 @@ confidently it can interpret conflicts:
   record.
 
 `record_id = sha256([source_group_id, stable_source_record_id, componentKey])`,
-where `componentKey` is a semantic key: `meta`, `message`, `reasoning`,
-`tool-call:<tool_call_id>`, or `tool-result:<tool_call_id>`. `message` and
-`reasoning` carry a type-local ordinal (`message:1`) only when the source record
-contains more than one component of that type. Keeping the key semantic (rather
-than a global component index) means a conflicting version that inserts an
-unrelated component does not shift the `record_id` of the surrounding records,
-so the worker can still recognize it as a conflicting version of the same
-logical record. Each occurrence of the same source record produces identical
-component keys, so exact duplicates collapse to the same `record_id`.
-`component_index` is retained only as worker sort input.
+where `componentKey` is a semantic key: `meta`, `tool-call:<tool_call_id>`,
+`tool-result:<tool_call_id>`, or `message:<n>` / `reasoning:<n>`. Tool
+calls/results use their native `tool_call_id`. Messages and reasoning can repeat
+within one source record without a native id, so they always carry a type-local
+ordinal (`message:0` even when there is only one) — the ordinal is present from
+the start so a conflicting version that changes cardinality (one reasoning block
+becomes two) does not shift the original record's `record_id`. Keeping the key
+semantic (rather than a global component index) means inserting an unrelated
+component does not shift the surrounding records' `record_id`, so the worker can
+still recognize a conflicting version of the same logical record. Each
+occurrence of the same source record produces identical component keys, so exact
+duplicates collapse to the same `record_id`. `component_index` is retained only
+as worker sort input.
 
 ## Worker responsibilities (LET-9827 handoff)
 

@@ -238,6 +238,30 @@ remaining valid JSON objects. Tool results support:
 Set an individual `maxCharacters` to `null` to disable that bound. Omitted
 fields use the exported `DEFAULT_NORMALIZATION_BOUNDS` values.
 
+## Canonical records for ingestion
+
+`normalizeToCanonical()` returns an additive, ingestion-ready view for the Cloud
+normalizer worker, carrying source-native identity, logical ordering, and
+content hashing alongside the trajectory-v1 record. `normalizeTranscript()` and
+its output are unchanged.
+
+```ts
+import {
+  normalizeToCanonical,
+  NORMALIZER_VERSION,
+  CANONICAL_SCHEMA_VERSION,
+} from "@letta-ai/trajectory";
+
+const { records } = normalizeToCanonical({ source: "claude-code", transcript: rawJsonl });
+```
+
+`NORMALIZER_VERSION` (the exact package version) and `CANONICAL_SCHEMA_VERSION`
+are exported runtime constants recorded on every canonical row. See
+[`CANONICAL.md`](CANONICAL.md) for the full field contract, identity model,
+determinism guarantees, and the worker-side responsibilities. The canonical
+JSON Schema is published as
+[`schema/trajectory-canonical-v1.schema.json`](schema/trajectory-canonical-v1.schema.json).
+
 ## Adding a source
 
 Each native format is implemented as a focused adapter that decodes source

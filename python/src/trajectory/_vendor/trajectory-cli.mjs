@@ -996,6 +996,7 @@ var TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
 function validateTranscript(value) {
   if (!Array.isArray(value) || value.length === 0)
     fail("Transcript must be a non-empty array.");
+  const allCallIds = collectCallIds(value);
   const callIds = new Set;
   const roles = new Set;
   let metaSeen = false;
@@ -1047,8 +1048,8 @@ function validateTranscript(value) {
     }
     if (record.role === "tool") {
       exactKeys(record, TOOL_RESULT_KEYS, index);
-      if (typeof record.tool_call_id !== "string" || !callIds.has(record.tool_call_id)) {
-        fail(`Record ${index}: tool result must reference an earlier tool call.`);
+      if (typeof record.tool_call_id !== "string" || !allCallIds.has(record.tool_call_id)) {
+        fail(`Record ${index}: tool result must reference a tool call.`);
       }
       if (typeof record.content !== "string") {
         fail(`Record ${index}: tool content must be a string.`);
@@ -1061,6 +1062,21 @@ function validateTranscript(value) {
     fail("Transcript must contain at least one user record.");
   if (!roles.has("assistant"))
     fail("Transcript must contain at least one assistant record.");
+}
+function collectCallIds(records) {
+  const ids = new Set;
+  for (const record of records) {
+    if (!isObject2(record) || record.role !== "assistant")
+      continue;
+    if (!Array.isArray(record.tool_calls))
+      continue;
+    for (const call of record.tool_calls) {
+      if (isObject2(call) && typeof call.id === "string" && call.id) {
+        ids.add(call.id);
+      }
+    }
+  }
+  return ids;
 }
 function validateToolCall(call, recordIndex, callIds) {
   if (!isObject2(call))
@@ -1122,6 +1138,73 @@ var NOISE_PREFIXES = [
   "<local-command-stderr>",
   "<task-notification"
 ];
+function semanticBucket(event) {
+  switch (event.type) {
+    case "message":
+      return "message";
+    case "reasoning":
+      return "reasoning";
+    case "tool_call":
+      return "tool_call";
+    case "tool_result":
+      return "tool_result";
+  }
+}
+function planEvents(events) {
+  const calls = new Map;
+  const openCalls = new Map;
+  const usedIds = new Set;
+  const totals = new Map;
+  const occOf = [];
+  const bucketOf = [];
+  let occurrence = -1;
+  for (let index = 0;index < events.length; index += 1) {
+    const event = events[index];
+    if (event === undefined) {
+      occOf.push(occurrence);
+      bucketOf.push("");
+      continue;
+    }
+    if ((event.componentIndex ?? 0) === 0)
+      occurrence += 1;
+    const bucket = semanticBucket(event);
+    occOf.push(occurrence);
+    bucketOf.push(bucket);
+    const key = `${occurrence}:${bucket}`;
+    totals.set(key, (totals.get(key) ?? 0) + 1);
+    if (event.type === "tool_call") {
+      const sourceId = event.id || `call_${index + 1}`;
+      const synthesized = !event.id;
+      let finalId = sourceId;
+      let renamed = false;
+      if (usedIds.has(finalId)) {
+        let suffix = 2;
+        while (usedIds.has(`${sourceId}__${suffix}`))
+          suffix += 1;
+        finalId = `${sourceId}__${suffix}`;
+        renamed = true;
+      }
+      usedIds.add(finalId);
+      const entries = openCalls.get(sourceId) ?? [];
+      entries.push({ finalId, consumed: false });
+      openCalls.set(sourceId, entries);
+      calls.set(index, { finalId, renamed, synthesized, sourceId });
+    }
+  }
+  const seen = new Map;
+  const components = [];
+  for (let index = 0;index < events.length; index += 1) {
+    if (events[index] === undefined) {
+      components.push(undefined);
+      continue;
+    }
+    const key = `${occOf[index]}:${bucketOf[index]}`;
+    const ordinal = seen.get(key) ?? 0;
+    seen.set(key, ordinal + 1);
+    components.push({ typeOrdinal: ordinal, typeTotal: totals.get(key) ?? 1 });
+  }
+  return { calls, openCalls, components };
+}
 function normalizeDecodedSession(decoded, bounds) {
   const internal = normalizeDecodedSessionInternal(decoded, bounds);
   return { records: internal.records, diagnostics: internal.diagnostics };
@@ -1131,9 +1214,8 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
   const body = [];
   const bodyBases = [];
   const anchors = new Map;
-  const openCalls = new Map;
-  const usedIds = new Set;
   const modelCounts = new Map;
+  const plan = planEvents(decoded.events);
   for (let eventIndex = 0;eventIndex < decoded.events.length; eventIndex += 1) {
     const event = decoded.events[eventIndex];
     if (event === undefined)
@@ -1141,16 +1223,22 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
     if (event.model) {
       modelCounts.set(event.model, (modelCounts.get(event.model) ?? 0) + 1);
     }
-    const record = normalizeEvent(event, eventIndex, body.length + 1, openCalls, usedIds, diagnostics, bounds);
+    const record = normalizeEvent(event, eventIndex, body.length + 1, plan, diagnostics, bounds);
     if (!record)
       continue;
     const hasTimestamp = event.timestamp !== undefined && !Number.isNaN(event.timestamp.getTime());
     if (hasTimestamp && event.timestamp) {
       anchors.set(body.length, event.timestamp);
     }
+    const component = plan.components[eventIndex] ?? {
+      typeOrdinal: 0,
+      typeTotal: 1
+    };
     body.push(record);
     bodyBases.push({
       componentIndex: event.componentIndex ?? 0,
+      componentTypeOrdinal: component.typeOrdinal,
+      componentTypeTotal: component.typeTotal,
       ...event.sourceRecordId !== undefined ? { sourceRecordId: event.sourceRecordId } : {},
       ...event.sourceSequence !== undefined ? { sourceSequence: event.sourceSequence } : {},
       ...event.sourceOffset !== undefined ? { sourceOffset: event.sourceOffset } : {},
@@ -1189,7 +1277,7 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
     bounds
   };
 }
-function normalizeEvent(event, eventIndex, recordIndex, openCalls, usedIds, diagnostics, bounds) {
+function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bounds) {
   if (event.type === "message") {
     if (!event.content.trim()) {
       return;
@@ -1227,8 +1315,10 @@ function normalizeEvent(event, eventIndex, recordIndex, openCalls, usedIds, diag
     return record2;
   }
   if (event.type === "tool_call") {
-    const sourceId2 = event.id || `call_${eventIndex + 1}`;
-    if (!event.id) {
+    const entry = plan.calls.get(eventIndex);
+    const sourceId2 = entry?.sourceId ?? (event.id || `call_${eventIndex + 1}`);
+    const finalId = entry?.finalId ?? sourceId2;
+    if (entry?.synthesized ?? !event.id) {
       diagnostics.push({
         code: "tool_call_id_synthesized",
         message: `Synthesized tool-call ID ${JSON.stringify(sourceId2)}.`,
@@ -1236,12 +1326,7 @@ function normalizeEvent(event, eventIndex, recordIndex, openCalls, usedIds, diag
         ...event.inputLine ? { inputLine: event.inputLine } : {}
       });
     }
-    let finalId = sourceId2;
-    if (usedIds.has(finalId)) {
-      let suffix = 2;
-      while (usedIds.has(`${sourceId2}__${suffix}`))
-        suffix += 1;
-      finalId = `${sourceId2}__${suffix}`;
+    if (entry?.renamed) {
       diagnostics.push({
         code: "duplicate_tool_call_id",
         message: `Renamed duplicate tool-call ID ${JSON.stringify(sourceId2)} to ${JSON.stringify(finalId)}.`,
@@ -1249,10 +1334,6 @@ function normalizeEvent(event, eventIndex, recordIndex, openCalls, usedIds, diag
         ...event.inputLine ? { inputLine: event.inputLine } : {}
       });
     }
-    usedIds.add(finalId);
-    const entries2 = openCalls.get(sourceId2) ?? [];
-    entries2.push({ finalId, consumed: false });
-    openCalls.set(sourceId2, entries2);
     const name = event.name || "unknown_tool";
     if (!event.name) {
       diagnostics.push({
@@ -1287,7 +1368,7 @@ function normalizeEvent(event, eventIndex, recordIndex, openCalls, usedIds, diag
     return record2;
   }
   const sourceId = event.callId || "";
-  const entries = openCalls.get(sourceId);
+  const entries = plan.openCalls.get(sourceId);
   const openEntry = entries?.find((entry) => !entry.consumed);
   if (!openEntry) {
     const duplicate = Boolean(entries && entries.length > 0);

@@ -43,6 +43,98 @@ interface OpenCall {
   consumed: boolean;
 }
 
+interface CallPlanEntry {
+  finalId: string;
+  renamed: boolean;
+  synthesized: boolean;
+  sourceId: string;
+}
+
+interface ComponentPlan {
+  typeOrdinal: number;
+  typeTotal: number;
+}
+
+interface EventPlan {
+  /** Pre-assigned tool-call identity, keyed by event index. */
+  calls: Map<number, CallPlanEntry>;
+  /** Pre-populated tool-call queues by source id; consumed as results link. */
+  openCalls: Map<string, OpenCall[]>;
+  /** Per source-record component-type ordinal/total, keyed by event index. */
+  components: (ComponentPlan | undefined)[];
+}
+
+function semanticBucket(event: DecodedEvent): string {
+  switch (event.type) {
+    case "message":
+      return "message";
+    case "reasoning":
+      return "reasoning";
+    case "tool_call":
+      return "tool_call";
+    case "tool_result":
+      return "tool_result";
+  }
+}
+
+function planEvents(events: DecodedEvent[]): EventPlan {
+  const calls = new Map<number, CallPlanEntry>();
+  const openCalls = new Map<string, OpenCall[]>();
+  const usedIds = new Set<string>();
+  const totals = new Map<string, number>();
+  const occOf: number[] = [];
+  const bucketOf: string[] = [];
+  let occurrence = -1;
+
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (event === undefined) {
+      occOf.push(occurrence);
+      bucketOf.push("");
+      continue;
+    }
+    if ((event.componentIndex ?? 0) === 0) occurrence += 1;
+    const bucket = semanticBucket(event);
+    occOf.push(occurrence);
+    bucketOf.push(bucket);
+    const key = `${occurrence}:${bucket}`;
+    totals.set(key, (totals.get(key) ?? 0) + 1);
+
+    if (event.type === "tool_call") {
+      const sourceId = event.id || `call_${index + 1}`;
+      const synthesized = !event.id;
+      let finalId = sourceId;
+      let renamed = false;
+      if (usedIds.has(finalId)) {
+        let suffix = 2;
+        while (usedIds.has(`${sourceId}__${suffix}`)) suffix += 1;
+        finalId = `${sourceId}__${suffix}`;
+        renamed = true;
+      }
+      usedIds.add(finalId);
+      const entries = openCalls.get(sourceId) ?? [];
+      entries.push({ finalId, consumed: false });
+      openCalls.set(sourceId, entries);
+      calls.set(index, { finalId, renamed, synthesized, sourceId });
+    }
+  }
+
+  const seen = new Map<string, number>();
+  const components: (ComponentPlan | undefined)[] = [];
+  for (let index = 0; index < events.length; index += 1) {
+    if (events[index] === undefined) {
+      components.push(undefined);
+      continue;
+    }
+    const key = `${occOf[index]}:${bucketOf[index]}`;
+    const ordinal = seen.get(key) ?? 0;
+    seen.set(key, ordinal + 1);
+    components.push({ typeOrdinal: ordinal, typeTotal: totals.get(key) ?? 1 });
+  }
+
+  return { calls, openCalls, components };
+}
+
 interface ArgsResult {
   args: string;
   reshaped: boolean;
@@ -81,9 +173,13 @@ export function normalizeDecodedSessionInternal(
   const body: UnstampedBodyRecord[] = [];
   const bodyBases: CanonicalSourceBasis[] = [];
   const anchors = new Map<number, Date>();
-  const openCalls = new Map<string, OpenCall[]>();
-  const usedIds = new Set<string>();
   const modelCounts = new Map<string, number>();
+
+  // Pre-pass: resolve source-native structure independently of arrival order.
+  // Tool-call ids are assigned up front so a tool result links to its call even
+  // when it arrives earlier in the transcript (reversed chunks). Component-type
+  // ordinals/totals are computed per source-record occurrence.
+  const plan = planEvents(decoded.events);
 
   for (let eventIndex = 0; eventIndex < decoded.events.length; eventIndex += 1) {
     const event = decoded.events[eventIndex];
@@ -96,8 +192,7 @@ export function normalizeDecodedSessionInternal(
       event,
       eventIndex,
       body.length + 1,
-      openCalls,
-      usedIds,
+      plan,
       diagnostics,
       bounds,
     );
@@ -107,9 +202,15 @@ export function normalizeDecodedSessionInternal(
     if (hasTimestamp && event.timestamp) {
       anchors.set(body.length, event.timestamp);
     }
+    const component = plan.components[eventIndex] ?? {
+      typeOrdinal: 0,
+      typeTotal: 1,
+    };
     body.push(record);
     bodyBases.push({
       componentIndex: event.componentIndex ?? 0,
+      componentTypeOrdinal: component.typeOrdinal,
+      componentTypeTotal: component.typeTotal,
       ...(event.sourceRecordId !== undefined
         ? { sourceRecordId: event.sourceRecordId }
         : {}),
@@ -179,8 +280,7 @@ function normalizeEvent(
   event: DecodedEvent,
   eventIndex: number,
   recordIndex: number,
-  openCalls: Map<string, OpenCall[]>,
-  usedIds: Set<string>,
+  plan: EventPlan,
   diagnostics: Diagnostic[],
   bounds: ResolvedNormalizationBounds,
 ): UnstampedBodyRecord | undefined {
@@ -226,8 +326,10 @@ function normalizeEvent(
   }
 
   if (event.type === "tool_call") {
-    const sourceId = event.id || `call_${eventIndex + 1}`;
-    if (!event.id) {
+    const entry = plan.calls.get(eventIndex);
+    const sourceId = entry?.sourceId ?? (event.id || `call_${eventIndex + 1}`);
+    const finalId = entry?.finalId ?? sourceId;
+    if (entry?.synthesized ?? !event.id) {
       diagnostics.push({
         code: "tool_call_id_synthesized",
         message: `Synthesized tool-call ID ${JSON.stringify(sourceId)}.`,
@@ -235,11 +337,7 @@ function normalizeEvent(
         ...(event.inputLine ? { inputLine: event.inputLine } : {}),
       });
     }
-    let finalId = sourceId;
-    if (usedIds.has(finalId)) {
-      let suffix = 2;
-      while (usedIds.has(`${sourceId}__${suffix}`)) suffix += 1;
-      finalId = `${sourceId}__${suffix}`;
+    if (entry?.renamed) {
       diagnostics.push({
         code: "duplicate_tool_call_id",
         message: `Renamed duplicate tool-call ID ${JSON.stringify(sourceId)} to ${JSON.stringify(finalId)}.`,
@@ -247,10 +345,6 @@ function normalizeEvent(
         ...(event.inputLine ? { inputLine: event.inputLine } : {}),
       });
     }
-    usedIds.add(finalId);
-    const entries = openCalls.get(sourceId) ?? [];
-    entries.push({ finalId, consumed: false });
-    openCalls.set(sourceId, entries);
 
     const name = event.name || "unknown_tool";
     if (!event.name) {
@@ -290,7 +384,7 @@ function normalizeEvent(
   }
 
   const sourceId = event.callId || "";
-  const entries = openCalls.get(sourceId);
+  const entries = plan.openCalls.get(sourceId);
   const openEntry = entries?.find((entry) => !entry.consumed);
   if (!openEntry) {
     const duplicate = Boolean(entries && entries.length > 0);

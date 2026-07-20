@@ -40,9 +40,8 @@ export function buildCanonicalRecords(
       basis,
       contentHash,
     );
-    const base = componentBase(record, type);
     const componentIndex = basis?.componentIndex ?? 0;
-    const componentKey = `${base}#${componentIndex}`;
+    const componentKey = componentKeyFor(record, type, basis);
     const recordJson = canonicalJson(record);
     const sourceTimestamp = basis?.sourceTimestamp ?? null;
 
@@ -153,18 +152,27 @@ function recordType(record: NormalizedRecord): CanonicalRecordType {
   }
 }
 
-function componentBase(
+/**
+ * Semantic component key for `record_id`. Tool calls/results are keyed by their
+ * tool_call_id; messages/reasoning use a type-local ordinal only when the source
+ * record contains more than one of that type. This keeps `record_id` stable when
+ * an unrelated component is added (e.g. a conflicting version that inserts
+ * reasoning), so the worker can still recognize a conflicting version of the
+ * same logical record.
+ */
+function componentKeyFor(
   record: NormalizedRecord,
   type: CanonicalRecordType,
+  basis: CanonicalSourceBasis | null,
 ): string {
   switch (type) {
     case "meta":
       return "meta";
     case "user":
     case "assistant":
-      return "message";
+      return withOrdinal("message", basis);
     case "reasoning":
-      return "reasoning";
+      return withOrdinal("reasoning", basis);
     case "assistant-tool-call":
       return "tool_calls" in record
         ? `tool-call:${record.tool_calls[0]?.id ?? ""}`
@@ -174,6 +182,12 @@ function componentBase(
         ? `tool-result:${record.tool_call_id}`
         : "tool-result";
   }
+}
+
+function withOrdinal(base: string, basis: CanonicalSourceBasis | null): string {
+  const total = basis?.componentTypeTotal ?? 1;
+  if (total <= 1) return base;
+  return `${base}:${basis?.componentTypeOrdinal ?? 0}`;
 }
 
 function semanticContent(

@@ -154,6 +154,40 @@ describe("determinism", () => {
     expect(before?.content_hash).not.toBe(after?.content_hash ?? "");
   });
 
+  test("tool linkage resolves when a result arrives before its call", () => {
+    const call = ccToolUse("a-1", "call_x", "run", "2026-05-01T10:00:02.000Z");
+    const result = ccToolResult("u-2", "call_x", "command output", "2026-05-01T10:00:03.000Z");
+
+    const inOrder = canonical([
+      ccUser("u-1", "go", "2026-05-01T10:00:00.000Z"),
+      call,
+      result,
+    ]);
+    const reversed = canonical([
+      ccUser("u-1", "go", "2026-05-01T10:00:00.000Z"),
+      result, // result arrives before its call
+      call,
+    ]);
+
+    const reversedTool = reversed.records.find((record) => record.record_type === "tool");
+    const reversedCall = reversed.records.find(
+      (record) => record.record_type === "assistant-tool-call",
+    );
+    expect(reversedTool?.tool_call_id).toBe("call_x");
+    expect(reversedCall?.tool_call_id).toBe("call_x");
+    expect(reversed.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "orphan_tool_result",
+    );
+
+    // Identity is independent of whether the result or call arrived first.
+    const inOrderTool = inOrder.records.find((record) => record.record_type === "tool");
+    const inOrderCall = inOrder.records.find(
+      (record) => record.record_type === "assistant-tool-call",
+    );
+    expect(reversedTool?.record_id).toBe(inOrderTool?.record_id ?? "");
+    expect(reversedCall?.record_id).toBe(inOrderCall?.record_id ?? "");
+  });
+
   test("content-addressed fallback is flagged and dedupes exact duplicates", () => {
     // Codex has no per-record id; identity falls back to a stable location.
     const result = normalizeToCanonical({
@@ -249,6 +283,33 @@ function ccReasoning(uuid: string, text: string, timestamp: string): string {
       role: "assistant",
       model: "test-model",
       content: [{ type: "thinking", thinking: text }],
+    },
+  });
+}
+
+function ccToolUse(uuid: string, callId: string, name: string, timestamp: string): string {
+  return JSON.stringify({
+    type: "assistant",
+    uuid,
+    sessionId: "session-fixture",
+    timestamp,
+    message: {
+      role: "assistant",
+      model: "test-model",
+      content: [{ type: "tool_use", id: callId, name, input: { arg: "value" } }],
+    },
+  });
+}
+
+function ccToolResult(uuid: string, callId: string, text: string, timestamp: string): string {
+  return JSON.stringify({
+    type: "user",
+    uuid,
+    sessionId: "session-fixture",
+    timestamp,
+    message: {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: callId, content: text }],
     },
   });
 }

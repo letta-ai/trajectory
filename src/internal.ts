@@ -102,6 +102,16 @@ export interface CanonicalSourceBasis {
   sourceSequence?: number;
   sourceOffset?: number;
   componentIndex: number;
+  /**
+   * Ordinal of this component among components of the same canonical type within
+   * its source record (0-based). Used to disambiguate otherwise-indistinguishable
+   * components (for example two assistant text blocks) in a way that is stable
+   * under insertion of other-typed components and identical across duplicate
+   * occurrences.
+   */
+  componentTypeOrdinal: number;
+  /** Total components of this component's canonical type within its source record. */
+  componentTypeTotal: number;
   /** ISO-8601 source event time, when the source supplied one. */
   sourceTimestamp?: string;
 }

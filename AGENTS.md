@@ -37,3 +37,33 @@ build/test it and consume it as an imported library.
   and run with `DEEPAGENTS_TEST_PYTHON=python DEEPAGENTS_SDK_TEST_PYTHON=python bun test ...`.
   These are optional; a clean `bun run check` + Python parity run is sufficient for
   most work.
+
+## Canonical-contract work: invariants and review learnings
+
+The canonical view (`normalizeToCanonical`, see `CANONICAL.md`) is a frozen
+cross-repo contract consumed by the letta-cloud normalizer worker. Changes here
+went through several avoidable review rounds; hold these invariants explicitly
+from the start and self-audit against them **before** requesting review:
+
+- **Chunk-stable identity.** A given source record must produce identical
+  `stable_source_record_id` / `record_id` / `source_order_id` / `content_hash`
+  whether it is normalized in the full transcript or in a standalone
+  continuation chunk, and regardless of transport-arrival order. Never derive
+  identity from content, in-transcript position, or synthesized timestamps.
+- **Per-adapter anchor semantics differ.** Identity anchors are `byte` (JSONL
+  byte-cursor sources: Claude Code, Codex, local Letta) vs `ordinal` (whole
+  decode: Deep Agents). `sourceContext.baseByteOffset` applies only to `byte`
+  anchors; the unit is part of the identity tuple. Group must be authoritative
+  and stable across chunks (worker-supplied `sourceContext.groupId` fills a
+  missing detected group; disagreement fails). Audit **every** adapter, not just
+  the one you changed.
+- **Continuation chunks are partial.** `baseByteOffset > 0` ⇒ partial mode: omit
+  meta, don't require user/assistant turns, and keep cross-chunk tool results
+  (call in an earlier chunk) instead of dropping them. `normalizeTranscript()`
+  stays strict. Single-line JSONL continuations still parse (route lone wrapper
+  rows through the local parser).
+- **Process:** for contract-heavy tickets, ask the design authority (Amelia) to
+  *red-team* the invariants ("what breaks under chunking / partial uploads / each
+  adapter's anchor?"), not just to approve a proposed shape — a prose proposal
+  hides bugs that a diff review finds. Then do a per-adapter self-audit against
+  the invariants above before undrafting.

@@ -136,7 +136,11 @@ jobs:
             throw new Error("CANONICAL_SCHEMA_VERSION must be an integer.");
           }
 
-          const canonical = normalizeToCanonical({ source: "codex", transcript });
+          const canonical = normalizeToCanonical({
+            source: "codex",
+            transcript,
+            sourceContext: { groupId: "consumer-session" },
+          });
           if (canonical.records.length !== 3) {
             throw new Error(`Expected 3 canonical records, got ${canonical.records.length}.`);
           }

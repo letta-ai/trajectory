@@ -17,20 +17,42 @@ export const openHandsAdapter: SourceAdapter = {
   decode(transcript: string): DecodedSession {
     const diagnostics: Diagnostic[] = [];
     const events: DecodedEvent[] = [];
-    const callIdByActionId = new Map<string, string>();
+    const rawEvents = parseEvents(transcript);
 
-    for (const event of parseEvents(transcript)) {
+    // Pre-pass: map every action id to its tool-call id before decoding, so an
+    // observation that arrives before its action still resolves the call instead
+    // of being dropped as an orphan.
+    const callIdByActionId = new Map<string, string>();
+    for (const event of rawEvents) {
+      if (
+        isObject(event) &&
+        event.kind === "ActionEvent" &&
+        typeof event.id === "string" &&
+        event.id
+      ) {
+        callIdByActionId.set(event.id, actionCallId(event));
+      }
+    }
+
+    for (const event of rawEvents) {
       if (!isObject(event) || typeof event.id !== "string" || !event.id) {
         continue;
       }
       const timestamp = parseTimestamp(event.timestamp);
+      // Native identity: the OpenHands event `id`. An ActionEvent may emit a
+      // reasoning component and a tool-call component sharing that id.
+      const sourceRecordId = event.id;
+      let componentIndex = 0;
+      const emit = (decoded: DecodedEvent): void => {
+        events.push({ ...decoded, sourceRecordId, componentIndex: componentIndex++ });
+      };
 
       if (event.kind === "MessageEvent") {
         if (event.source !== "user" && event.source !== "agent") continue;
         const message = isObject(event.llm_message) ? event.llm_message : {};
         const content = joinTextContent(message.content);
         if (!content) continue;
-        events.push({
+        emit({
           type: "message",
           role: event.source === "user" ? "user" : "assistant",
           content,
@@ -42,19 +64,15 @@ export const openHandsAdapter: SourceAdapter = {
       if (event.kind === "ActionEvent") {
         const thought = joinTextContent(event.thought);
         if (thought) {
-          events.push({
+          emit({
             type: "reasoning",
             content: thought,
             ...(timestamp ? { timestamp } : {}),
           });
         }
 
-        const callId =
-          typeof event.tool_call_id === "string" && event.tool_call_id
-            ? event.tool_call_id
-            : `oh_${event.id}`;
-        callIdByActionId.set(event.id, callId);
-        events.push({
+        const callId = callIdByActionId.get(event.id) ?? actionCallId(event);
+        emit({
           type: "tool_call",
           id: callId,
           args: actionArgsText(event),
@@ -74,7 +92,7 @@ export const openHandsAdapter: SourceAdapter = {
           : typeof event.action_id === "string"
             ? callIdByActionId.get(event.action_id)
             : undefined;
-      events.push({
+      emit({
         type: "tool_result",
         content: result,
         ...(callId ? { callId } : {}),
@@ -89,6 +107,12 @@ export const openHandsAdapter: SourceAdapter = {
     };
   },
 };
+
+function actionCallId(event: Record<string, unknown>): string {
+  return typeof event.tool_call_id === "string" && event.tool_call_id
+    ? event.tool_call_id
+    : `oh_${String(event.id)}`;
+}
 
 function parseEvents(transcript: string): unknown[] {
   let parsed: unknown;

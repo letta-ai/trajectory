@@ -10,9 +10,28 @@ const ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls
 const TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "timestamp"]);
 const TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
 
-export function validateTranscript(value: unknown): asserts value is NormalizedRecord[] {
+/**
+ * Options for {@link validateTranscript}.
+ *
+ * `partial` relaxes the whole-conversation invariants for a canonical
+ * continuation chunk: it no longer requires a user and an assistant turn, and a
+ * tool result may reference a tool call that lived in an earlier chunk (not
+ * present here). `normalizeTranscript()` always validates strictly.
+ */
+export interface ValidateOptions {
+  partial?: boolean;
+}
+
+export function validateTranscript(
+  value: unknown,
+  options?: ValidateOptions,
+): asserts value is NormalizedRecord[] {
+  const partial = options?.partial ?? false;
   if (!Array.isArray(value) || value.length === 0) fail("Transcript must be a non-empty array.");
 
+  // Collect every tool-call id first so a tool result may reference a call that
+  // appears later in the transcript (order-independent linkage).
+  const allCallIds = collectCallIds(value);
   const callIds = new Set<string>();
   const roles = new Set<string>();
   let metaSeen = false;
@@ -67,8 +86,12 @@ export function validateTranscript(value: unknown): asserts value is NormalizedR
 
     if (record.role === "tool") {
       exactKeys(record, TOOL_RESULT_KEYS, index);
-      if (typeof record.tool_call_id !== "string" || !callIds.has(record.tool_call_id)) {
-        fail(`Record ${index}: tool result must reference an earlier tool call.`);
+      if (
+        typeof record.tool_call_id !== "string" ||
+        !record.tool_call_id ||
+        (!partial && !allCallIds.has(record.tool_call_id))
+      ) {
+        fail(`Record ${index}: tool result must reference a tool call.`);
       }
       if (typeof record.content !== "string") {
         fail(`Record ${index}: tool content must be a string.`);
@@ -79,8 +102,26 @@ export function validateTranscript(value: unknown): asserts value is NormalizedR
     fail(`Record ${index}: unknown role ${JSON.stringify(record.role)}.`);
   }
 
-  if (!roles.has("user")) fail("Transcript must contain at least one user record.");
-  if (!roles.has("assistant")) fail("Transcript must contain at least one assistant record.");
+  if (!partial) {
+    if (!roles.has("user")) fail("Transcript must contain at least one user record.");
+    if (!roles.has("assistant")) {
+      fail("Transcript must contain at least one assistant record.");
+    }
+  }
+}
+
+function collectCallIds(records: unknown[]): Set<string> {
+  const ids = new Set<string>();
+  for (const record of records) {
+    if (!isObject(record) || record.role !== "assistant") continue;
+    if (!Array.isArray(record.tool_calls)) continue;
+    for (const call of record.tool_calls) {
+      if (isObject(call) && typeof call.id === "string" && call.id) {
+        ids.add(call.id);
+      }
+    }
+  }
+  return ids;
 }
 
 function validateToolCall(call: unknown, recordIndex: number, callIds: Set<string>): void {

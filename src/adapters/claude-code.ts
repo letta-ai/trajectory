@@ -4,6 +4,7 @@ import type {
   SourceAdapter,
 } from "../internal.js";
 import type { Diagnostic } from "../types.js";
+import { NormalizationError } from "../types.js";
 import {
   blocksText,
   isObject,
@@ -34,10 +35,13 @@ export const claudeCodeAdapter: SourceAdapter = {
   decode(transcript: string): DecodedSession {
     const diagnostics: Diagnostic[] = [];
     const events: DecodedEvent[] = [];
-    let cwd: string | undefined;
-    let gitBranch: string | undefined;
+    // Resolve session context from source chronology, not input order, so the
+    // meta record and its hashes do not depend on transport-arrival order.
+    let cwdCandidate: ContextCandidate | undefined;
+    let branchCandidate: ContextCandidate | undefined;
+    const sessionIds = new Set<string>();
 
-    for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
+    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       if (record.isSidechain === true) {
         diagnostics.push({
@@ -50,9 +54,24 @@ export const claudeCodeAdapter: SourceAdapter = {
       if (typeof recordType === "string" && TRANSPORT_TYPES.has(recordType)) {
         continue;
       }
-      if (!cwd && typeof record.cwd === "string" && record.cwd) cwd = record.cwd;
-      if (!gitBranch && typeof record.gitBranch === "string" && record.gitBranch) {
-        gitBranch = record.gitBranch;
+      const contextKey: ContextKey = {
+        ts: parseTimestamp(record.timestamp)?.getTime() ?? Number.POSITIVE_INFINITY,
+        tie:
+          typeof record.uuid === "string" && record.uuid
+            ? record.uuid
+            : `@${byteOffset}`,
+      };
+      if (typeof record.cwd === "string" && record.cwd) {
+        cwdCandidate = earlier(cwdCandidate, { ...contextKey, value: record.cwd });
+      }
+      if (typeof record.gitBranch === "string" && record.gitBranch) {
+        branchCandidate = earlier(branchCandidate, {
+          ...contextKey,
+          value: record.gitBranch,
+        });
+      }
+      if (typeof record.sessionId === "string" && record.sessionId) {
+        sessionIds.add(record.sessionId);
       }
 
       if (recordType !== "user" && recordType !== "assistant") continue;
@@ -62,10 +81,24 @@ export const claudeCodeAdapter: SourceAdapter = {
       const timestamp = parseTimestamp(record.timestamp);
       const model = typeof message.model === "string" ? message.model : undefined;
       const content = message.content;
+      // Native per-record identity: the line `uuid` (falling back to the line
+      // offset). `componentIndex` disambiguates multiple components decoded from
+      // the same line, identically across duplicate occurrences.
+      const uuid = typeof record.uuid === "string" && record.uuid ? record.uuid : undefined;
+      let componentIndex = 0;
+      const emit = (event: DecodedEvent): void => {
+        events.push({
+          ...event,
+          ...(uuid !== undefined ? { sourceRecordId: uuid } : {}),
+          sourceOffset: byteOffset,
+          sourceAnchorKind: "byte",
+          componentIndex: componentIndex++,
+        });
+      };
 
       if (recordType === "user") {
         if (typeof content === "string") {
-          events.push(messageEvent("user", content, line, timestamp));
+          emit(messageEvent("user", content, line, timestamp));
           continue;
         }
 
@@ -73,7 +106,7 @@ export const claudeCodeAdapter: SourceAdapter = {
         for (const block of Array.isArray(content) ? content : []) {
           if (!isObject(block)) continue;
           if (block.type === "tool_result") {
-            events.push(
+            emit(
               toolResultEvent(
                 blocksText(block.content),
                 typeof block.tool_use_id === "string" ? block.tool_use_id : undefined,
@@ -88,14 +121,14 @@ export const claudeCodeAdapter: SourceAdapter = {
           }
         }
         if (textParts.length > 0) {
-          events.push(messageEvent("user", textParts.join("\n"), line, timestamp));
+          emit(messageEvent("user", textParts.join("\n"), line, timestamp));
         }
         continue;
       }
 
       if (typeof content === "string") {
         if (content.trim()) {
-          events.push(messageEvent("assistant", content, line, timestamp, model));
+          emit(messageEvent("assistant", content, line, timestamp, model));
         }
         continue;
       }
@@ -103,7 +136,7 @@ export const claudeCodeAdapter: SourceAdapter = {
       for (const block of Array.isArray(content) ? content : []) {
         if (!isObject(block)) continue;
         if (block.type === "thinking") {
-          events.push(
+          emit(
             reasoningEvent(
               typeof block.thinking === "string" ? block.thinking : "",
               line,
@@ -112,7 +145,7 @@ export const claudeCodeAdapter: SourceAdapter = {
             ),
           );
         } else if (block.type === "text") {
-          events.push(
+          emit(
             messageEvent(
               "assistant",
               typeof block.text === "string" ? block.text : "",
@@ -122,7 +155,7 @@ export const claudeCodeAdapter: SourceAdapter = {
             ),
           );
         } else if (block.type === "tool_use") {
-          events.push(
+          emit(
             toolCallEvent(
               typeof block.id === "string" ? block.id : undefined,
               typeof block.name === "string" ? block.name : undefined,
@@ -136,17 +169,51 @@ export const claudeCodeAdapter: SourceAdapter = {
       }
     }
 
+    if (sessionIds.size > 1) {
+      throw new NormalizationError(
+        "source_group_conflict",
+        `Claude Code transcript contains multiple session ids: ${[...sessionIds]
+          .map((id) => JSON.stringify(id))
+          .sort()
+          .join(", ")}.`,
+      );
+    }
+    const [sessionId] = sessionIds;
+    const cwd = cwdCandidate?.value;
+    const gitBranch = branchCandidate?.value;
+
     return {
       events,
       context: {
         source: "claude-code",
         ...(cwd ? { cwd } : {}),
         ...(gitBranch ? { gitBranch } : {}),
+        ...(sessionId ? { sourceGroupId: sessionId } : {}),
       },
       diagnostics,
     };
   },
 };
+
+interface ContextKey {
+  ts: number;
+  tie: string;
+}
+
+interface ContextCandidate extends ContextKey {
+  value: string;
+}
+
+/** Pick the chronologically-earliest candidate, tie-broken by stable record id. */
+function earlier(
+  current: ContextCandidate | undefined,
+  next: ContextCandidate,
+): ContextCandidate {
+  if (current === undefined) return next;
+  if (next.ts < current.ts) return next;
+  if (next.ts > current.ts) return current;
+  return next.tie < current.tie ? next : current;
+}
 
 function messageEvent(
   role: "user" | "assistant",

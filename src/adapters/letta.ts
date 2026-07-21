@@ -20,7 +20,7 @@ export const lettaAdapter: SourceAdapter = {
 
     if (parsed.format === "local") {
       for (const entry of parsed.messages) {
-        decodeLocalMessage(entry.message, entry.timestamp, events);
+        decodeLocalMessage(entry.message, entry.timestamp, entry.byteOffset, events);
       }
       return {
         events,
@@ -34,6 +34,20 @@ export const lettaAdapter: SourceAdapter = {
 
     for (const message of parsed.messages) {
       const timestamp = parseTimestamp(message.date);
+      // Native identity: the message `id`, ordered by `seq_id`.
+      const id =
+        typeof message.id === "string" && message.id ? message.id : undefined;
+      const seq =
+        typeof message.seq_id === "number" ? message.seq_id : undefined;
+      let componentIndex = 0;
+      const emit = (event: DecodedEvent): void => {
+        events.push({
+          ...event,
+          ...(id !== undefined ? { sourceRecordId: id } : {}),
+          ...(seq !== undefined ? { sourceSequence: seq } : {}),
+          componentIndex: componentIndex++,
+        });
+      };
 
       if (
         message.message_type === "user_message" ||
@@ -41,7 +55,7 @@ export const lettaAdapter: SourceAdapter = {
       ) {
         const content = blocksText(message.content);
         if (content) {
-          events.push({
+          emit({
             type: "message",
             role:
               message.message_type === "user_message" ? "user" : "assistant",
@@ -54,7 +68,7 @@ export const lettaAdapter: SourceAdapter = {
 
       if (message.message_type === "reasoning_message") {
         if (typeof message.reasoning === "string" && message.reasoning) {
-          events.push({
+          emit({
             type: "reasoning",
             content: message.reasoning,
             ...(timestamp ? { timestamp } : {}),
@@ -68,7 +82,7 @@ export const lettaAdapter: SourceAdapter = {
         message.message_type === "approval_request_message"
       ) {
         for (const call of messageToolCalls(message)) {
-          events.push({
+          emit({
             type: "tool_call",
             args: toolArguments(call.arguments),
             ...(typeof call.tool_call_id === "string" && call.tool_call_id
@@ -94,7 +108,7 @@ export const lettaAdapter: SourceAdapter = {
           ) {
             content = `Error: ${content}`;
           }
-          events.push({
+          emit({
             type: "tool_result",
             content,
             ...(typeof result.tool_call_id === "string" && result.tool_call_id
@@ -114,14 +128,18 @@ export const lettaAdapter: SourceAdapter = {
   },
 };
 
+type LocalMessageEntry = {
+  message: Record<string, unknown>;
+  timestamp?: Date;
+  /** Absolute UTF-8 byte offset of this row within the transcript. */
+  byteOffset: number;
+};
+
 type ParsedTranscript =
   | { format: "api"; messages: Record<string, unknown>[] }
   | {
       format: "local";
-      messages: Array<{
-        message: Record<string, unknown>;
-        timestamp?: Date;
-      }>;
+      messages: LocalMessageEntry[];
       createdAt?: Date;
     };
 
@@ -133,7 +151,11 @@ function parseTranscript(transcript: string): ParsedTranscript {
     return parseLocalJsonLines(transcript);
   }
   if (isObject(parsed)) {
-    if (parsed.type === "session") return parseLocalJsonLines(transcript);
+    // A single-line v3 continuation is one `type:"session"` or `type:"message"`
+    // wrapper row that parses as whole-input JSON; route it to the JSONL parser.
+    if (parsed.type === "session" || parsed.type === "message") {
+      return parseLocalJsonLines(transcript);
+    }
     if (typeof parsed.role === "string") {
       const timestamp = messageTimestamp(parsed);
       return {
@@ -141,6 +163,7 @@ function parseTranscript(transcript: string): ParsedTranscript {
         messages: [
           {
             message: parsed,
+            byteOffset: 0,
             ...(timestamp ? { timestamp } : {}),
           },
         ],
@@ -169,8 +192,12 @@ function parseTranscript(transcript: string): ParsedTranscript {
 }
 
 function parseLocalJsonLines(transcript: string): ParsedTranscript {
-  const rows: Record<string, unknown>[] = [];
+  const rows: Array<{ row: Record<string, unknown>; byteOffset: number }> = [];
+  let byteOffset = 0;
   for (const raw of transcript.split("\n")) {
+    const rowByteOffset = byteOffset;
+    // Advance past this row's bytes plus the "\n" separator that split removed.
+    byteOffset += utf8ByteLength(raw) + 1;
     if (!raw.trim()) continue;
     let row: unknown;
     try {
@@ -179,27 +206,33 @@ function parseLocalJsonLines(transcript: string): ParsedTranscript {
       throw invalidLettaTranscript();
     }
     if (!isObject(row)) throw invalidLettaTranscript();
-    rows.push(row);
+    rows.push({ row, byteOffset: rowByteOffset });
   }
   if (rows.length === 0) throw invalidLettaTranscript();
 
-  const session = rows.find((row) => row.type === "session");
-  if (session) {
-    if (session.version !== 3) {
-      throw new NormalizationError(
-        "invalid_input",
-        `Unsupported Letta local transcript version ${JSON.stringify(session.version)}; supported version: 3.`,
-      );
-    }
-    const createdAt = parseTimestamp(session.timestamp);
+  const session = rows.find((entry) => entry.row.type === "session");
+  if (session && session.row.version !== 3) {
+    throw new NormalizationError(
+      "invalid_input",
+      `Unsupported Letta local transcript version ${JSON.stringify(session.row.version)}; supported version: 3.`,
+    );
+  }
+
+  // Version 3 files use `type: "message"` wrapper rows. A standalone continuation
+  // chunk contains those wrapper rows without the leading `type: "session"` row,
+  // so detect the wrapper shape directly rather than requiring the session row.
+  const hasMessageWrappers = rows.some((entry) => entry.row.type === "message");
+  if (session || hasMessageWrappers) {
+    const createdAt = session ? parseTimestamp(session.row.timestamp) : undefined;
     return {
       format: "local",
-      messages: rows.flatMap((row) => {
-        if (row.type !== "message" || !isObject(row.message)) return [];
-        const timestamp = parseTimestamp(row.timestamp);
+      messages: rows.flatMap((entry) => {
+        if (entry.row.type !== "message" || !isObject(entry.row.message)) return [];
+        const timestamp = parseTimestamp(entry.row.timestamp);
         return [
           {
-            message: row.message,
+            message: entry.row.message,
+            byteOffset: entry.byteOffset,
             ...(timestamp ? { timestamp } : {}),
           },
         ];
@@ -208,15 +241,16 @@ function parseLocalJsonLines(transcript: string): ParsedTranscript {
     };
   }
 
-  if (!rows.every((row) => typeof row.role === "string")) {
+  if (!rows.every((entry) => typeof entry.row.role === "string")) {
     throw invalidLettaTranscript();
   }
   return {
     format: "local",
-    messages: rows.map((message) => {
-      const timestamp = messageTimestamp(message);
+    messages: rows.map((entry) => {
+      const timestamp = messageTimestamp(entry.row);
       return {
-        message,
+        message: entry.row,
+        byteOffset: entry.byteOffset,
         ...(timestamp ? { timestamp } : {}),
       };
     }),
@@ -226,15 +260,29 @@ function parseLocalJsonLines(transcript: string): ParsedTranscript {
 function decodeLocalMessage(
   message: Record<string, unknown>,
   entryTimestamp: Date | undefined,
+  byteOffset: number,
   events: DecodedEvent[],
 ): void {
   const timestamp = entryTimestamp ?? messageTimestamp(message);
   const model = typeof message.model === "string" ? message.model : undefined;
+  // Prefer a native message id; otherwise anchor identity to the absolute UTF-8
+  // byte offset so it is stable across chunked uploads (kind `byte`).
+  const id = typeof message.id === "string" && message.id ? message.id : undefined;
+  let componentIndex = 0;
+  const emit = (event: DecodedEvent): void => {
+    events.push({
+      ...event,
+      ...(id !== undefined
+        ? { sourceRecordId: id }
+        : { sourceOffset: byteOffset, sourceAnchorKind: "byte" }),
+      componentIndex: componentIndex++,
+    });
+  };
 
   if (message.role === "user") {
     const content = blocksText(message.content);
     if (content) {
-      events.push({
+      emit({
         type: "message",
         role: "user",
         content,
@@ -247,7 +295,7 @@ function decodeLocalMessage(
   if (message.role === "assistant") {
     if (typeof message.content === "string") {
       if (message.content) {
-        events.push({
+        emit({
           type: "message",
           role: "assistant",
           content: message.content,
@@ -260,14 +308,14 @@ function decodeLocalMessage(
     for (const part of Array.isArray(message.content) ? message.content : []) {
       if (!isObject(part)) continue;
       if (part.type === "thinking" && typeof part.thinking === "string") {
-        events.push({
+        emit({
           type: "reasoning",
           content: part.thinking,
           ...(timestamp ? { timestamp } : {}),
           ...(model ? { model } : {}),
         });
       } else if (part.type === "text" && typeof part.text === "string") {
-        events.push({
+        emit({
           type: "message",
           role: "assistant",
           content: part.text,
@@ -275,7 +323,7 @@ function decodeLocalMessage(
           ...(model ? { model } : {}),
         });
       } else if (part.type === "toolCall") {
-        events.push({
+        emit({
           type: "tool_call",
           args: toolArguments(part.arguments),
           ...(typeof part.id === "string" && part.id ? { id: part.id } : {}),
@@ -301,7 +349,7 @@ function decodeLocalMessage(
         : typeof message.tool_call_id === "string"
           ? message.tool_call_id
           : undefined;
-    events.push({
+    emit({
       type: "tool_result",
       content,
       ...(callId ? { callId } : {}),
@@ -317,6 +365,10 @@ function messageTimestamp(message: Record<string, unknown>): Date | undefined {
     parseTimestamp(message.date) ??
     parseTimestamp(message.timestamp)
   );
+}
+
+function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
 }
 
 function toolArguments(value: unknown): string {

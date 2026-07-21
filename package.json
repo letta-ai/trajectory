@@ -19,7 +19,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./schema": "./schema/trajectory-v1.schema.json"
+    "./schema": "./schema/trajectory-v1.schema.json",
+    "./schema/canonical": "./schema/trajectory-canonical-v1.schema.json",
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -28,6 +30,7 @@
     "prompts",
     "README.md",
     "PARITY.md",
+    "CANONICAL.md",
     "SOURCE_VERSION_AUDIT.md"
   ],
   "scripts": {

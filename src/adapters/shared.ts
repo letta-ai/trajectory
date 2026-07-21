@@ -3,6 +3,8 @@ import type { Diagnostic } from "../types.js";
 export interface JsonLine {
   value: Record<string, unknown>;
   line: number;
+  /** UTF-8 byte offset of this line's start within the transcript. */
+  byteOffset: number;
 }
 
 export function parseJsonLines(
@@ -12,9 +14,14 @@ export function parseJsonLines(
   const parsed: JsonLine[] = [];
   const lines = transcript.split("\n");
 
+  let byteOffset = 0;
   for (let index = 0; index < lines.length; index += 1) {
     const raw = lines[index];
-    if (raw === undefined || !raw.trim()) continue;
+    if (raw === undefined) continue;
+    const lineByteOffset = byteOffset;
+    // Advance past this line's bytes plus the "\n" separator that split removed.
+    byteOffset += utf8ByteLength(raw) + 1;
+    if (!raw.trim()) continue;
     const line = index + 1;
     let value: unknown;
     try {
@@ -35,10 +42,14 @@ export function parseJsonLines(
       });
       continue;
     }
-    parsed.push({ value, line });
+    parsed.push({ value, line, byteOffset: lineByteOffset });
   }
 
   return parsed;
+}
+
+function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
 }
 
 export function isObject(value: unknown): value is Record<string, unknown> {

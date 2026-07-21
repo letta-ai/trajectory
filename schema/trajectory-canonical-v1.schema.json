@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://letta.ai/schemas/trajectory/canonical-v1.json",
+  "title": "Canonical trajectory records (v1)",
+  "description": "Ingestion-ready records emitted by normalizeToCanonical(). The library owns every field here; the Cloud normalizer worker owns tenancy, raw-upload lineage, ingestion identity, content_version, config_hash, and the final ClickHouse record_index.",
+  "type": "array",
+  "items": { "$ref": "#/$defs/canonicalRecord" },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "canonicalRecord": {
+      "type": "object",
+      "required": [
+        "source_type",
+        "source_group_id",
+        "stable_source_record_id",
+        "source_identity_kind",
+        "source_order_id",
+        "component_index",
+        "record_type",
+        "record_id",
+        "record_hash",
+        "content_hash",
+        "source_timestamp",
+        "record_timestamp",
+        "content",
+        "tool_call_id",
+        "tool_name",
+        "tool_arguments_json",
+        "tool_result_json",
+        "record_json"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "source_type": { "type": "string", "minLength": 1 },
+        "source_group_id": { "type": "string", "minLength": 1 },
+        "stable_source_record_id": { "type": "string", "minLength": 1 },
+        "source_identity_kind": {
+          "type": "string",
+          "enum": ["native", "location", "content", "synthetic"]
+        },
+        "source_order_id": { "type": "string", "minLength": 1 },
+        "component_index": { "type": "integer", "minimum": 0 },
+        "record_type": {
+          "type": "string",
+          "enum": [
+            "meta",
+            "user",
+            "reasoning",
+            "assistant",
+            "assistant-tool-call",
+            "tool"
+          ]
+        },
+        "record_id": { "$ref": "#/$defs/sha256" },
+        "record_hash": { "$ref": "#/$defs/sha256" },
+        "content_hash": { "$ref": "#/$defs/sha256" },
+        "source_timestamp": { "type": ["string", "null"] },
+        "record_timestamp": { "type": ["string", "null"] },
+        "content": { "type": ["string", "null"] },
+        "tool_call_id": { "type": ["string", "null"] },
+        "tool_name": { "type": ["string", "null"] },
+        "tool_arguments_json": { "type": ["string", "null"] },
+        "tool_result_json": { "type": ["string", "null"] },
+        "record_json": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

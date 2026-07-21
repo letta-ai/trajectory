@@ -80,24 +80,29 @@ would turn missing context into durable bad identity. Absolute byte offsets are
 only stable within one append-only generation; a truncation/replacement is a new
 generation upstream (worker-owned).
 
-A non-zero `baseByteOffset` marks a **continuation chunk** — one slice of a
-larger conversation — and `normalizeToCanonical` switches to partial-transcript
-semantics for it (while `normalizeTranscript()` stays strict):
+`normalizeToCanonical` supports **partial-transcript semantics** for a chunk of
+a larger conversation (while `normalizeTranscript()` stays strict). Partial mode
+is enabled by an explicit `sourceContext.partial: true`, and is also implied by a
+non-zero `baseByteOffset` (a continuation necessarily follows earlier content).
+It is decoupled from meta emission:
 
-- The meta record is emitted only for the initial byte range
-  (`baseByteOffset === 0` or absent). A continuation omits meta: its meta would
-  share the group's constant meta identity but carry different session context,
-  which would look like a false conflicting-version. If the initial range never
-  arrives, missing meta is preferable to a false conflict.
-- Whole-conversation invariants are relaxed: a continuation is not required to
-  contain a user and an assistant turn, so single-role chunks are accepted.
-- A tool result whose call lived in an earlier chunk is kept and linked by its
-  source call id (not dropped as an orphan); the worker resolves cross-chunk
-  linkage. A duplicate result (call present and already consumed) is still
-  dropped.
+- **Meta emission tracks the byte offset only.** Meta is emitted for the initial
+  byte range (`baseByteOffset === 0` or absent) and omitted for a continuation
+  (`baseByteOffset > 0`). A continuation's meta would share the group's constant
+  meta identity but carry different session context, which would look like a false
+  conflicting-version; if the initial range never arrives, missing meta is
+  preferable to a false conflict. An **initial chunk** (offset 0) that is partial
+  still emits its authoritative meta.
+- **Relaxed invariants (partial only).** A partial chunk is not required to
+  contain a user and an assistant turn, so single-role chunks are accepted at any
+  offset.
+- **Cross-chunk tool results kept (partial only).** A tool result whose call
+  lived in another chunk is kept and linked by its source call id (not dropped as
+  an orphan); the worker resolves cross-chunk linkage. A duplicate result (call
+  present and already consumed) is still dropped.
 
-`normalizeTranscript()` always requires a user and an assistant turn, drops
-orphan/cross-chunk tool results, and includes meta.
+`normalizeTranscript()` and non-partial canonical callers always require a user
+and an assistant turn, drop orphan tool results, and include meta.
 
 Deep Agents checkpoint identity is grouped by the `(threadId, checkpointNamespace)`
 pair, encoded uniformly for every namespace (including root) as

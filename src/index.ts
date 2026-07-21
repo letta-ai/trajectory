@@ -68,9 +68,11 @@ export function normalizeTranscript(input: NormalizeInput): NormalizeResult {
 export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
   const { decoded, bounds } = decodeTranscript(input);
   const baseByteOffset = input.sourceContext?.baseByteOffset ?? 0;
-  // A continuation chunk (non-zero base offset) is a partial slice of a larger
-  // conversation: relax whole-conversation invariants and omit the meta record.
-  const partial = baseByteOffset > 0;
+  // Partial (chunk) semantics are an explicit signal, decoupled from the byte
+  // offset: a non-zero offset always implies a continuation, but an initial chunk
+  // at offset 0 can also be partial. Meta emission tracks the byte offset only,
+  // so an offset-0 partial still emits the authoritative meta.
+  const partial = (input.sourceContext?.partial ?? false) || baseByteOffset > 0;
   const internal = normalizeDecodedSessionInternal(decoded, bounds, { partial });
   const groupId = resolveGroupId(
     input.source,
@@ -80,7 +82,9 @@ export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
   return finalizeCanonical(internal, bounds, {
     groupId,
     baseByteOffset,
-    emitMeta: !partial,
+    // Meta emission is tied to the byte offset, not the partial flag: the initial
+    // range (offset 0) emits the authoritative meta even when it is a partial chunk.
+    emitMeta: baseByteOffset === 0,
   });
 }
 

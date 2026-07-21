@@ -288,6 +288,21 @@ describe("canonical continuation (partial) chunks", () => {
     );
   });
 
+  test("an offset-zero partial chunk is lenient but still emits meta", () => {
+    // Offset 0 is the initial range, not necessarily a complete transcript: an
+    // explicit partial signal relaxes validation while meta is still emitted.
+    const chunk = normalizeToCanonical({
+      source: "codex",
+      transcript: [
+        codexMeta("sess-1", "/work", "2026-06-01T09:00:00.000Z"),
+        codexMessage("assistant", "opening statement", "2026-06-01T09:00:01.000Z"),
+      ].join("\n"),
+      sourceContext: { partial: true },
+    });
+    expect(chunk.records[0]?.record_type).toBe("meta");
+    expect(chunk.records.filter((record) => record.record_type === "assistant")).toHaveLength(1);
+  });
+
   test("strict normalizeToCanonical still rejects a single-role full transcript", () => {
     expect(() =>
       normalizeToCanonical({

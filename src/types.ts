@@ -51,6 +51,16 @@ export interface SourceContext {
    * is stable regardless of chunk boundaries.
    */
   baseByteOffset?: number;
+  /**
+   * Marks this transcript as one chunk of a larger conversation (not a complete
+   * transcript), enabling partial-transcript semantics: whole-conversation
+   * invariants are relaxed (no required user/assistant turn; a tool result whose
+   * call lived in another chunk is kept). This is independent of the byte offset —
+   * an initial chunk at offset 0 can still be partial (and still emits meta). A
+   * non-zero `baseByteOffset` already implies a continuation and is treated as
+   * partial. Full-transcript callers omit this and stay strict.
+   */
+  partial?: boolean;
 }
 
 export interface NormalizeInput {

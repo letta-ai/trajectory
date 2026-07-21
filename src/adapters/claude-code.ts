@@ -91,6 +91,7 @@ export const claudeCodeAdapter: SourceAdapter = {
           ...event,
           ...(uuid !== undefined ? { sourceRecordId: uuid } : {}),
           sourceOffset: byteOffset,
+          sourceAnchorKind: "byte",
           componentIndex: componentIndex++,
         });
       };

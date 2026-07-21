@@ -212,6 +212,9 @@ export function normalizeDecodedSessionInternal(
       ...(event.sourceOffset !== undefined
         ? { sourceOffset: event.sourceOffset }
         : {}),
+      ...(event.sourceAnchorKind !== undefined
+        ? { sourceAnchorKind: event.sourceAnchorKind }
+        : {}),
       ...(hasTimestamp && event.timestamp
         ? { sourceTimestamp: event.timestamp.toISOString() }
         : {}),

@@ -17,8 +17,15 @@ const SEQUENCE_WIDTH = 20;
 export interface CanonicalOptions {
   /** Resolved source group id (overrides adapter-detected context). */
   groupId: string;
-  /** Absolute base byte offset added to location anchors for chunked uploads. */
+  /** Absolute base byte offset added to byte-anchored locations for chunked uploads. */
   baseByteOffset: number;
+  /**
+   * Whether to emit the leading meta record. The worker sets this false for a
+   * continuation chunk (baseByteOffset > 0): its meta would share the group's
+   * constant meta identity but carry different session context, creating a false
+   * conflicting-version. The authoritative meta is emitted with the initial chunk.
+   */
+  emitMeta: boolean;
 }
 
 /**
@@ -37,7 +44,13 @@ export function buildCanonicalRecords(
   const sourceType = internal.context.source;
   const groupId = options.groupId;
 
-  return internal.records.map((record, index) => {
+  const projected = options.emitMeta
+    ? internal.records.map((record, index) => ({ record, index }))
+    : internal.records
+        .map((record, index) => ({ record, index }))
+        .filter(({ record }) => record.role !== "meta");
+
+  return projected.map(({ record, index }) => {
     const basis = internal.bases[index] ?? null;
     const recordTimestamp = internal.recordTimestamps[index] ?? null;
     const type = recordType(record);
@@ -107,9 +120,14 @@ function deriveIdentity(
     return { stableSourceRecordId: basis.sourceRecordId, kind: "native" };
   }
   if (basis?.sourceOffset !== undefined) {
-    const absoluteOffset = basis.sourceOffset + baseByteOffset;
+    // `baseByteOffset` anchors byte offsets absolutely across chunked uploads;
+    // it must not be applied to ordinal anchors. The unit is part of the identity
+    // tuple so byte and ordinal anchors can never collide.
+    const anchorKind = basis.sourceAnchorKind ?? "ordinal";
+    const value =
+      anchorKind === "byte" ? basis.sourceOffset + baseByteOffset : basis.sourceOffset;
     return {
-      stableSourceRecordId: sha256Hex(`${groupId}|offset|${absoluteOffset}`),
+      stableSourceRecordId: sha256Hex(`${groupId}|${anchorKind}|${value}`),
       kind: "location",
     };
   }

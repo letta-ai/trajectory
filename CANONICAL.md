@@ -68,8 +68,10 @@ normalizeToCanonical({ source, transcript, sourceContext: { groupId, baseByteOff
   and disagree, normalization fails with `source_group_conflict` so the upload
   can be quarantined.
 - `baseByteOffset` — the absolute UTF-8 byte offset of this transcript within its
-  source generation, added to each record's in-transcript byte offset. This makes
-  `location`-anchored identity (Codex) stable regardless of chunk boundaries.
+  source generation. It is added only to **byte-anchored** location identities
+  (Codex, and local Letta rows without a native id), making them stable
+  regardless of chunk boundaries. Ordinal anchors (Deep Agents) ignore it, and the
+  anchor unit is part of the identity so byte and ordinal anchors never collide.
 
 Codex is `location`-anchored and therefore **requires** a resolved group
 (detected `session_meta` or `sourceContext.groupId`); it fails with
@@ -78,9 +80,19 @@ would turn missing context into durable bad identity. Absolute byte offsets are
 only stable within one append-only generation; a truncation/replacement is a new
 generation upstream (worker-owned).
 
+The **meta** record is emitted only for the initial byte range
+(`baseByteOffset === 0` or absent). A continuation chunk omits meta: its meta
+would share the group's constant meta identity but carry different session
+context, which would look like a false conflicting-version. The authoritative
+meta arrives with the initial chunk; if the initial range never arrives, missing
+meta is preferable to a false conflict. `normalizeTranscript()` always includes
+meta.
+
 Deep Agents checkpoint identity is grouped by the `(threadId, checkpointNamespace)`
-pair: the root namespace uses `threadId`; sub-namespaces use `JSON.stringify([threadId, checkpointNamespace])`
-so distinct threads and namespaces never collide on offset-derived identities.
+pair, encoded uniformly for every namespace (including root) as
+`JSON.stringify([threadId, checkpointNamespace])`, so distinct threads and
+namespaces never collide — even when a thread id literally looks like the
+encoding.
 
 ## Identity model
 
@@ -92,10 +104,11 @@ confidently it can interpret conflicts:
 - `native` — a source-native per-record id (Claude Code line `uuid`, Letta
   message `id`, OpenHands event `id`). Supports exact-duplicate dedup **and**
   conflicting-version detection.
-- `location` — a stable source-native location anchor when no native id exists
-  (append-only line offset for Codex, entry offset for local Letta / Deep
-  Agents, Letta `seq_id`). Supports dedup and conflict detection for
-  in-order, append-only assembly.
+- `location` — a stable source-native location anchor when no native id exists:
+  an absolute UTF-8 byte offset for Codex and local Letta (chunkable via
+  `baseByteOffset`), a whole-decode ordinal for Deep Agents, or a Letta `seq_id`.
+  The anchor unit is part of the identity, so byte and ordinal anchors never
+  collide. Supports dedup and conflict detection for append-only assembly.
 - `content` — content-addressed fallback when neither a native id nor a stable
   location exists. Supports exact-duplicate dedup **only**; it cannot detect a
   conflicting version of the same logical record.

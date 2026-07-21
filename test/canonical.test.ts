@@ -230,6 +230,11 @@ describe("codex chunked-upload source context", () => {
     expect(chunkSecond?.stable_source_record_id).toBe(fullSecond?.stable_source_record_id ?? "");
     expect(chunkSecond?.record_id).toBe(fullSecond?.record_id ?? "");
     expect(chunkSecond?.source_group_id).toBe("sess-1");
+
+    // The authoritative meta is emitted with the initial chunk only; a
+    // continuation (baseByteOffset > 0) omits meta to avoid a false conflict.
+    expect(full.records[0]?.record_type).toBe("meta");
+    expect(chunk.records.some((record) => record.record_type === "meta")).toBe(false);
   });
 
   test("requires a resolved group for Codex rather than a silent default", () => {
@@ -253,13 +258,43 @@ describe("codex chunked-upload source context", () => {
   });
 });
 
+describe("local letta chunked-upload byte anchoring", () => {
+  // Multibyte content before the split proves the anchor is bytes, not chars.
+  const m1 = lettaLocalMessage("user", "héllo 😀 first");
+  const m2 = lettaLocalMessage("assistant", "réply 😀 one");
+  const m3 = lettaLocalMessage("user", "second question");
+  const m4 = lettaLocalMessage("assistant", "second answer");
+  const session = JSON.stringify({ type: "session", version: 3, timestamp: "2026-06-01T09:00:00.000Z" });
+
+  test("identity matches between full file and a standalone continuation", () => {
+    const full = normalizeToCanonical({
+      source: "letta",
+      transcript: [session, m1, m2, m3, m4].join("\n"),
+      sourceContext: { groupId: "letta-session" },
+    });
+    const baseByteOffset = utf8Len([session, m1, m2].join("\n") + "\n");
+    const chunk = normalizeToCanonical({
+      source: "letta",
+      transcript: [m3, m4].join("\n"),
+      sourceContext: { groupId: "letta-session", baseByteOffset },
+    });
+
+    const fullSecond = full.records.find((record) => record.content === "second question");
+    const chunkSecond = chunk.records.find((record) => record.content === "second question");
+    expect(chunkSecond?.source_identity_kind).toBe("location");
+    expect(chunkSecond?.stable_source_record_id).toBe(fullSecond?.stable_source_record_id ?? "");
+    expect(chunkSecond?.record_id).toBe(fullSecond?.record_id ?? "");
+    expect(chunk.records.some((record) => record.record_type === "meta")).toBe(false);
+  });
+});
+
 describe("deepagents thread grouping", () => {
   test("root-namespace threads do not collide on offset identities", () => {
     const first = canonicalCheckpoint(checkpointData("thread-a", ""));
     const second = canonicalCheckpoint(checkpointData("thread-b", ""));
 
-    expect(first[1]?.source_group_id).toBe("thread-a");
-    expect(second[1]?.source_group_id).toBe("thread-b");
+    expect(first[1]?.source_group_id).toBe(JSON.stringify(["thread-a", ""]));
+    expect(second[1]?.source_group_id).toBe(JSON.stringify(["thread-b", ""]));
     const firstIds = new Set(first.map((record) => record.record_id));
     for (const record of second) {
       expect(firstIds.has(record.record_id)).toBe(false);
@@ -269,9 +304,18 @@ describe("deepagents thread grouping", () => {
   test("distinct namespaces in one thread are distinct groups", () => {
     const root = canonicalCheckpoint(checkpointData("thread-a", ""));
     const sub = canonicalCheckpoint(checkpointData("thread-a", "sub"));
-    expect(root[1]?.source_group_id).toBe("thread-a");
+    expect(root[1]?.source_group_id).toBe(JSON.stringify(["thread-a", ""]));
     expect(sub[1]?.source_group_id).toBe(JSON.stringify(["thread-a", "sub"]));
     expect(sub[1]?.record_id).not.toBe(root[1]?.record_id ?? "");
+  });
+
+  test("a literal tuple-shaped thread id cannot collide with a real pair", () => {
+    // Thread whose id is literally `["thread-a",""]` (root) must not collide with
+    // thread `thread-a` + namespace `""` — uniform encoding wraps each level.
+    const literal = canonicalCheckpoint(checkpointData(JSON.stringify(["thread-a", ""]), ""));
+    const real = canonicalCheckpoint(checkpointData("thread-a", ""));
+    expect(literal[1]?.source_group_id).not.toBe(real[1]?.source_group_id ?? "");
+    expect(literal[1]?.record_id).not.toBe(real[1]?.record_id ?? "");
   });
 });
 
@@ -462,6 +506,11 @@ function ccAssistantCwd(uuid: string, text: string, cwd: string, timestamp: stri
   });
 }
 
+function lettaLocalMessage(role: "user" | "assistant", content: string): string {
+  // Version-3 wrapper row with no native message id, so identity uses the byte anchor.
+  return JSON.stringify({ type: "message", message: { role, content } });
+}
+
 function codexMeta(id: string, cwd: string, timestamp: string): string {
   return JSON.stringify({ type: "session_meta", payload: { id, cwd, timestamp } });
 }
@@ -503,6 +552,7 @@ function canonicalCheckpoint(data: DeepAgentsCheckpointData): CanonicalRecord[] 
   return buildCanonicalRecords(internal, {
     groupId: internal.context.sourceGroupId ?? "default",
     baseByteOffset: 0,
+    emitMeta: true,
   });
 }
 

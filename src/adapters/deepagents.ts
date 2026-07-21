@@ -14,7 +14,12 @@ export function decodeDeepAgentsCheckpoint(
     // anchored to the message offset within the checkpoint (kind `location`).
     let componentIndex = 0;
     const emit = (event: DecodedEvent): void => {
-      events.push({ ...event, sourceOffset: offset, componentIndex: componentIndex++ });
+      events.push({
+        ...event,
+        sourceOffset: offset,
+        sourceAnchorKind: "ordinal",
+        componentIndex: componentIndex++,
+      });
     };
 
     if (message.role === "human") {
@@ -86,12 +91,10 @@ export function decodeDeepAgentsCheckpoint(
 /**
  * Group identity for a Deep Agents checkpoint. Different namespaces are distinct
  * checkpoint streams whose offset-derived identities would otherwise collide, so
- * the group must uniquely encode the `(threadId, checkpointNamespace)` pair. The
- * root namespace uses the thread id directly; sub-namespaces use an unambiguous
- * JSON-tuple encoding to avoid delimiter collisions between the two strings.
+ * the group uniquely encodes the `(threadId, checkpointNamespace)` pair. The pair
+ * is encoded uniformly for every namespace (including root) so no thread id whose
+ * literal value looks like the encoding can collide with a real pair.
  */
 function deepAgentsGroupId(threadId: string, checkpointNamespace: string): string {
-  return checkpointNamespace === ""
-    ? threadId
-    : JSON.stringify([threadId, checkpointNamespace]);
+  return JSON.stringify([threadId, checkpointNamespace]);
 }

@@ -23,10 +23,13 @@ interface DecodedEventBase {
   sourceSequence?: number;
   /**
    * Stable source-native location used as a fallback identity anchor when no
-   * native record id exists but a durable offset does (for example a 1-based
-   * line offset in an append-only transcript).
+   * native record id exists but a durable offset does. Its unit is given by
+   * {@link sourceAnchorKind}: an absolute UTF-8 byte offset (`byte`, chunkable
+   * via `sourceContext.baseByteOffset`) or a whole-decode ordinal (`ordinal`).
    */
   sourceOffset?: number;
+  /** Unit of {@link sourceOffset}. `baseByteOffset` applies only to `byte`. */
+  sourceAnchorKind?: "byte" | "ordinal";
   /**
    * Index of this component within its own source record, starting at 0. A
    * single source record (one line/message) may expand into multiple canonical
@@ -101,6 +104,7 @@ export interface CanonicalSourceBasis {
   sourceRecordId?: string;
   sourceSequence?: number;
   sourceOffset?: number;
+  sourceAnchorKind?: "byte" | "ordinal";
   componentIndex: number;
   /**
    * Ordinal of this component among components of the same canonical type within

@@ -19,9 +19,9 @@ export const lettaAdapter: SourceAdapter = {
     const parsed = parseTranscript(transcript);
 
     if (parsed.format === "local") {
-      parsed.messages.forEach((entry, index) => {
-        decodeLocalMessage(entry.message, entry.timestamp, index, events);
-      });
+      for (const entry of parsed.messages) {
+        decodeLocalMessage(entry.message, entry.timestamp, entry.byteOffset, events);
+      }
       return {
         events,
         context: {
@@ -128,14 +128,18 @@ export const lettaAdapter: SourceAdapter = {
   },
 };
 
+type LocalMessageEntry = {
+  message: Record<string, unknown>;
+  timestamp?: Date;
+  /** Absolute UTF-8 byte offset of this row within the transcript. */
+  byteOffset: number;
+};
+
 type ParsedTranscript =
   | { format: "api"; messages: Record<string, unknown>[] }
   | {
       format: "local";
-      messages: Array<{
-        message: Record<string, unknown>;
-        timestamp?: Date;
-      }>;
+      messages: LocalMessageEntry[];
       createdAt?: Date;
     };
 
@@ -155,6 +159,7 @@ function parseTranscript(transcript: string): ParsedTranscript {
         messages: [
           {
             message: parsed,
+            byteOffset: 0,
             ...(timestamp ? { timestamp } : {}),
           },
         ],
@@ -183,8 +188,12 @@ function parseTranscript(transcript: string): ParsedTranscript {
 }
 
 function parseLocalJsonLines(transcript: string): ParsedTranscript {
-  const rows: Record<string, unknown>[] = [];
+  const rows: Array<{ row: Record<string, unknown>; byteOffset: number }> = [];
+  let byteOffset = 0;
   for (const raw of transcript.split("\n")) {
+    const rowByteOffset = byteOffset;
+    // Advance past this row's bytes plus the "\n" separator that split removed.
+    byteOffset += utf8ByteLength(raw) + 1;
     if (!raw.trim()) continue;
     let row: unknown;
     try {
@@ -193,27 +202,33 @@ function parseLocalJsonLines(transcript: string): ParsedTranscript {
       throw invalidLettaTranscript();
     }
     if (!isObject(row)) throw invalidLettaTranscript();
-    rows.push(row);
+    rows.push({ row, byteOffset: rowByteOffset });
   }
   if (rows.length === 0) throw invalidLettaTranscript();
 
-  const session = rows.find((row) => row.type === "session");
-  if (session) {
-    if (session.version !== 3) {
-      throw new NormalizationError(
-        "invalid_input",
-        `Unsupported Letta local transcript version ${JSON.stringify(session.version)}; supported version: 3.`,
-      );
-    }
-    const createdAt = parseTimestamp(session.timestamp);
+  const session = rows.find((entry) => entry.row.type === "session");
+  if (session && session.row.version !== 3) {
+    throw new NormalizationError(
+      "invalid_input",
+      `Unsupported Letta local transcript version ${JSON.stringify(session.row.version)}; supported version: 3.`,
+    );
+  }
+
+  // Version 3 files use `type: "message"` wrapper rows. A standalone continuation
+  // chunk contains those wrapper rows without the leading `type: "session"` row,
+  // so detect the wrapper shape directly rather than requiring the session row.
+  const hasMessageWrappers = rows.some((entry) => entry.row.type === "message");
+  if (session || hasMessageWrappers) {
+    const createdAt = session ? parseTimestamp(session.row.timestamp) : undefined;
     return {
       format: "local",
-      messages: rows.flatMap((row) => {
-        if (row.type !== "message" || !isObject(row.message)) return [];
-        const timestamp = parseTimestamp(row.timestamp);
+      messages: rows.flatMap((entry) => {
+        if (entry.row.type !== "message" || !isObject(entry.row.message)) return [];
+        const timestamp = parseTimestamp(entry.row.timestamp);
         return [
           {
-            message: row.message,
+            message: entry.row.message,
+            byteOffset: entry.byteOffset,
             ...(timestamp ? { timestamp } : {}),
           },
         ];
@@ -222,15 +237,16 @@ function parseLocalJsonLines(transcript: string): ParsedTranscript {
     };
   }
 
-  if (!rows.every((row) => typeof row.role === "string")) {
+  if (!rows.every((entry) => typeof entry.row.role === "string")) {
     throw invalidLettaTranscript();
   }
   return {
     format: "local",
-    messages: rows.map((message) => {
-      const timestamp = messageTimestamp(message);
+    messages: rows.map((entry) => {
+      const timestamp = messageTimestamp(entry.row);
       return {
-        message,
+        message: entry.row,
+        byteOffset: entry.byteOffset,
         ...(timestamp ? { timestamp } : {}),
       };
     }),
@@ -240,18 +256,21 @@ function parseLocalJsonLines(transcript: string): ParsedTranscript {
 function decodeLocalMessage(
   message: Record<string, unknown>,
   entryTimestamp: Date | undefined,
-  offset: number,
+  byteOffset: number,
   events: DecodedEvent[],
 ): void {
   const timestamp = entryTimestamp ?? messageTimestamp(message);
   const model = typeof message.model === "string" ? message.model : undefined;
-  // Prefer a native message id; otherwise anchor identity to the entry offset.
+  // Prefer a native message id; otherwise anchor identity to the absolute UTF-8
+  // byte offset so it is stable across chunked uploads (kind `byte`).
   const id = typeof message.id === "string" && message.id ? message.id : undefined;
   let componentIndex = 0;
   const emit = (event: DecodedEvent): void => {
     events.push({
       ...event,
-      ...(id !== undefined ? { sourceRecordId: id } : { sourceOffset: offset }),
+      ...(id !== undefined
+        ? { sourceRecordId: id }
+        : { sourceOffset: byteOffset, sourceAnchorKind: "byte" }),
       componentIndex: componentIndex++,
     });
   };
@@ -342,6 +361,10 @@ function messageTimestamp(message: Record<string, unknown>): Date | undefined {
     parseTimestamp(message.date) ??
     parseTimestamp(message.timestamp)
   );
+}
+
+function utf8ByteLength(text: string): number {
+  return new TextEncoder().encode(text).length;
 }
 
 function toolArguments(value: unknown): string {

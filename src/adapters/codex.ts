@@ -41,7 +41,12 @@ export const codexAdapter: SourceAdapter = {
       // The worker adds sourceContext.baseByteOffset to anchor it absolutely
       // across chunked uploads.
       const emit = (event: DecodedEvent): void => {
-        events.push({ ...event, sourceOffset: byteOffset, componentIndex: 0 });
+        events.push({
+          ...event,
+          sourceOffset: byteOffset,
+          sourceAnchorKind: "byte",
+          componentIndex: 0,
+        });
       };
 
       if (recordType === "session_meta") {

@@ -162,6 +162,7 @@ var claudeCodeAdapter = {
           ...event,
           ...uuid !== undefined ? { sourceRecordId: uuid } : {},
           sourceOffset: byteOffset,
+          sourceAnchorKind: "byte",
           componentIndex: componentIndex++
         });
       };
@@ -296,7 +297,12 @@ var codexAdapter = {
       const timestamp = parseTimestamp(record.timestamp);
       const payloadType = payload.type;
       const emit = (event) => {
-        events.push({ ...event, sourceOffset: byteOffset, componentIndex: 0 });
+        events.push({
+          ...event,
+          sourceOffset: byteOffset,
+          sourceAnchorKind: "byte",
+          componentIndex: 0
+        });
       };
       if (recordType === "session_meta") {
         if (!cwd && typeof payload.cwd === "string" && payload.cwd)
@@ -454,9 +460,9 @@ var lettaAdapter = {
     const events = [];
     const parsed = parseTranscript(transcript);
     if (parsed.format === "local") {
-      parsed.messages.forEach((entry, index) => {
-        decodeLocalMessage(entry.message, entry.timestamp, index, events);
-      });
+      for (const entry of parsed.messages) {
+        decodeLocalMessage(entry.message, entry.timestamp, entry.byteOffset, events);
+      }
       return {
         events,
         context: {
@@ -552,6 +558,7 @@ function parseTranscript(transcript) {
         messages: [
           {
             message: parsed,
+            byteOffset: 0,
             ...timestamp ? { timestamp } : {}
           }
         ]
@@ -572,8 +579,11 @@ function parseTranscript(transcript) {
 }
 function parseLocalJsonLines(transcript) {
   const rows = [];
+  let byteOffset = 0;
   for (const raw of transcript.split(`
 `)) {
+    const rowByteOffset = byteOffset;
+    byteOffset += utf8ByteLength2(raw) + 1;
     if (!raw.trim())
       continue;
     let row;
@@ -584,25 +594,27 @@ function parseLocalJsonLines(transcript) {
     }
     if (!isObject(row))
       throw invalidLettaTranscript();
-    rows.push(row);
+    rows.push({ row, byteOffset: rowByteOffset });
   }
   if (rows.length === 0)
     throw invalidLettaTranscript();
-  const session = rows.find((row) => row.type === "session");
-  if (session) {
-    if (session.version !== 3) {
-      throw new NormalizationError("invalid_input", `Unsupported Letta local transcript version ${JSON.stringify(session.version)}; supported version: 3.`);
-    }
-    const createdAt = parseTimestamp(session.timestamp);
+  const session = rows.find((entry) => entry.row.type === "session");
+  if (session && session.row.version !== 3) {
+    throw new NormalizationError("invalid_input", `Unsupported Letta local transcript version ${JSON.stringify(session.row.version)}; supported version: 3.`);
+  }
+  const hasMessageWrappers = rows.some((entry) => entry.row.type === "message");
+  if (session || hasMessageWrappers) {
+    const createdAt = session ? parseTimestamp(session.row.timestamp) : undefined;
     return {
       format: "local",
-      messages: rows.flatMap((row) => {
-        if (row.type !== "message" || !isObject(row.message))
+      messages: rows.flatMap((entry) => {
+        if (entry.row.type !== "message" || !isObject(entry.row.message))
           return [];
-        const timestamp = parseTimestamp(row.timestamp);
+        const timestamp = parseTimestamp(entry.row.timestamp);
         return [
           {
-            message: row.message,
+            message: entry.row.message,
+            byteOffset: entry.byteOffset,
             ...timestamp ? { timestamp } : {}
           }
         ];
@@ -610,21 +622,22 @@ function parseLocalJsonLines(transcript) {
       ...createdAt ? { createdAt } : {}
     };
   }
-  if (!rows.every((row) => typeof row.role === "string")) {
+  if (!rows.every((entry) => typeof entry.row.role === "string")) {
     throw invalidLettaTranscript();
   }
   return {
     format: "local",
-    messages: rows.map((message) => {
-      const timestamp = messageTimestamp(message);
+    messages: rows.map((entry) => {
+      const timestamp = messageTimestamp(entry.row);
       return {
-        message,
+        message: entry.row,
+        byteOffset: entry.byteOffset,
         ...timestamp ? { timestamp } : {}
       };
     })
   };
 }
-function decodeLocalMessage(message, entryTimestamp, offset, events) {
+function decodeLocalMessage(message, entryTimestamp, byteOffset, events) {
   const timestamp = entryTimestamp ?? messageTimestamp(message);
   const model = typeof message.model === "string" ? message.model : undefined;
   const id = typeof message.id === "string" && message.id ? message.id : undefined;
@@ -632,7 +645,7 @@ function decodeLocalMessage(message, entryTimestamp, offset, events) {
   const emit = (event) => {
     events.push({
       ...event,
-      ...id !== undefined ? { sourceRecordId: id } : { sourceOffset: offset },
+      ...id !== undefined ? { sourceRecordId: id } : { sourceOffset: byteOffset, sourceAnchorKind: "byte" },
       componentIndex: componentIndex++
     });
   };
@@ -709,6 +722,9 @@ function decodeLocalMessage(message, entryTimestamp, offset, events) {
 function messageTimestamp(message) {
   const metadata = isObject(message.metadata) ? message.metadata : {};
   return parseTimestamp(metadata.created_at) ?? parseTimestamp(message.date) ?? parseTimestamp(message.timestamp);
+}
+function utf8ByteLength2(text) {
+  return new TextEncoder().encode(text).length;
 }
 function toolArguments(value) {
   if (typeof value === "string" && value)
@@ -887,7 +903,12 @@ function decodeDeepAgentsCheckpoint(checkpoint) {
     const timestamp = parseTimestamp(message.timestamp) ?? checkpointTimestamp;
     let componentIndex = 0;
     const emit = (event) => {
-      events.push({ ...event, sourceOffset: offset, componentIndex: componentIndex++ });
+      events.push({
+        ...event,
+        sourceOffset: offset,
+        sourceAnchorKind: "ordinal",
+        componentIndex: componentIndex++
+      });
     };
     if (message.role === "human") {
       if (message.content) {
@@ -952,7 +973,7 @@ function decodeDeepAgentsCheckpoint(checkpoint) {
   };
 }
 function deepAgentsGroupId(threadId, checkpointNamespace) {
-  return checkpointNamespace === "" ? threadId : JSON.stringify([threadId, checkpointNamespace]);
+  return JSON.stringify([threadId, checkpointNamespace]);
 }
 
 // src/bounds.ts
@@ -1277,6 +1298,7 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
       ...event.sourceRecordId !== undefined ? { sourceRecordId: event.sourceRecordId } : {},
       ...event.sourceSequence !== undefined ? { sourceSequence: event.sourceSequence } : {},
       ...event.sourceOffset !== undefined ? { sourceOffset: event.sourceOffset } : {},
+      ...event.sourceAnchorKind !== undefined ? { sourceAnchorKind: event.sourceAnchorKind } : {},
       ...hasTimestamp && event.timestamp ? { sourceTimestamp: event.timestamp.toISOString() } : {}
     });
   }

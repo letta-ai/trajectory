@@ -73,9 +73,12 @@ export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
     internal.context.sourceGroupId,
     input.sourceContext?.groupId,
   );
+  const baseByteOffset = input.sourceContext?.baseByteOffset ?? 0;
   return finalizeCanonical(internal, bounds, {
     groupId,
-    baseByteOffset: input.sourceContext?.baseByteOffset ?? 0,
+    baseByteOffset,
+    // The authoritative meta is emitted with the initial byte range only.
+    emitMeta: baseByteOffset === 0,
   });
 }
 
@@ -124,6 +127,7 @@ export async function normalizeCheckpointToCanonical(
   return finalizeCanonical(internal, bounds, {
     groupId: internal.context.sourceGroupId || GROUP_SENTINEL,
     baseByteOffset: 0,
+    emitMeta: true,
   });
 }
 
@@ -150,7 +154,7 @@ async function decodeCheckpoint(input: DeepAgentsCheckpointInput): Promise<{
 function finalizeCanonical(
   internal: ReturnType<typeof normalizeDecodedSessionInternal>,
   bounds: ResolvedNormalizationBounds,
-  options: { groupId: string; baseByteOffset: number },
+  options: { groupId: string; baseByteOffset: number; emitMeta: boolean },
 ): CanonicalResult {
   return {
     records: buildCanonicalRecords(internal, options),

@@ -7,12 +7,13 @@ on:
 
 permissions:
   contents: read
-  # Required for npm provenance (OIDC).
+  # Kept for when provenance is re-enabled (see the publish step); npm provenance
+  # requires OIDC. Unused while publishing without provenance.
   id-token: write
 
 jobs:
   publish:
-    name: Publish to npm with provenance
+    name: Publish to npm
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -37,7 +38,12 @@ jobs:
       - name: Verify (typecheck, test, build)
         run: bun run check
 
-      - name: Publish with provenance
-        run: npm publish --provenance --access public
+      # NOTE: provenance (`--provenance`) requires a PUBLIC GitHub source repo;
+      # npm rejects it for a private repo (422). This repo is currently private,
+      # so we publish without provenance to unblock consumers. Re-add
+      # `--provenance` once the repo is public (a later release will then be
+      # provenance-signed); no other change is needed.
+      - name: Publish
+        run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

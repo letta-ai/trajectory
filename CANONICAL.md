@@ -52,6 +52,36 @@ fields it must compute from stored cross-upload state.
 | `record_index` | worker | authoritative ClickHouse index, assigned after sorting |
 | `normalizer_version`, `schema_version`, `config_hash` | worker | versions come from the exports above; `config_hash` from `config.bounds` |
 
+## Source context for chunked uploads
+
+`normalizeToCanonical()` accepts an optional `sourceContext` so the worker can
+anchor identity absolutely across chunked uploads of one append-only source
+generation:
+
+```ts
+normalizeToCanonical({ source, transcript, sourceContext: { groupId, baseByteOffset } });
+```
+
+- `groupId` — the authoritative logical source group/session. It **fills** a
+  missing adapter-detected group (for example a Codex chunk uploaded without its
+  `session_meta`). If an adapter-detected group and `groupId` are both present
+  and disagree, normalization fails with `source_group_conflict` so the upload
+  can be quarantined.
+- `baseByteOffset` — the absolute UTF-8 byte offset of this transcript within its
+  source generation, added to each record's in-transcript byte offset. This makes
+  `location`-anchored identity (Codex) stable regardless of chunk boundaries.
+
+Codex is `location`-anchored and therefore **requires** a resolved group
+(detected `session_meta` or `sourceContext.groupId`); it fails with
+`source_group_required` rather than falling back to the `default` sentinel, which
+would turn missing context into durable bad identity. Absolute byte offsets are
+only stable within one append-only generation; a truncation/replacement is a new
+generation upstream (worker-owned).
+
+Deep Agents checkpoint identity is grouped by the `(threadId, checkpointNamespace)`
+pair: the root namespace uses `threadId`; sub-namespaces use `JSON.stringify([threadId, checkpointNamespace])`
+so distinct threads and namespaces never collide on offset-derived identities.
+
 ## Identity model
 
 Identity is derived only from source-native signals — never from content or
@@ -116,7 +146,13 @@ identity; `location`/`content` require in-order, append-only assembly):
 
 `record_timestamp` and therefore `record_hash` can vary when timestamps are
 synthesized/interpolated from record position; they are descriptive, not
-identity. Tool call↔result linkage is resolved independently of arrival order
+identity. `source_order_id` never uses `record_timestamp`: records without a
+source timestamp share a fixed missing-time sentinel that sorts as one
+deterministic bucket, ordered within it by native sequence then
+`stable_source_record_id`. The `meta` record's `cwd`/`git_branch`/`model` are
+resolved from source chronology (earliest source timestamp, tie-broken by stable
+id; model by highest count then lexicographically), so meta content and hashes
+are arrival-order independent. Tool call↔result linkage is resolved independently of arrival order
 using explicit tool-call ids, so a tool result links to its call even when it
 appears earlier in the transcript (reversed chunks); the worker does not need to
 pre-sort records into source order before normalizing. When a source exposes no

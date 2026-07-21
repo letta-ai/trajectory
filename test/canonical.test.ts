@@ -12,6 +12,11 @@ import type {
   CanonicalResult,
   TrajectorySource,
 } from "../src/index.js";
+import { decodeDeepAgentsCheckpoint } from "../src/adapters/deepagents.js";
+import { buildCanonicalRecords } from "../src/canonical.js";
+import { normalizeDecodedSessionInternal } from "../src/core.js";
+import { resolveBounds } from "../src/bounds.js";
+import type { DeepAgentsCheckpointData } from "../src/index.js";
 
 const canonicalSchema = JSON.parse(
   fixtureText("", "../schema/trajectory-canonical-v1.schema.json"),
@@ -201,6 +206,136 @@ describe("determinism", () => {
   });
 });
 
+describe("codex chunked-upload source context", () => {
+  const meta = codexMeta("sess-1", "/work", "2026-06-01T09:00:00.000Z");
+  const u1 = codexMessage("user", "first question", "2026-06-01T09:00:01.000Z");
+  const a1 = codexMessage("assistant", "first answer", "2026-06-01T09:00:02.000Z");
+  const u2 = codexMessage("user", "second question", "2026-06-01T09:00:03.000Z");
+  const a2 = codexMessage("assistant", "second answer", "2026-06-01T09:00:04.000Z");
+
+  test("identity matches between full transcript and a standalone later chunk", () => {
+    const full = normalizeToCanonical({
+      source: "codex",
+      transcript: [meta, u1, a1, u2, a2].join("\n"),
+    });
+    const baseByteOffset = utf8Len([meta, u1, a1].join("\n") + "\n");
+    const chunk = normalizeToCanonical({
+      source: "codex",
+      transcript: [u2, a2].join("\n"),
+      sourceContext: { groupId: "sess-1", baseByteOffset },
+    });
+
+    const fullSecond = full.records.find((record) => record.content === "second question");
+    const chunkSecond = chunk.records.find((record) => record.content === "second question");
+    expect(chunkSecond?.stable_source_record_id).toBe(fullSecond?.stable_source_record_id ?? "");
+    expect(chunkSecond?.record_id).toBe(fullSecond?.record_id ?? "");
+    expect(chunkSecond?.source_group_id).toBe("sess-1");
+  });
+
+  test("requires a resolved group for Codex rather than a silent default", () => {
+    expect(() =>
+      normalizeToCanonical({ source: "codex", transcript: [u1, a1].join("\n") }),
+    ).toThrow(
+      expect.objectContaining({ code: "source_group_required" }),
+    );
+  });
+
+  test("fails when detected and provided groups disagree", () => {
+    expect(() =>
+      normalizeToCanonical({
+        source: "codex",
+        transcript: [meta, u1, a1].join("\n"),
+        sourceContext: { groupId: "other-session" },
+      }),
+    ).toThrow(
+      expect.objectContaining({ code: "source_group_conflict" }),
+    );
+  });
+});
+
+describe("deepagents thread grouping", () => {
+  test("root-namespace threads do not collide on offset identities", () => {
+    const first = canonicalCheckpoint(checkpointData("thread-a", ""));
+    const second = canonicalCheckpoint(checkpointData("thread-b", ""));
+
+    expect(first[1]?.source_group_id).toBe("thread-a");
+    expect(second[1]?.source_group_id).toBe("thread-b");
+    const firstIds = new Set(first.map((record) => record.record_id));
+    for (const record of second) {
+      expect(firstIds.has(record.record_id)).toBe(false);
+    }
+  });
+
+  test("distinct namespaces in one thread are distinct groups", () => {
+    const root = canonicalCheckpoint(checkpointData("thread-a", ""));
+    const sub = canonicalCheckpoint(checkpointData("thread-a", "sub"));
+    expect(root[1]?.source_group_id).toBe("thread-a");
+    expect(sub[1]?.source_group_id).toBe(JSON.stringify(["thread-a", "sub"]));
+    expect(sub[1]?.record_id).not.toBe(root[1]?.record_id ?? "");
+  });
+});
+
+describe("openhands linkage independent of arrival order", () => {
+  test("an observation before its action still resolves the call", () => {
+    const events = [
+      { id: "e1", kind: "MessageEvent", source: "user", timestamp: "2026-07-03T10:00:00.000Z", llm_message: { content: [{ type: "text", text: "go" }] } },
+      { id: "e2", kind: "ObservationEvent", action_id: "e3", timestamp: "2026-07-03T10:00:02.000Z", observation: { content: [{ type: "text", text: "command output" }] } },
+      { id: "e3", kind: "ActionEvent", timestamp: "2026-07-03T10:00:01.000Z", tool_name: "run", action: { kind: "run", command: "ls" } },
+    ];
+    const result = normalizeToCanonical({ source: "openhands", transcript: JSON.stringify(events) });
+
+    const tool = result.records.find((record) => record.record_type === "tool");
+    const call = result.records.find((record) => record.record_type === "assistant-tool-call");
+    expect(tool?.tool_call_id).toBe("oh_e3");
+    expect(call?.tool_call_id).toBe("oh_e3");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "orphan_tool_result",
+    );
+  });
+});
+
+describe("timestamp-free determinism", () => {
+  test("native records without timestamps keep stable order identity", () => {
+    const lines = [
+      ccUserNoTs("u-1", "start"),
+      ccAssistantNoTs("a-1", "answer one"),
+      ccUserNoTs("u-2", "again"),
+      ccAssistantNoTs("a-2", "answer two"),
+    ];
+    const forward = identityKeys(canonical(lines));
+    const reversed = identityKeys(canonical([...lines].reverse()));
+    expect(reversed).toEqual(forward);
+  });
+});
+
+describe("meta determinism", () => {
+  test("meta content resolves from source chronology, not arrival order", () => {
+    const early = ccUserCwd("u-1", "first", "/repo/early", "2026-05-01T10:00:00.000Z");
+    const late = ccAssistantCwd("a-1", "second", "/repo/late", "2026-05-01T10:00:05.000Z");
+
+    const forward = canonical([early, late]);
+    const reversed = canonical([late, early]);
+    const forwardMeta = forward.records[0];
+    const reversedMeta = reversed.records[0];
+
+    expect(forwardMeta?.record_type).toBe("meta");
+    // cwd comes from the chronologically-earliest record regardless of order.
+    expect(JSON.parse(forwardMeta?.record_json ?? "{}").cwd).toBe("/repo/early");
+    expect(reversedMeta?.content_hash).toBe(forwardMeta?.content_hash ?? "");
+    expect(reversedMeta?.record_hash).toBe(forwardMeta?.record_hash ?? "");
+  });
+
+  test("multiple Claude Code session ids are rejected", () => {
+    const lines = [
+      JSON.stringify({ type: "user", uuid: "u-1", sessionId: "s-1", timestamp: "2026-05-01T10:00:00.000Z", message: { role: "user", content: "hi" } }),
+      JSON.stringify({ type: "assistant", uuid: "a-1", sessionId: "s-2", timestamp: "2026-05-01T10:00:01.000Z", message: { role: "assistant", content: [{ type: "text", text: "yo" }] } }),
+    ];
+    expect(() => canonical(lines)).toThrow(
+      expect.objectContaining({ code: "source_group_conflict" }),
+    );
+  });
+});
+
 describe("diagnostics surfacing", () => {
   test("noisy Claude Code records are dropped with diagnostics", () => {
     const result = canonical([
@@ -284,6 +419,90 @@ function ccReasoning(uuid: string, text: string, timestamp: string): string {
       model: "test-model",
       content: [{ type: "thinking", thinking: text }],
     },
+  });
+}
+
+function ccUserNoTs(uuid: string, content: string): string {
+  return JSON.stringify({
+    type: "user",
+    uuid,
+    sessionId: "session-fixture",
+    message: { role: "user", content },
+  });
+}
+
+function ccAssistantNoTs(uuid: string, text: string): string {
+  return JSON.stringify({
+    type: "assistant",
+    uuid,
+    sessionId: "session-fixture",
+    message: { role: "assistant", model: "test-model", content: [{ type: "text", text }] },
+  });
+}
+
+function ccUserCwd(uuid: string, content: string, cwd: string, timestamp: string): string {
+  return JSON.stringify({
+    type: "user",
+    uuid,
+    sessionId: "session-fixture",
+    cwd,
+    timestamp,
+    message: { role: "user", content },
+  });
+}
+
+function ccAssistantCwd(uuid: string, text: string, cwd: string, timestamp: string): string {
+  return JSON.stringify({
+    type: "assistant",
+    uuid,
+    sessionId: "session-fixture",
+    cwd,
+    timestamp,
+    message: { role: "assistant", model: "test-model", content: [{ type: "text", text }] },
+  });
+}
+
+function codexMeta(id: string, cwd: string, timestamp: string): string {
+  return JSON.stringify({ type: "session_meta", payload: { id, cwd, timestamp } });
+}
+
+function codexMessage(role: "user" | "assistant", text: string, timestamp: string): string {
+  return JSON.stringify({
+    type: "response_item",
+    timestamp,
+    payload: {
+      type: "message",
+      role,
+      content: [{ type: role === "user" ? "input_text" : "output_text", text }],
+    },
+  });
+}
+
+function utf8Len(text: string): number {
+  return new TextEncoder().encode(text).length;
+}
+
+function checkpointData(threadId: string, checkpointNamespace: string): DeepAgentsCheckpointData {
+  return {
+    threadId,
+    checkpointId: "ckpt-1",
+    checkpointNamespace,
+    checkpointTimestamp: "2026-07-01T12:00:00.000Z",
+    messages: [
+      { role: "human", content: "do the thing" },
+      { role: "ai", content: "done", reasoning: [], toolCalls: [] },
+    ],
+  };
+}
+
+function canonicalCheckpoint(data: DeepAgentsCheckpointData): CanonicalRecord[] {
+  const internal = normalizeDecodedSessionInternal(
+    decodeDeepAgentsCheckpoint(data),
+    resolveBounds(undefined),
+  );
+  return buildCanonicalRecords(internal, {
+    groupId: internal.context.sourceGroupId ?? "default",
+    baseByteOffset: 0,
   });
 }
 

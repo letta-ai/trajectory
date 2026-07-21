@@ -32,10 +32,32 @@ export interface NormalizationBounds {
   toolResults?: ToolResultBounds;
 }
 
+/**
+ * Optional caller-supplied source context. Lets the Cloud normalizer worker
+ * anchor identity absolutely across chunked uploads of one append-only source
+ * generation, independent of how the transcript was segmented.
+ */
+export interface SourceContext {
+  /**
+   * Authoritative logical source group/session id. Fills missing adapter-detected
+   * context (for example a Codex chunk without its `session_meta`). If both an
+   * adapter-detected group and this value are present and disagree, normalization
+   * fails so the upload can be quarantined.
+   */
+  groupId?: string;
+  /**
+   * Absolute UTF-8 byte offset of this transcript within its source generation.
+   * Added to each record's in-transcript byte offset so location-derived identity
+   * is stable regardless of chunk boundaries.
+   */
+  baseByteOffset?: number;
+}
+
 export interface NormalizeInput {
   source: TranscriptTrajectorySource;
   transcript: string;
   bounds?: NormalizationBounds;
+  sourceContext?: SourceContext;
 }
 
 export interface DeepAgentsCheckpointLocation {
@@ -91,6 +113,8 @@ export type DeepAgentsMessageData =
   | DeepAgentsToolMessageData;
 
 export interface DeepAgentsCheckpointData {
+  /** LangGraph thread_id the checkpoint was selected by; part of the group identity. */
+  threadId: string;
   checkpointId: string;
   checkpointNamespace: string;
   checkpointTimestamp: string;
@@ -285,7 +309,9 @@ export type NormalizationErrorCode =
   | "invalid_checkpoint_state"
   | "missing_user_records"
   | "missing_assistant_records"
-  | "invalid_normalized_transcript";
+  | "invalid_normalized_transcript"
+  | "source_group_required"
+  | "source_group_conflict";
 
 export class NormalizationError extends Error {
   readonly code: NormalizationErrorCode;

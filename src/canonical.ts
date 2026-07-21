@@ -7,9 +7,19 @@ import type {
   SourceIdentityKind,
 } from "./types.js";
 
-const GROUP_SENTINEL = "default";
+export const GROUP_SENTINEL = "default";
 const META_ORDER_TIMESTAMP = "0000-00-00T00:00:00.000Z";
+// Missing-time records form one deterministic bucket that sorts before any real
+// timestamp within the group; sequence and stable id order them within it.
+const MISSING_TIME_SENTINEL = "0000-00-00T00:00:00.001Z";
 const SEQUENCE_WIDTH = 20;
+
+export interface CanonicalOptions {
+  /** Resolved source group id (overrides adapter-detected context). */
+  groupId: string;
+  /** Absolute base byte offset added to location anchors for chunked uploads. */
+  baseByteOffset: number;
+}
 
 /**
  * Project a full internal normalization into canonical, ingestion-ready records.
@@ -22,9 +32,10 @@ const SEQUENCE_WIDTH = 20;
  */
 export function buildCanonicalRecords(
   internal: InternalNormalization,
+  options: CanonicalOptions,
 ): CanonicalRecord[] {
   const sourceType = internal.context.source;
-  const groupId = internal.context.sourceGroupId || GROUP_SENTINEL;
+  const groupId = options.groupId;
 
   return internal.records.map((record, index) => {
     const basis = internal.bases[index] ?? null;
@@ -39,6 +50,7 @@ export function buildCanonicalRecords(
       groupId,
       basis,
       contentHash,
+      options.baseByteOffset,
     );
     const componentIndex = basis?.componentIndex ?? 0;
     const componentKey = componentKeyFor(record, type, basis);
@@ -54,7 +66,6 @@ export function buildCanonicalRecords(
       source_order_id: buildOrderId(
         type,
         sourceTimestamp,
-        recordTimestamp,
         basis,
         identity.stableSourceRecordId,
       ),
@@ -87,6 +98,7 @@ function deriveIdentity(
   groupId: string,
   basis: CanonicalSourceBasis | null,
   contentHash: string,
+  baseByteOffset: number,
 ): DerivedIdentity {
   if (type === "meta") {
     return { stableSourceRecordId: "meta", kind: "synthetic" };
@@ -95,8 +107,9 @@ function deriveIdentity(
     return { stableSourceRecordId: basis.sourceRecordId, kind: "native" };
   }
   if (basis?.sourceOffset !== undefined) {
+    const absoluteOffset = basis.sourceOffset + baseByteOffset;
     return {
-      stableSourceRecordId: sha256Hex(`${groupId}|offset|${basis.sourceOffset}`),
+      stableSourceRecordId: sha256Hex(`${groupId}|offset|${absoluteOffset}`),
       kind: "location",
     };
   }
@@ -121,15 +134,14 @@ function deriveIdentity(
 function buildOrderId(
   type: CanonicalRecordType,
   sourceTimestamp: string | null,
-  recordTimestamp: string | null,
   basis: CanonicalSourceBasis | null,
   stableSourceRecordId: string,
 ): string {
   const rank = type === "meta" ? "0" : "1";
+  // Never derive order from record_timestamp: it can be synthesized from array
+  // position and would make source_order_id depend on transport-arrival order.
   const timestamp =
-    type === "meta"
-      ? META_ORDER_TIMESTAMP
-      : (sourceTimestamp ?? recordTimestamp ?? META_ORDER_TIMESTAMP);
+    type === "meta" ? META_ORDER_TIMESTAMP : (sourceTimestamp ?? MISSING_TIME_SENTINEL);
   const sequence =
     basis?.sourceSequence !== undefined
       ? String(basis.sourceSequence).padStart(SEQUENCE_WIDTH, "0")

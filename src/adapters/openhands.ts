@@ -17,9 +17,24 @@ export const openHandsAdapter: SourceAdapter = {
   decode(transcript: string): DecodedSession {
     const diagnostics: Diagnostic[] = [];
     const events: DecodedEvent[] = [];
-    const callIdByActionId = new Map<string, string>();
+    const rawEvents = parseEvents(transcript);
 
-    for (const event of parseEvents(transcript)) {
+    // Pre-pass: map every action id to its tool-call id before decoding, so an
+    // observation that arrives before its action still resolves the call instead
+    // of being dropped as an orphan.
+    const callIdByActionId = new Map<string, string>();
+    for (const event of rawEvents) {
+      if (
+        isObject(event) &&
+        event.kind === "ActionEvent" &&
+        typeof event.id === "string" &&
+        event.id
+      ) {
+        callIdByActionId.set(event.id, actionCallId(event));
+      }
+    }
+
+    for (const event of rawEvents) {
       if (!isObject(event) || typeof event.id !== "string" || !event.id) {
         continue;
       }
@@ -56,11 +71,7 @@ export const openHandsAdapter: SourceAdapter = {
           });
         }
 
-        const callId =
-          typeof event.tool_call_id === "string" && event.tool_call_id
-            ? event.tool_call_id
-            : `oh_${event.id}`;
-        callIdByActionId.set(event.id, callId);
+        const callId = callIdByActionId.get(event.id) ?? actionCallId(event);
         emit({
           type: "tool_call",
           id: callId,
@@ -96,6 +107,12 @@ export const openHandsAdapter: SourceAdapter = {
     };
   },
 };
+
+function actionCallId(event: Record<string, unknown>): string {
+  return typeof event.tool_call_id === "string" && event.tool_call_id
+    ? event.tool_call_id
+    : `oh_${String(event.id)}`;
+}
 
 function parseEvents(transcript: string): unknown[] {
   let parsed: unknown;

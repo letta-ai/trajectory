@@ -418,13 +418,20 @@ function buildMeta(
 ): MetaRecord {
   let model = context.model;
   if (!model) {
+    // Highest count wins, tie-broken lexicographically so the choice does not
+    // depend on transport-arrival / insertion order.
+    let best: string | undefined;
     let highestCount = 0;
     for (const [candidate, count] of modelCounts) {
-      if (count > highestCount) {
-        model = candidate;
+      if (
+        count > highestCount ||
+        (count === highestCount && best !== undefined && candidate < best)
+      ) {
+        best = candidate;
         highestCount = count;
       }
     }
+    model = best;
   }
   return {
     role: "meta",

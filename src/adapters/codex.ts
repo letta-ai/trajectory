@@ -31,15 +31,17 @@ export const codexAdapter: SourceAdapter = {
     let createdAt: Date | undefined;
     let sessionId: string | undefined;
 
-    for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
+    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       const payload = isObject(record.payload) ? record.payload : {};
       const timestamp = parseTimestamp(record.timestamp);
       const payloadType = payload.type;
-      // Codex rollout lines carry no per-record id, so the append-only line
+      // Codex rollout lines carry no per-record id, so the append-only byte
       // offset is the stable location anchor for identity (kind `location`).
+      // The worker adds sourceContext.baseByteOffset to anchor it absolutely
+      // across chunked uploads.
       const emit = (event: DecodedEvent): void => {
-        events.push({ ...event, sourceOffset: line, componentIndex: 0 });
+        events.push({ ...event, sourceOffset: byteOffset, componentIndex: 0 });
       };
 
       if (recordType === "session_meta") {

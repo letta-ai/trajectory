@@ -1,14 +1,29 @@
 // src/python-cli.ts
 import { readFileSync, writeFileSync } from "node:fs";
 
+// src/types.ts
+class NormalizationError extends Error {
+  code;
+  constructor(code, message) {
+    super(message);
+    this.name = "NormalizationError";
+    this.code = code;
+  }
+}
+
 // src/adapters/shared.ts
 function parseJsonLines(transcript, diagnostics) {
   const parsed = [];
   const lines = transcript.split(`
 `);
+  let byteOffset = 0;
   for (let index = 0;index < lines.length; index += 1) {
     const raw = lines[index];
-    if (raw === undefined || !raw.trim())
+    if (raw === undefined)
+      continue;
+    const lineByteOffset = byteOffset;
+    byteOffset += utf8ByteLength(raw) + 1;
+    if (!raw.trim())
       continue;
     const line = index + 1;
     let value;
@@ -30,9 +45,12 @@ function parseJsonLines(transcript, diagnostics) {
       });
       continue;
     }
-    parsed.push({ value, line });
+    parsed.push({ value, line, byteOffset: lineByteOffset });
   }
   return parsed;
+}
+function utf8ByteLength(text) {
+  return new TextEncoder().encode(text).length;
 }
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -97,10 +115,10 @@ var claudeCodeAdapter = {
   decode(transcript) {
     const diagnostics = [];
     const events = [];
-    let cwd;
-    let gitBranch;
-    let sessionId;
-    for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
+    let cwdCandidate;
+    let branchCandidate;
+    const sessionIds = new Set;
+    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       if (record.isSidechain === true) {
         diagnostics.push({
@@ -113,13 +131,21 @@ var claudeCodeAdapter = {
       if (typeof recordType === "string" && TRANSPORT_TYPES.has(recordType)) {
         continue;
       }
-      if (!cwd && typeof record.cwd === "string" && record.cwd)
-        cwd = record.cwd;
-      if (!gitBranch && typeof record.gitBranch === "string" && record.gitBranch) {
-        gitBranch = record.gitBranch;
+      const contextKey = {
+        ts: parseTimestamp(record.timestamp)?.getTime() ?? Number.POSITIVE_INFINITY,
+        tie: typeof record.uuid === "string" && record.uuid ? record.uuid : `@${byteOffset}`
+      };
+      if (typeof record.cwd === "string" && record.cwd) {
+        cwdCandidate = earlier(cwdCandidate, { ...contextKey, value: record.cwd });
       }
-      if (!sessionId && typeof record.sessionId === "string" && record.sessionId) {
-        sessionId = record.sessionId;
+      if (typeof record.gitBranch === "string" && record.gitBranch) {
+        branchCandidate = earlier(branchCandidate, {
+          ...contextKey,
+          value: record.gitBranch
+        });
+      }
+      if (typeof record.sessionId === "string" && record.sessionId) {
+        sessionIds.add(record.sessionId);
       }
       if (recordType !== "user" && recordType !== "assistant")
         continue;
@@ -135,7 +161,7 @@ var claudeCodeAdapter = {
         events.push({
           ...event,
           ...uuid !== undefined ? { sourceRecordId: uuid } : {},
-          sourceOffset: line,
+          sourceOffset: byteOffset,
           componentIndex: componentIndex++
         });
       };
@@ -180,6 +206,12 @@ var claudeCodeAdapter = {
         }
       }
     }
+    if (sessionIds.size > 1) {
+      throw new NormalizationError("source_group_conflict", `Claude Code transcript contains multiple session ids: ${[...sessionIds].map((id) => JSON.stringify(id)).sort().join(", ")}.`);
+    }
+    const [sessionId] = sessionIds;
+    const cwd = cwdCandidate?.value;
+    const gitBranch = branchCandidate?.value;
     return {
       events,
       context: {
@@ -192,6 +224,15 @@ var claudeCodeAdapter = {
     };
   }
 };
+function earlier(current, next) {
+  if (current === undefined)
+    return next;
+  if (next.ts < current.ts)
+    return next;
+  if (next.ts > current.ts)
+    return current;
+  return next.tie < current.tie ? next : current;
+}
 function messageEvent(role, content, inputLine, timestamp, model) {
   return {
     type: "message",
@@ -249,13 +290,13 @@ var codexAdapter = {
     let model;
     let createdAt;
     let sessionId;
-    for (const { value: record, line } of parseJsonLines(transcript, diagnostics)) {
+    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       const payload = isObject(record.payload) ? record.payload : {};
       const timestamp = parseTimestamp(record.timestamp);
       const payloadType = payload.type;
       const emit = (event) => {
-        events.push({ ...event, sourceOffset: line, componentIndex: 0 });
+        events.push({ ...event, sourceOffset: byteOffset, componentIndex: 0 });
       };
       if (recordType === "session_meta") {
         if (!cwd && typeof payload.cwd === "string" && payload.cwd)
@@ -404,16 +445,6 @@ function outputText(output) {
     return typeof output.content === "string" && output.content ? output.content : jsonString(output);
   }
   return output == null ? "" : String(output);
-}
-
-// src/types.ts
-class NormalizationError extends Error {
-  code;
-  constructor(code, message) {
-    super(message);
-    this.name = "NormalizationError";
-    this.code = code;
-  }
 }
 
 // src/adapters/letta.ts
@@ -725,8 +756,14 @@ var openHandsAdapter = {
   decode(transcript) {
     const diagnostics = [];
     const events = [];
+    const rawEvents = parseEvents(transcript);
     const callIdByActionId = new Map;
-    for (const event of parseEvents(transcript)) {
+    for (const event of rawEvents) {
+      if (isObject(event) && event.kind === "ActionEvent" && typeof event.id === "string" && event.id) {
+        callIdByActionId.set(event.id, actionCallId(event));
+      }
+    }
+    for (const event of rawEvents) {
       if (!isObject(event) || typeof event.id !== "string" || !event.id) {
         continue;
       }
@@ -760,8 +797,7 @@ var openHandsAdapter = {
             ...timestamp ? { timestamp } : {}
           });
         }
-        const callId2 = typeof event.tool_call_id === "string" && event.tool_call_id ? event.tool_call_id : `oh_${event.id}`;
-        callIdByActionId.set(event.id, callId2);
+        const callId2 = callIdByActionId.get(event.id) ?? actionCallId(event);
         emit({
           type: "tool_call",
           id: callId2,
@@ -789,6 +825,9 @@ var openHandsAdapter = {
     };
   }
 };
+function actionCallId(event) {
+  return typeof event.tool_call_id === "string" && event.tool_call_id ? event.tool_call_id : `oh_${String(event.id)}`;
+}
 function parseEvents(transcript) {
   let parsed;
   try {
@@ -907,10 +946,13 @@ function decodeDeepAgentsCheckpoint(checkpoint) {
       ...checkpoint.cwd ? { cwd: checkpoint.cwd } : {},
       ...checkpoint.model ? { model: checkpoint.model } : {},
       ...checkpointTimestamp ? { createdAt: checkpointTimestamp } : {},
-      ...checkpoint.checkpointNamespace ? { sourceGroupId: checkpoint.checkpointNamespace } : {}
+      sourceGroupId: deepAgentsGroupId(checkpoint.threadId, checkpoint.checkpointNamespace)
     },
     diagnostics: []
   };
+}
+function deepAgentsGroupId(threadId, checkpointNamespace) {
+  return checkpointNamespace === "" ? threadId : JSON.stringify([threadId, checkpointNamespace]);
 }
 
 // src/bounds.ts
@@ -1394,13 +1436,15 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
 function buildMeta(context, modelCounts) {
   let model = context.model;
   if (!model) {
+    let best;
     let highestCount = 0;
     for (const [candidate, count] of modelCounts) {
-      if (count > highestCount) {
-        model = candidate;
+      if (count > highestCount || count === highestCount && best !== undefined && candidate < best) {
+        best = candidate;
         highestCount = count;
       }
     }
+    model = best;
   }
   return {
     role: "meta",
@@ -1756,7 +1800,7 @@ async function loadDeepAgentsCheckpoint(checkpoint) {
         reject(new NormalizationError("invalid_checkpoint_state", "Deep Agents checkpoint helper returned an invalid message envelope."));
         return;
       }
-      resolve(response.data);
+      resolve({ ...response.data, threadId: checkpoint.threadId });
     });
     child.stdin.on("error", () => {});
     child.stdin.end(JSON.stringify({

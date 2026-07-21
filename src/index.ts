@@ -5,7 +5,7 @@ import { openHandsAdapter } from "./adapters/openhands.js";
 import { decodeDeepAgentsCheckpoint } from "./adapters/deepagents.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
 import { resolveBounds } from "./bounds.js";
-import { buildCanonicalRecords } from "./canonical.js";
+import { buildCanonicalRecords, GROUP_SENTINEL } from "./canonical.js";
 import {
   normalizeDecodedSession,
   normalizeDecodedSessionInternal,
@@ -67,7 +67,44 @@ export function normalizeTranscript(input: NormalizeInput): NormalizeResult {
  */
 export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
   const { decoded, bounds } = decodeTranscript(input);
-  return finalizeCanonical(normalizeDecodedSessionInternal(decoded, bounds), bounds);
+  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+  const groupId = resolveGroupId(
+    input.source,
+    internal.context.sourceGroupId,
+    input.sourceContext?.groupId,
+  );
+  return finalizeCanonical(internal, bounds, {
+    groupId,
+    baseByteOffset: input.sourceContext?.baseByteOffset ?? 0,
+  });
+}
+
+/**
+ * Resolve the authoritative source group. Caller context fills a missing
+ * adapter-detected group but must not silently override a detected one: a
+ * disagreement fails so the upload can be quarantined. Location-anchored sources
+ * (Codex) require a resolved group rather than falling back to a sentinel, which
+ * would turn missing context into durable bad identity.
+ */
+function resolveGroupId(
+  source: TranscriptTrajectorySource,
+  detected: string | undefined,
+  provided: string | undefined,
+): string {
+  if (detected && provided && detected !== provided) {
+    throw new NormalizationError(
+      "source_group_conflict",
+      `Detected source group ${JSON.stringify(detected)} conflicts with the provided source context group ${JSON.stringify(provided)}.`,
+    );
+  }
+  const resolved = detected || provided;
+  if (source === "codex" && !resolved) {
+    throw new NormalizationError(
+      "source_group_required",
+      "Canonical Codex normalization requires a source group: include session_meta or pass sourceContext.groupId.",
+    );
+  }
+  return resolved || GROUP_SENTINEL;
 }
 
 /** Normalize a Python Deep Agents SDK checkpoint selected by path and thread. */
@@ -83,7 +120,11 @@ export async function normalizeCheckpointToCanonical(
   input: DeepAgentsCheckpointInput,
 ): Promise<CanonicalResult> {
   const { decoded, bounds } = await decodeCheckpoint(input);
-  return finalizeCanonical(normalizeDecodedSessionInternal(decoded, bounds), bounds);
+  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+  return finalizeCanonical(internal, bounds, {
+    groupId: internal.context.sourceGroupId || GROUP_SENTINEL,
+    baseByteOffset: 0,
+  });
 }
 
 async function decodeCheckpoint(input: DeepAgentsCheckpointInput): Promise<{
@@ -109,9 +150,10 @@ async function decodeCheckpoint(input: DeepAgentsCheckpointInput): Promise<{
 function finalizeCanonical(
   internal: ReturnType<typeof normalizeDecodedSessionInternal>,
   bounds: ResolvedNormalizationBounds,
+  options: { groupId: string; baseByteOffset: number },
 ): CanonicalResult {
   return {
-    records: buildCanonicalRecords(internal),
+    records: buildCanonicalRecords(internal, options),
     diagnostics: internal.diagnostics,
     normalizer_version: NORMALIZER_VERSION,
     canonical_schema_version: CANONICAL_SCHEMA_VERSION,
@@ -151,6 +193,7 @@ export {
   type NormalizeInput,
   type NormalizeResult,
   type ReasoningRecord,
+  type SourceContext,
   type SourceIdentityKind,
   type ToolCall,
   type ToolArgumentBounds,

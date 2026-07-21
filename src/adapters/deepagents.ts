@@ -74,10 +74,24 @@ export function decodeDeepAgentsCheckpoint(
       ...(checkpoint.cwd ? { cwd: checkpoint.cwd } : {}),
       ...(checkpoint.model ? { model: checkpoint.model } : {}),
       ...(checkpointTimestamp ? { createdAt: checkpointTimestamp } : {}),
-      ...(checkpoint.checkpointNamespace
-        ? { sourceGroupId: checkpoint.checkpointNamespace }
-        : {}),
+      sourceGroupId: deepAgentsGroupId(
+        checkpoint.threadId,
+        checkpoint.checkpointNamespace,
+      ),
     },
     diagnostics: [],
   };
+}
+
+/**
+ * Group identity for a Deep Agents checkpoint. Different namespaces are distinct
+ * checkpoint streams whose offset-derived identities would otherwise collide, so
+ * the group must uniquely encode the `(threadId, checkpointNamespace)` pair. The
+ * root namespace uses the thread id directly; sub-namespaces use an unambiguous
+ * JSON-tuple encoding to avoid delimiter collisions between the two strings.
+ */
+function deepAgentsGroupId(threadId: string, checkpointNamespace: string): string {
+  return checkpointNamespace === ""
+    ? threadId
+    : JSON.stringify([threadId, checkpointNamespace]);
 }

@@ -126,7 +126,9 @@ export async function loadDeepAgentsCheckpoint(
         );
         return;
       }
-      resolve(response.data);
+      // The Python helper does not echo the thread; carry it from the request so
+      // the checkpoint's group identity is unique per (threadId, namespace).
+      resolve({ ...response.data, threadId: checkpoint.threadId });
     });
 
     child.stdin.on("error", () => {

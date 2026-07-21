@@ -549,8 +549,9 @@ function parseTranscript(transcript) {
     return parseLocalJsonLines(transcript);
   }
   if (isObject(parsed)) {
-    if (parsed.type === "session")
+    if (parsed.type === "session" || parsed.type === "message") {
       return parseLocalJsonLines(transcript);
+    }
     if (typeof parsed.role === "string") {
       const timestamp = messageTimestamp(parsed);
       return {
@@ -1056,7 +1057,8 @@ var CONTENT_KEYS = new Set(["role", "content", "timestamp"]);
 var ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls"]);
 var TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "timestamp"]);
 var TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
-function validateTranscript(value) {
+function validateTranscript(value, options) {
+  const partial = options?.partial ?? false;
   if (!Array.isArray(value) || value.length === 0)
     fail("Transcript must be a non-empty array.");
   const allCallIds = collectCallIds(value);
@@ -1111,7 +1113,7 @@ function validateTranscript(value) {
     }
     if (record.role === "tool") {
       exactKeys(record, TOOL_RESULT_KEYS, index);
-      if (typeof record.tool_call_id !== "string" || !allCallIds.has(record.tool_call_id)) {
+      if (typeof record.tool_call_id !== "string" || !record.tool_call_id || !partial && !allCallIds.has(record.tool_call_id)) {
         fail(`Record ${index}: tool result must reference a tool call.`);
       }
       if (typeof record.content !== "string") {
@@ -1121,10 +1123,13 @@ function validateTranscript(value) {
     }
     fail(`Record ${index}: unknown role ${JSON.stringify(record.role)}.`);
   }
-  if (!roles.has("user"))
-    fail("Transcript must contain at least one user record.");
-  if (!roles.has("assistant"))
-    fail("Transcript must contain at least one assistant record.");
+  if (!partial) {
+    if (!roles.has("user"))
+      fail("Transcript must contain at least one user record.");
+    if (!roles.has("assistant")) {
+      fail("Transcript must contain at least one assistant record.");
+    }
+  }
 }
 function collectCallIds(records) {
   const ids = new Set;
@@ -1269,7 +1274,8 @@ function normalizeDecodedSession(decoded, bounds) {
   const internal = normalizeDecodedSessionInternal(decoded, bounds);
   return { records: internal.records, diagnostics: internal.diagnostics };
 }
-function normalizeDecodedSessionInternal(decoded, bounds) {
+function normalizeDecodedSessionInternal(decoded, bounds, options) {
+  const partial = options?.partial ?? false;
   const diagnostics = [...decoded.diagnostics];
   const body = [];
   const bodyBases = [];
@@ -1283,7 +1289,7 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
     if (event.model) {
       modelCounts.set(event.model, (modelCounts.get(event.model) ?? 0) + 1);
     }
-    const record = normalizeEvent(event, eventIndex, body.length + 1, plan, diagnostics, bounds);
+    const record = normalizeEvent(event, eventIndex, body.length + 1, plan, diagnostics, bounds, partial);
     if (!record)
       continue;
     const hasTimestamp = event.timestamp !== undefined && !Number.isNaN(event.timestamp.getTime());
@@ -1303,11 +1309,13 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
     });
   }
   const roles = new Set(body.map((record) => record.role));
-  if (!roles.has("user")) {
-    throw new NormalizationError("missing_user_records", "Transcript did not contain any normalizable user records.");
-  }
-  if (!roles.has("assistant")) {
-    throw new NormalizationError("missing_assistant_records", "Transcript did not contain any normalizable assistant records.");
+  if (!partial) {
+    if (!roles.has("user")) {
+      throw new NormalizationError("missing_user_records", "Transcript did not contain any normalizable user records.");
+    }
+    if (!roles.has("assistant")) {
+      throw new NormalizationError("missing_assistant_records", "Transcript did not contain any normalizable assistant records.");
+    }
   }
   const timestamps = fillTimestamps(body.length, anchors, decoded.context, diagnostics);
   const stampedBody = body.map((record, index) => {
@@ -1319,7 +1327,7 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
   });
   const meta = buildMeta(decoded.context, modelCounts);
   const records = [meta, ...stampedBody];
-  validateTranscript(records);
+  validateTranscript(records, { partial });
   const recordTimestamps = [
     null,
     ...stampedBody.map((record) => record.timestamp)
@@ -1334,7 +1342,7 @@ function normalizeDecodedSessionInternal(decoded, bounds) {
     bounds
   };
 }
-function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bounds) {
+function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bounds, partial) {
   if (event.type === "message") {
     if (!event.content.trim()) {
       return;
@@ -1374,7 +1382,7 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
   if (event.type === "tool_call") {
     const entry = plan.calls.get(eventIndex);
     const sourceId2 = entry?.sourceId ?? (event.id || `call_${eventIndex + 1}`);
-    const finalId = entry?.finalId ?? sourceId2;
+    const finalId2 = entry?.finalId ?? sourceId2;
     if (entry?.synthesized ?? !event.id) {
       diagnostics.push({
         code: "tool_call_id_synthesized",
@@ -1386,7 +1394,7 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
     if (entry?.renamed) {
       diagnostics.push({
         code: "duplicate_tool_call_id",
-        message: `Renamed duplicate tool-call ID ${JSON.stringify(sourceId2)} to ${JSON.stringify(finalId)}.`,
+        message: `Renamed duplicate tool-call ID ${JSON.stringify(sourceId2)} to ${JSON.stringify(finalId2)}.`,
         recordIndex,
         ...event.inputLine ? { inputLine: event.inputLine } : {}
       });
@@ -1404,7 +1412,7 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
     if (args.reshaped) {
       diagnostics.push({
         code: "tool_arguments_reshaped",
-        message: `Reshaped arguments for tool call ${JSON.stringify(finalId)} into a JSON object.`,
+        message: `Reshaped arguments for tool call ${JSON.stringify(finalId2)} into a JSON object.`,
         recordIndex,
         ...event.inputLine ? { inputLine: event.inputLine } : {}
       });
@@ -1412,7 +1420,7 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
     if (args.truncated) {
       diagnostics.push({
         code: "tool_arguments_truncated",
-        message: `Truncated arguments for tool call ${JSON.stringify(finalId)} to at most ${bounds.toolArguments.maxCharacters} Unicode code points.`,
+        message: `Truncated arguments for tool call ${JSON.stringify(finalId2)} to at most ${bounds.toolArguments.maxCharacters} Unicode code points.`,
         recordIndex,
         ...event.inputLine ? { inputLine: event.inputLine } : {}
       });
@@ -1420,14 +1428,15 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
     const record2 = {
       role: "assistant",
       content: null,
-      tool_calls: [{ id: finalId, name, args: args.args }]
+      tool_calls: [{ id: finalId2, name, args: args.args }]
     };
     return record2;
   }
   const sourceId = event.callId || "";
   const entries = plan.openCalls.get(sourceId);
   const openEntry = entries?.find((entry) => !entry.consumed);
-  if (!openEntry) {
+  const crossChunk = !openEntry && partial && sourceId !== "" && !(entries && entries.length > 0);
+  if (!openEntry && !crossChunk) {
     const duplicate = Boolean(entries && entries.length > 0);
     diagnostics.push({
       code: duplicate ? "duplicate_tool_result" : "orphan_tool_result",
@@ -1437,20 +1446,22 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
     });
     return;
   }
-  openEntry.consumed = true;
+  if (openEntry)
+    openEntry.consumed = true;
+  const finalId = openEntry ? openEntry.finalId : sourceId;
   const resultLimit = bounds.toolResults.maxCharacters;
   const content = resultLimit === null ? event.content : truncateText(event.content, resultLimit, bounds.toolResults.strategy);
   if (content !== event.content) {
     diagnostics.push({
       code: "tool_result_truncated",
-      message: `Truncated the result for tool call ${JSON.stringify(openEntry.finalId)} to at most ${resultLimit} Unicode code points using the ${JSON.stringify(bounds.toolResults.strategy)} strategy.`,
+      message: `Truncated the result for tool call ${JSON.stringify(finalId)} to at most ${resultLimit} Unicode code points using the ${JSON.stringify(bounds.toolResults.strategy)} strategy.`,
       recordIndex,
       ...event.inputLine ? { inputLine: event.inputLine } : {}
     });
   }
   const record = {
     role: "tool",
-    tool_call_id: openEntry.finalId,
+    tool_call_id: finalId,
     content
   };
   return record;

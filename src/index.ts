@@ -67,18 +67,20 @@ export function normalizeTranscript(input: NormalizeInput): NormalizeResult {
  */
 export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
   const { decoded, bounds } = decodeTranscript(input);
-  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+  const baseByteOffset = input.sourceContext?.baseByteOffset ?? 0;
+  // A continuation chunk (non-zero base offset) is a partial slice of a larger
+  // conversation: relax whole-conversation invariants and omit the meta record.
+  const partial = baseByteOffset > 0;
+  const internal = normalizeDecodedSessionInternal(decoded, bounds, { partial });
   const groupId = resolveGroupId(
     input.source,
     internal.context.sourceGroupId,
     input.sourceContext?.groupId,
   );
-  const baseByteOffset = input.sourceContext?.baseByteOffset ?? 0;
   return finalizeCanonical(internal, bounds, {
     groupId,
     baseByteOffset,
-    // The authoritative meta is emitted with the initial byte range only.
-    emitMeta: baseByteOffset === 0,
+    emitMeta: !partial,
   });
 }
 

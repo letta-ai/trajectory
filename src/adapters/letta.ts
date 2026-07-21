@@ -151,7 +151,11 @@ function parseTranscript(transcript: string): ParsedTranscript {
     return parseLocalJsonLines(transcript);
   }
   if (isObject(parsed)) {
-    if (parsed.type === "session") return parseLocalJsonLines(transcript);
+    // A single-line v3 continuation is one `type:"session"` or `type:"message"`
+    // wrapper row that parses as whole-input JSON; route it to the JSONL parser.
+    if (parsed.type === "session" || parsed.type === "message") {
+      return parseLocalJsonLines(transcript);
+    }
     if (typeof parsed.role === "string") {
       const timestamp = messageTimestamp(parsed);
       return {

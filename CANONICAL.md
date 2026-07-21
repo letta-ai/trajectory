@@ -80,13 +80,24 @@ would turn missing context into durable bad identity. Absolute byte offsets are
 only stable within one append-only generation; a truncation/replacement is a new
 generation upstream (worker-owned).
 
-The **meta** record is emitted only for the initial byte range
-(`baseByteOffset === 0` or absent). A continuation chunk omits meta: its meta
-would share the group's constant meta identity but carry different session
-context, which would look like a false conflicting-version. The authoritative
-meta arrives with the initial chunk; if the initial range never arrives, missing
-meta is preferable to a false conflict. `normalizeTranscript()` always includes
-meta.
+A non-zero `baseByteOffset` marks a **continuation chunk** — one slice of a
+larger conversation — and `normalizeToCanonical` switches to partial-transcript
+semantics for it (while `normalizeTranscript()` stays strict):
+
+- The meta record is emitted only for the initial byte range
+  (`baseByteOffset === 0` or absent). A continuation omits meta: its meta would
+  share the group's constant meta identity but carry different session context,
+  which would look like a false conflicting-version. If the initial range never
+  arrives, missing meta is preferable to a false conflict.
+- Whole-conversation invariants are relaxed: a continuation is not required to
+  contain a user and an assistant turn, so single-role chunks are accepted.
+- A tool result whose call lived in an earlier chunk is kept and linked by its
+  source call id (not dropped as an orphan); the worker resolves cross-chunk
+  linkage. A duplicate result (call present and already consumed) is still
+  dropped.
+
+`normalizeTranscript()` always requires a user and an assistant turn, drops
+orphan/cross-chunk tool results, and includes meta.
 
 Deep Agents checkpoint identity is grouped by the `(threadId, checkpointNamespace)`
 pair, encoded uniformly for every namespace (including root) as

@@ -258,6 +258,58 @@ describe("codex chunked-upload source context", () => {
   });
 });
 
+describe("canonical continuation (partial) chunks", () => {
+  test("a single-role continuation chunk is accepted", () => {
+    // A continuation that only contains assistant records must not be rejected
+    // for missing a user turn.
+    const chunk = normalizeToCanonical({
+      source: "codex",
+      transcript: [
+        codexMessage("assistant", "continued answer one", "2026-06-01T09:10:00.000Z"),
+        codexMessage("assistant", "continued answer two", "2026-06-01T09:10:01.000Z"),
+      ].join("\n"),
+      sourceContext: { groupId: "sess-1", baseByteOffset: 4096 },
+    });
+    expect(chunk.records.filter((record) => record.record_type === "assistant")).toHaveLength(2);
+    expect(chunk.records.some((record) => record.record_type === "meta")).toBe(false);
+  });
+
+  test("a tool result whose call was in an earlier chunk is kept, not dropped", () => {
+    const result = normalizeToCanonical({
+      source: "codex",
+      transcript: codexFunctionOutput("call_earlier", "command output", "2026-06-01T09:10:05.000Z"),
+      sourceContext: { groupId: "sess-1", baseByteOffset: 8192 },
+    });
+    const tool = result.records.find((record) => record.record_type === "tool");
+    expect(tool?.tool_call_id).toBe("call_earlier");
+    expect(tool?.tool_result_json).toBe("command output");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "orphan_tool_result",
+    );
+  });
+
+  test("strict normalizeToCanonical still rejects a single-role full transcript", () => {
+    expect(() =>
+      normalizeToCanonical({
+        source: "codex",
+        transcript: [
+          codexMeta("sess-1", "/work", "2026-06-01T09:00:00.000Z"),
+          codexMessage("assistant", "only assistant", "2026-06-01T09:00:01.000Z"),
+        ].join("\n"),
+      }),
+    ).toThrow(expect.objectContaining({ code: "missing_user_records" }));
+  });
+
+  test("a one-row v3 local Letta continuation is routed through the local parser", () => {
+    const chunk = normalizeToCanonical({
+      source: "letta",
+      transcript: lettaLocalMessage("assistant", "single continuation row"),
+      sourceContext: { groupId: "letta-session", baseByteOffset: 2048 },
+    });
+    expect(chunk.records.filter((record) => record.record_type === "assistant")).toHaveLength(1);
+  });
+});
+
 describe("local letta chunked-upload byte anchoring", () => {
   // Multibyte content before the split proves the anchor is bytes, not chars.
   const m1 = lettaLocalMessage("user", "héllo 😀 first");
@@ -524,6 +576,14 @@ function codexMessage(role: "user" | "assistant", text: string, timestamp: strin
       role,
       content: [{ type: role === "user" ? "input_text" : "output_text", text }],
     },
+  });
+}
+
+function codexFunctionOutput(callId: string, output: string, timestamp: string): string {
+  return JSON.stringify({
+    type: "response_item",
+    timestamp,
+    payload: { type: "function_call_output", call_id: callId, output },
   });
 }
 

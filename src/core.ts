@@ -161,10 +161,22 @@ export function normalizeDecodedSession(
  * source-identity bases and canonical record timestamps used by the canonical
  * view. The public {@link normalizeDecodedSession} is a thin projection of this.
  */
+export interface NormalizeInternalOptions {
+  /**
+   * Partial (canonical continuation) mode: the transcript is one chunk of a
+   * larger conversation, so whole-conversation invariants are relaxed. It does
+   * not require user/assistant turns, and a tool result whose call lived in an
+   * earlier chunk is kept (linked by its source call id) instead of dropped.
+   */
+  partial?: boolean;
+}
+
 export function normalizeDecodedSessionInternal(
   decoded: DecodedSession,
   bounds: ResolvedNormalizationBounds,
+  options?: NormalizeInternalOptions,
 ): InternalNormalization {
+  const partial = options?.partial ?? false;
   const diagnostics = [...decoded.diagnostics];
   const body: UnstampedBodyRecord[] = [];
   const bodyBases: CanonicalSourceBasis[] = [];
@@ -191,6 +203,7 @@ export function normalizeDecodedSessionInternal(
       plan,
       diagnostics,
       bounds,
+      partial,
     );
     if (!record) continue;
     const hasTimestamp =
@@ -222,17 +235,19 @@ export function normalizeDecodedSessionInternal(
   }
 
   const roles = new Set(body.map((record) => record.role));
-  if (!roles.has("user")) {
-    throw new NormalizationError(
-      "missing_user_records",
-      "Transcript did not contain any normalizable user records.",
-    );
-  }
-  if (!roles.has("assistant")) {
-    throw new NormalizationError(
-      "missing_assistant_records",
-      "Transcript did not contain any normalizable assistant records.",
-    );
+  if (!partial) {
+    if (!roles.has("user")) {
+      throw new NormalizationError(
+        "missing_user_records",
+        "Transcript did not contain any normalizable user records.",
+      );
+    }
+    if (!roles.has("assistant")) {
+      throw new NormalizationError(
+        "missing_assistant_records",
+        "Transcript did not contain any normalizable assistant records.",
+      );
+    }
   }
 
   const timestamps = fillTimestamps(
@@ -254,7 +269,7 @@ export function normalizeDecodedSessionInternal(
 
   const meta = buildMeta(decoded.context, modelCounts);
   const records: NormalizedRecord[] = [meta, ...stampedBody];
-  validateTranscript(records);
+  validateTranscript(records, { partial });
 
   const recordTimestamps: (string | null)[] = [
     null,
@@ -278,6 +293,7 @@ function normalizeEvent(
   plan: EventPlan,
   diagnostics: Diagnostic[],
   bounds: ResolvedNormalizationBounds,
+  partial: boolean,
 ): UnstampedBodyRecord | undefined {
   if (event.type === "message") {
     if (!event.content.trim()) {
@@ -381,7 +397,13 @@ function normalizeEvent(
   const sourceId = event.callId || "";
   const entries = plan.openCalls.get(sourceId);
   const openEntry = entries?.find((entry) => !entry.consumed);
-  if (!openEntry) {
+  // In partial (continuation) mode a tool result whose call is absent from this
+  // chunk is kept and linked by its source call id — the call lived in an earlier
+  // chunk and the worker resolves cross-chunk linkage. A duplicate (call present
+  // but already consumed) is still dropped, as in strict mode.
+  const crossChunk =
+    !openEntry && partial && sourceId !== "" && !(entries && entries.length > 0);
+  if (!openEntry && !crossChunk) {
     const duplicate = Boolean(entries && entries.length > 0);
     diagnostics.push({
       code: duplicate ? "duplicate_tool_result" : "orphan_tool_result",
@@ -393,7 +415,8 @@ function normalizeEvent(
     });
     return undefined;
   }
-  openEntry.consumed = true;
+  if (openEntry) openEntry.consumed = true;
+  const finalId = openEntry ? openEntry.finalId : sourceId;
   const resultLimit = bounds.toolResults.maxCharacters;
   const content =
     resultLimit === null
@@ -402,14 +425,14 @@ function normalizeEvent(
   if (content !== event.content) {
     diagnostics.push({
       code: "tool_result_truncated",
-      message: `Truncated the result for tool call ${JSON.stringify(openEntry.finalId)} to at most ${resultLimit} Unicode code points using the ${JSON.stringify(bounds.toolResults.strategy)} strategy.`,
+      message: `Truncated the result for tool call ${JSON.stringify(finalId)} to at most ${resultLimit} Unicode code points using the ${JSON.stringify(bounds.toolResults.strategy)} strategy.`,
       recordIndex,
       ...(event.inputLine ? { inputLine: event.inputLine } : {}),
     });
   }
   const record: Omit<ToolResultRecord, "timestamp"> = {
     role: "tool",
-    tool_call_id: openEntry.finalId,
+    tool_call_id: finalId,
     content,
   };
   return record;

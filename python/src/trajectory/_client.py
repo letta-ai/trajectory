@@ -43,23 +43,22 @@ def normalize_transcript(
 
 def normalize_checkpoint(
     *,
-    path: str | Path,
     thread_id: str,
-    checkpoint_namespace: str = "",
-    checkpoint_id: str | None = None,
+    path: str | Path | None = None,
     bounds: NormalizationBounds | None = None,
     python_executable: str | None = None,
 ) -> NormalizeResult:
-    """Normalize a Python Deep Agents SDK LangGraph SQLite checkpoint."""
+    """Normalize one Deep Agents thread from its LangGraph SQLite store.
+
+    ``path`` defaults to the Deep Agents CLI store, ``~/.deepagents/sessions.db``.
+    """
 
     checkpoint: dict[str, str] = {
-        "path": str(path),
         "threadId": thread_id,
-        "checkpointNamespace": checkpoint_namespace,
         "pythonExecutable": python_executable or sys.executable,
     }
-    if checkpoint_id is not None:
-        checkpoint["checkpointId"] = checkpoint_id
+    if path is not None:
+        checkpoint["path"] = str(path)
     request: NormalizeRequest = {
         "source": "deepagents",
         "checkpoint": checkpoint,

@@ -102,8 +102,10 @@ with a deterministic tool-capable model and normalizes the SDK-created SQLite
 checkpoint, so CI covers the actual SDK persistence contract without an API key.
 It contains canonical `HumanMessage`, `AIMessage` reasoning/text/tool calls,
 `ToolMessage`, model/cwd metadata, an ancestor checkpoint with message writes,
-and a selected checkpoint with pending message writes. Tests cover latest and
-explicit checkpoint selection plus checkpoint namespaces.
+and a selected checkpoint with pending message writes. The fixture mirrors the
+Deep Agents CLI store layout (`~/.deepagents/sessions.db`): multiple threads,
+all in the root checkpoint namespace, with the latest checkpoint selected per
+thread. Tests cover per-thread isolation and LangGraph Overwrite semantics.
 
 A Python-generated fixture was also opened with the official JavaScript
 `@langchain/langgraph-checkpoint-sqlite` saver as an interoperability gate. The

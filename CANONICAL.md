@@ -104,11 +104,11 @@ It is decoupled from meta emission:
 `normalizeTranscript()` and non-partial canonical callers always require a user
 and an assistant turn, drop orphan tool results, and include meta.
 
-Deep Agents checkpoint identity is grouped by the `(threadId, checkpointNamespace)`
-pair, encoded uniformly for every namespace (including root) as
-`JSON.stringify([threadId, checkpointNamespace])`, so distinct threads and
-namespaces never collide — even when a thread id literally looks like the
-encoding.
+Deep Agents identity is grouped by the `(threadId, checkpointNamespace)` pair,
+encoded as `JSON.stringify([threadId, checkpointNamespace])`. The supported CLI
+store keeps every thread in the root namespace, but the pair encoding is kept
+so historical group ids stay stable and no thread id that literally looks like
+the encoding can collide with a real pair.
 
 ## Identity model
 

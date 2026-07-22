@@ -8,9 +8,9 @@ tool results—in incompatible native formats. `trajectory` provides one
 TypeScript API that turns those formats into deterministic,
 structured records for training, evaluation, analysis, and inference.
 
-For transcript sources, the caller supplies a transcript string and its source.
-The Deep Agents SDK integration instead requires an explicit LangGraph SQLite
-checkpoint path and thread ID; the SDK defines no standard local store.
+The caller supplies a transcript string and its source. The one exception is
+Deep Agents, whose sessions are read from its local store instead; see
+[Deep Agents local sessions](#deep-agents-local-sessions).
 
 ## Installation
 
@@ -27,13 +27,6 @@ dependencies, but it requires Node.js 20 or newer:
 
 ```sh
 pip install "letta-trajectory @ git+ssh://git@github.com/letta-ai/trajectory.git"
-```
-
-Reading Python Deep Agents checkpoints additionally requires the optional
-LangGraph dependencies (already present in a typical Deep Agents environment):
-
-```sh
-pip install "letta-trajectory[deepagents] @ git+ssh://git@github.com/letta-ai/trajectory.git"
 ```
 
 ## Quick start
@@ -117,7 +110,7 @@ and is empty when the transcript required no recoverable cleanup.
 | `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
 | `openclaw` | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
-| `deepagents` | User-supplied Python LangGraph `SqliteSaver` database plus `threadId` | `deepagents` |
+| `deepagents` | Deep Agents CLI LangGraph SQLite store (`~/.deepagents/sessions.db` by default) plus `threadId` | `deepagents` |
 
 Letta messages use native `message_type` values such as `user_message`,
 `reasoning_message`, `assistant_message`, `tool_call_message`,
@@ -181,14 +174,16 @@ The public function is:
 normalizeTranscript(input: NormalizeInput): NormalizeResult
 ```
 
-### Deep Agents SDK checkpoints
+### Deep Agents local sessions
 
-Deep Agents conversation persistence is determined by its LangGraph
-checkpointer: no checkpointer is durable, `InMemorySaver` lasts only for the
-process, and `SqliteSaver` writes a caller-chosen SQLite database. There is no
-SDK-wide default path, so `deepagents` is a separate source from the
-`deepagents-code` CLI integration and always requires both `path` and
-`threadId`.
+Deep Agents has no transcript format: all conversation persistence goes
+through a LangGraph checkpointer, so the on-disk data is checkpoint state, not
+messages. The one standard local store is the Deep Agents CLI database at
+`~/.deepagents/sessions.db`, where every session is a thread in the root
+checkpoint namespace. `normalizeCheckpoint` reads that store by default and
+normalizes the latest state of one thread; pass `path` only for a non-default
+store (for example an SDK application's own `SqliteSaver` database, whose
+threads must live in the root namespace).
 
 ```ts
 import { normalizeCheckpoint } from "@letta-ai/trajectory";
@@ -196,41 +191,33 @@ import { normalizeCheckpoint } from "@letta-ai/trajectory";
 const result = await normalizeCheckpoint({
   source: "deepagents",
   checkpoint: {
-    path: "deepagents.db",
-    threadId: "thread-123",
-    // checkpointNamespace: "", // optional, defaults to root
-    // checkpointId: "...",     // optional, defaults to latest
-    // pythonExecutable: "/path/to/venv/bin/python",
+    threadId: "abc12345", // as listed by the CLI session picker
+    // path: "custom/sessions.db",              // optional store override
+    // pythonExecutable: "/path/to/venv/python", // optional interpreter
   },
 });
 ```
 
-The TypeScript API invokes the selected Python environment because current
-Python LangGraph SQLite checkpoints use serializer types that the JavaScript
-`SqliteSaver` cannot deserialize. The helper calls Python LangGraph's
-`SqliteSaver.get_tuple()` and DeltaChannel history APIs, then applies decoded
-message writes with LangGraph's official `add_messages` reducer. It never
-parses SQLite checkpoint blobs itself. The Python interpreter must contain
-`langgraph` and `langgraph-checkpoint-sqlite`; pass `pythonExecutable` or set
-`PYTHON` when `python3` is not the correct environment.
+Decoding delegates to the installed Python LangGraph packages (Python
+checkpoint serialization is not readable from JavaScript), so the selected
+interpreter must contain `langgraph` and `langgraph-checkpoint-sqlite` — both
+already present in a typical Deep Agents environment. Pass `pythonExecutable`
+or set `PYTHON` when `python3` is not the right environment. The Python
+wrapper reuses its own interpreter automatically, and its optional extra
+installs the LangGraph dependencies:
 
-The Python wrapper automatically reuses its own interpreter:
+```sh
+pip install "letta-trajectory[deepagents] @ git+ssh://git@github.com/letta-ai/trajectory.git"
+```
 
 ```python
 from trajectory import normalize_checkpoint
 
 result = normalize_checkpoint(
-    path="deepagents.db",
-    thread_id="thread-123",
-    checkpoint_namespace="",  # optional
-    checkpoint_id=None,        # optional; latest when omitted
+    thread_id="abc12345",
+    # path="custom/sessions.db",  # optional; defaults to ~/.deepagents/sessions.db
 )
 ```
-
-`loadDeepAgentsCheckpoint(location)` is also exported for integrations such as
-Deep Agents Code that need to discover a location before reusing the same
-decoder. `FilesystemBackend` is unrelated to this trajectory: it persists
-agent-created files, not the LangGraph message/checkpoint state.
 
 An unknown source, an invalid source-level container, or a transcript that
 cannot form a valid trajectory throws `NormalizationError`. Recoverable

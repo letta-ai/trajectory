@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generate checkpoint.db exclusively through Python LangGraph APIs."""
+"""Generate checkpoint.db exclusively through Python LangGraph APIs.
+
+The layout mirrors the Deep Agents CLI store (`~/.deepagents/sessions.db`):
+every thread lives in the root checkpoint namespace, and distinct sessions are
+distinct thread ids.
+"""
 
 from __future__ import annotations
 
@@ -12,8 +17,9 @@ from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.types import Overwrite
 
 
-THREAD_ID = "thread-123"
-NAMESPACE = "sdk"
+MAIN_THREAD_ID = "thread-123"
+BASIC_THREAD_ID = "thread-basic"
+OVERWRITE_THREAD_ID = "thread-overwrite"
 OLDER_ID = "00000000-0000-6000-8000-000000000001"
 LATEST_ID = "00000000-0000-6000-8000-000000000002"
 
@@ -30,6 +36,10 @@ def checkpoint(
     value["channel_values"] = channel_values
     value["channel_versions"] = versions
     return value
+
+
+def thread_config(thread_id: str) -> dict[str, object]:
+    return {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
 
 
 def main() -> None:
@@ -66,12 +76,6 @@ def main() -> None:
     ]
 
     with SqliteSaver.from_conn_string(str(output)) as saver:
-        root_config = {
-            "configurable": {
-                "thread_id": THREAD_ID,
-                "checkpoint_ns": NAMESPACE,
-            }
-        }
         older = checkpoint(
             OLDER_ID,
             "2026-01-02T03:04:06+00:00",
@@ -82,7 +86,7 @@ def main() -> None:
             {"messages": "1", "cwd": "1"},
         )
         older_config = saver.put(
-            root_config,
+            thread_config(MAIN_THREAD_ID),
             older,  # type: ignore[arg-type]
             {"source": "loop", "step": 1, "parents": {}},
             older["channel_versions"],  # type: ignore[arg-type]
@@ -140,27 +144,22 @@ def main() -> None:
             task_path="pull,model",
         )
 
-        other = checkpoint(
+        basic = checkpoint(
             "00000000-0000-6000-8000-000000000003",
             "2026-01-02T04:00:00+00:00",
             {
                 "messages": [
-                    HumanMessage(content="Other namespace", id="other-human"),
-                    AIMessage(content="Other response", id="other-ai"),
+                    HumanMessage(content="Basic thread", id="basic-human"),
+                    AIMessage(content="Basic response", id="basic-ai"),
                 ]
             },
             {"messages": "1"},
         )
         saver.put(
-            {
-                "configurable": {
-                    "thread_id": THREAD_ID,
-                    "checkpoint_ns": "other",
-                }
-            },
-            other,  # type: ignore[arg-type]
+            thread_config(BASIC_THREAD_ID),
+            basic,  # type: ignore[arg-type]
             {"source": "loop", "step": 1, "parents": {}},
-            other["channel_versions"],  # type: ignore[arg-type]
+            basic["channel_versions"],  # type: ignore[arg-type]
         )
 
         overwrite = checkpoint(
@@ -175,12 +174,7 @@ def main() -> None:
             {"messages": "1"},
         )
         overwrite_config = saver.put(
-            {
-                "configurable": {
-                    "thread_id": THREAD_ID,
-                    "checkpoint_ns": "overwrite",
-                }
-            },
+            thread_config(OVERWRITE_THREAD_ID),
             overwrite,  # type: ignore[arg-type]
             {"source": "loop", "step": 1, "parents": {}},
             overwrite["channel_versions"],  # type: ignore[arg-type]

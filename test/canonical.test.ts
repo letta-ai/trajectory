@@ -12,7 +12,7 @@ import type {
   CanonicalResult,
   TrajectorySource,
 } from "../src/index.js";
-import { decodeDeepAgentsCheckpoint } from "../src/adapters/deepagents.js";
+import { decodeDeepAgentsCheckpoint } from "../src/deepagents.js";
 import { buildCanonicalRecords } from "../src/canonical.js";
 import { normalizeDecodedSessionInternal } from "../src/core.js";
 import { resolveBounds } from "../src/bounds.js";

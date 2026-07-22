@@ -1284,87 +1284,6 @@ function extractToolResultText(event) {
   return;
 }
 
-// src/adapters/deepagents.ts
-function decodeDeepAgentsCheckpoint(checkpoint) {
-  const events = [];
-  const checkpointTimestamp = parseTimestamp(checkpoint.checkpointTimestamp);
-  checkpoint.messages.forEach((message, offset) => {
-    const timestamp = parseTimestamp(message.timestamp) ?? checkpointTimestamp;
-    let componentIndex = 0;
-    const emit = (event) => {
-      events.push({
-        ...event,
-        sourceOffset: offset,
-        sourceAnchorKind: "ordinal",
-        componentIndex: componentIndex++
-      });
-    };
-    if (message.role === "human") {
-      if (message.content) {
-        emit({
-          type: "message",
-          role: "user",
-          content: message.content,
-          ...timestamp ? { timestamp } : {}
-        });
-      }
-      return;
-    }
-    if (message.role === "ai") {
-      for (const reasoning of message.reasoning) {
-        if (!reasoning)
-          continue;
-        emit({
-          type: "reasoning",
-          content: reasoning,
-          ...timestamp ? { timestamp } : {},
-          ...message.model ? { model: message.model } : {}
-        });
-      }
-      if (message.content) {
-        emit({
-          type: "message",
-          role: "assistant",
-          content: message.content,
-          ...timestamp ? { timestamp } : {},
-          ...message.model ? { model: message.model } : {}
-        });
-      }
-      for (const call of message.toolCalls) {
-        emit({
-          type: "tool_call",
-          args: jsonString(call.args),
-          ...call.id ? { id: call.id } : {},
-          ...call.name ? { name: call.name } : {},
-          ...timestamp ? { timestamp } : {},
-          ...message.model ? { model: message.model } : {}
-        });
-      }
-      return;
-    }
-    emit({
-      type: "tool_result",
-      callId: message.toolCallId,
-      content: message.content,
-      ...timestamp ? { timestamp } : {}
-    });
-  });
-  return {
-    events,
-    context: {
-      source: "deepagents",
-      ...checkpoint.cwd ? { cwd: checkpoint.cwd } : {},
-      ...checkpoint.model ? { model: checkpoint.model } : {},
-      ...checkpointTimestamp ? { createdAt: checkpointTimestamp } : {},
-      sourceGroupId: deepAgentsGroupId(checkpoint.threadId, checkpoint.checkpointNamespace)
-    },
-    diagnostics: []
-  };
-}
-function deepAgentsGroupId(threadId, checkpointNamespace) {
-  return JSON.stringify([threadId, checkpointNamespace]);
-}
-
 // src/bounds.ts
 var DEFAULT_NORMALIZATION_BOUNDS = Object.freeze({
   toolArguments: Object.freeze({ maxCharacters: 20000 }),
@@ -2155,13 +2074,33 @@ function sliceCodePoints(text, start, end) {
   return result;
 }
 
-// src/deepagents-checkpoint.ts
+// src/deepagents.ts
 import { spawn } from "node:child_process";
 import { accessSync, constants } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 var MAX_HELPER_OUTPUT_BYTES = 64 * 1024 * 1024;
+async function normalizeCheckpoint(input) {
+  const { decoded, bounds } = await decodeCheckpoint(input);
+  return normalizeDecodedSession(decoded, bounds);
+}
+async function decodeCheckpoint(input) {
+  if (!input || typeof input !== "object") {
+    throw new NormalizationError("invalid_input", "Input must be an object.");
+  }
+  if (input.source !== "deepagents") {
+    throw new NormalizationError("unknown_source", `Checkpoint source must be "deepagents"; received ${JSON.stringify(input.source)}.`);
+  }
+  const checkpoint = await loadDeepAgentsCheckpoint(input.checkpoint);
+  return {
+    decoded: decodeDeepAgentsCheckpoint(checkpoint),
+    bounds: resolveBounds(input.bounds)
+  };
+}
 async function loadDeepAgentsCheckpoint(checkpoint) {
   validateLocation(checkpoint);
+  const path = checkpoint.path ?? join(homedir(), ".deepagents", "sessions.db");
   const python = checkpoint.pythonExecutable ?? process.env.PYTHON ?? "python3";
   const helper = resolveHelperPath();
   return await new Promise((resolve, reject) => {
@@ -2225,28 +2164,100 @@ async function loadDeepAgentsCheckpoint(checkpoint) {
     });
     child.stdin.on("error", () => {});
     child.stdin.end(JSON.stringify({
-      path: checkpoint.path,
+      path,
       threadId: checkpoint.threadId,
-      checkpointNamespace: checkpoint.checkpointNamespace ?? "",
-      ...checkpoint.checkpointId ? { checkpointId: checkpoint.checkpointId } : {}
+      checkpointNamespace: ""
     }));
   });
+}
+function decodeDeepAgentsCheckpoint(checkpoint) {
+  const events = [];
+  const checkpointTimestamp = parseTimestamp(checkpoint.checkpointTimestamp);
+  checkpoint.messages.forEach((message, offset) => {
+    const timestamp = parseTimestamp(message.timestamp) ?? checkpointTimestamp;
+    let componentIndex = 0;
+    const emit = (event) => {
+      events.push({
+        ...event,
+        sourceOffset: offset,
+        sourceAnchorKind: "ordinal",
+        componentIndex: componentIndex++
+      });
+    };
+    if (message.role === "human") {
+      if (message.content) {
+        emit({
+          type: "message",
+          role: "user",
+          content: message.content,
+          ...timestamp ? { timestamp } : {}
+        });
+      }
+      return;
+    }
+    if (message.role === "ai") {
+      for (const reasoning of message.reasoning) {
+        if (!reasoning)
+          continue;
+        emit({
+          type: "reasoning",
+          content: reasoning,
+          ...timestamp ? { timestamp } : {},
+          ...message.model ? { model: message.model } : {}
+        });
+      }
+      if (message.content) {
+        emit({
+          type: "message",
+          role: "assistant",
+          content: message.content,
+          ...timestamp ? { timestamp } : {},
+          ...message.model ? { model: message.model } : {}
+        });
+      }
+      for (const call of message.toolCalls) {
+        emit({
+          type: "tool_call",
+          args: jsonString(call.args),
+          ...call.id ? { id: call.id } : {},
+          ...call.name ? { name: call.name } : {},
+          ...timestamp ? { timestamp } : {},
+          ...message.model ? { model: message.model } : {}
+        });
+      }
+      return;
+    }
+    emit({
+      type: "tool_result",
+      callId: message.toolCallId,
+      content: message.content,
+      ...timestamp ? { timestamp } : {}
+    });
+  });
+  return {
+    events,
+    context: {
+      source: "deepagents",
+      ...checkpoint.cwd ? { cwd: checkpoint.cwd } : {},
+      ...checkpoint.model ? { model: checkpoint.model } : {},
+      ...checkpointTimestamp ? { createdAt: checkpointTimestamp } : {},
+      sourceGroupId: deepAgentsGroupId(checkpoint.threadId, checkpoint.checkpointNamespace)
+    },
+    diagnostics: []
+  };
+}
+function deepAgentsGroupId(threadId, checkpointNamespace) {
+  return JSON.stringify([threadId, checkpointNamespace]);
 }
 function validateLocation(checkpoint) {
   if (!checkpoint || typeof checkpoint !== "object") {
     throw new NormalizationError("invalid_input", "Deep Agents checkpoint location must be an object.");
   }
-  if (typeof checkpoint.path !== "string" || !checkpoint.path) {
-    throw new NormalizationError("invalid_input", "Deep Agents checkpoint.path is required.");
-  }
   if (typeof checkpoint.threadId !== "string" || !checkpoint.threadId) {
-    throw new NormalizationError("invalid_input", "Deep Agents checkpoint.threadId is required because the SDK has no standard thread.");
+    throw new NormalizationError("invalid_input", "Deep Agents checkpoint.threadId is required; the CLI session picker lists thread ids.");
   }
-  if (checkpoint.checkpointNamespace !== undefined && typeof checkpoint.checkpointNamespace !== "string") {
-    throw new NormalizationError("invalid_input", "Deep Agents checkpoint.checkpointNamespace must be a string.");
-  }
-  if (checkpoint.checkpointId !== undefined && (typeof checkpoint.checkpointId !== "string" || !checkpoint.checkpointId)) {
-    throw new NormalizationError("invalid_input", "Deep Agents checkpoint.checkpointId must be a non-empty string.");
+  if (checkpoint.path !== undefined && (typeof checkpoint.path !== "string" || !checkpoint.path)) {
+    throw new NormalizationError("invalid_input", "Deep Agents checkpoint.path must be a non-empty string when provided.");
   }
   if (checkpoint.pythonExecutable !== undefined && (typeof checkpoint.pythonExecutable !== "string" || !checkpoint.pythonExecutable)) {
     throw new NormalizationError("invalid_input", "Deep Agents checkpoint.pythonExecutable must be a non-empty string.");
@@ -2323,23 +2334,6 @@ function decodeTranscript(input) {
 function normalizeTranscript(input) {
   const { decoded, bounds } = decodeTranscript(input);
   return normalizeDecodedSession(decoded, bounds);
-}
-async function normalizeCheckpoint(input) {
-  const { decoded, bounds } = await decodeCheckpoint(input);
-  return normalizeDecodedSession(decoded, bounds);
-}
-async function decodeCheckpoint(input) {
-  if (!input || typeof input !== "object") {
-    throw new NormalizationError("invalid_input", "Input must be an object.");
-  }
-  if (input.source !== "deepagents") {
-    throw new NormalizationError("unknown_source", `Checkpoint source must be "deepagents"; received ${JSON.stringify(input.source)}.`);
-  }
-  const checkpoint = await loadDeepAgentsCheckpoint(input.checkpoint);
-  return {
-    decoded: decodeDeepAgentsCheckpoint(checkpoint),
-    bounds: resolveBounds(input.bounds)
-  };
 }
 
 // src/python-cli.ts

@@ -18,3 +18,9 @@ answering tool rows only when the counts match unambiguously. It prefers
 pads, skips soft-deleted (`active = 0`) rewound rows that Hermes itself
 excludes from replay, and orders rows by the AUTOINCREMENT id, which also
 provides native record identity.
+
+## Listing
+
+`listTrajectories({ source: "hermes" })` reads the `sessions` table of
+`~/.hermes/state.db` (id, title, timestamps); each item's `path` is the SQLite
+store, and the item `id` is the session id to export.

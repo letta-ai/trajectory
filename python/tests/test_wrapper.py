@@ -10,6 +10,7 @@ import trajectory._client as client
 from trajectory import (
     NodeUnavailableError,
     NormalizationError,
+    list_trajectories,
     normalize_checkpoint,
     normalize_many,
     normalize_transcript,
@@ -91,6 +92,26 @@ class WrapperTests(unittest.TestCase):
                     normalize_transcript(source="codex", transcript="{}")
         finally:
             client._node_executable.cache_clear()
+
+    def test_lists_trajectories_with_pagination(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "proj-a"
+            project.mkdir()
+            for name in ("s1", "s2", "s3"):
+                (project / f"{name}.jsonl").write_text("{}\n", encoding="utf-8")
+
+            first = list_trajectories(
+                source="claude-code", root=directory, limit=2
+            )
+            self.assertEqual(len(first["items"]), 2)
+            self.assertIn("nextCursor", first)
+            second = list_trajectories(
+                source="claude-code", root=directory, cursor=first["nextCursor"]
+            )
+            self.assertEqual(len(second["items"]), 1)
+            self.assertNotIn("nextCursor", second)
+            ids = {item["id"] for item in first["items"] + second["items"]}
+            self.assertEqual(ids, {"s1", "s2", "s3"})
 
     @unittest.skipUnless(HAS_LANGGRAPH_SQLITE, "LangGraph SQLite extra not installed")
     def test_normalizes_deepagents_checkpoint_with_current_python(self) -> None:

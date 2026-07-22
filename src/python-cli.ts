@@ -1,5 +1,10 @@
 import { readFileSync, writeFileSync } from "node:fs";
-import { normalizeCheckpoint, normalizeTranscript } from "./index.js";
+import {
+  listTrajectories,
+  normalizeCheckpoint,
+  normalizeTranscript,
+} from "./index.js";
+import type { ListTrajectoriesResult } from "./listing.js";
 import type { NormalizeResult } from "./types.js";
 import { NormalizationError } from "./types.js";
 
@@ -17,7 +22,7 @@ interface WireError {
 }
 
 type WireResult =
-  | { ok: true; result: NormalizeResult }
+  | { ok: true; result: NormalizeResult | ListTrajectoriesResult }
   | { ok: false; error: WireError };
 
 async function main(): Promise<void> {
@@ -26,16 +31,20 @@ async function main(): Promise<void> {
   for (const input of request.requests) {
     try {
       const result =
-        input !== null &&
-        typeof input === "object" &&
-        "source" in input &&
-        input.source === "deepagents"
-          ? await normalizeCheckpoint(
-              input as Parameters<typeof normalizeCheckpoint>[0],
+        input !== null && typeof input === "object" && "list" in input
+          ? await listTrajectories(
+              (input as { list: Parameters<typeof listTrajectories>[0] }).list,
             )
-          : normalizeTranscript(
-              input as Parameters<typeof normalizeTranscript>[0],
-            );
+          : input !== null &&
+              typeof input === "object" &&
+              "source" in input &&
+              input.source === "deepagents"
+            ? await normalizeCheckpoint(
+                input as Parameters<typeof normalizeCheckpoint>[0],
+              )
+            : normalizeTranscript(
+                input as Parameters<typeof normalizeTranscript>[0],
+              );
       results.push({
         ok: true,
         result,

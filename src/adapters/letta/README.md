@@ -18,3 +18,9 @@ Compaction entries are excluded because they summarize existing conversation
 context. The separate `~/.letta/transcripts` tree contains reflection
 artifacts and is not a supported native input. Failed tool returns gain an
 `Error:` prefix.
+
+## Listing
+
+`listTrajectories({ source: "letta" })` scans
+`~/.letta/lc-local-backend/conversations/`, decoding each base64 directory
+name to its conversation id; each item's `path` is the `messages.jsonl` file.

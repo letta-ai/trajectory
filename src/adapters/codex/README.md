@@ -18,3 +18,8 @@ resolved session id: include the `session_meta` row or pass
 System-injected user content (`<environment_context>`, `<user_instructions>`,
 `<permissions instructions>`, `<turn_context>`) is dropped with an
 `injected_context_dropped` diagnostic.
+
+## Listing
+
+`listTrajectories({ source: "codex" })` walks `~/.codex/sessions/` recursively
+for rollout `.jsonl` files; each item's `path` is the transcript file.

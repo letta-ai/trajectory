@@ -256,6 +256,7 @@ export type NormalizationErrorCode =
   | "checkpoint_not_found"
   | "checkpoint_messages_missing"
   | "invalid_checkpoint_state"
+  | "listing_unavailable"
   | "missing_user_records"
   | "missing_assistant_records"
   | "invalid_normalized_transcript"

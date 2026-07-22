@@ -16,3 +16,10 @@ from external CLI backends under the `delivery-mirror` placeholder model keep
 their prose but do not contribute model metadata. Wrapper entry ids provide
 native record identity; rows without ids anchor to the append-only byte
 offset.
+
+## Listing
+
+`listTrajectories({ source: "openclaw" })` scans `<state>/agents/*/sessions/`
+for `.jsonl` transcripts, resolving the state directory like OpenClaw does
+(`$OPENCLAW_STATE_DIR`/`$CLAWDBOT_STATE_DIR`, `~/.openclaw`, legacy
+`~/.clawdbot`).

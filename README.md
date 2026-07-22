@@ -117,6 +117,38 @@ Each adapter lives in its own folder under [`src/adapters/`](src/adapters/)
 with a README documenting the exact input contract, decoding behavior, and
 what the adapter drops.
 
+## Listing local trajectories
+
+`listTrajectories()` enumerates the sessions in a source's standard local
+store, newest first, with cursor pagination. It is a discovery layer beside
+normalization — `normalizeTranscript()` itself never touches the filesystem.
+
+```ts
+import { listTrajectories } from "@letta-ai/trajectory";
+
+let cursor: string | undefined;
+do {
+  const page = await listTrajectories({ source: "claude-code", limit: 100, cursor });
+  for (const item of page.items) {
+    // item.id, item.path, item.updatedAt?, item.title?, item.sizeBytes?
+  }
+  cursor = page.nextCursor;
+} while (cursor);
+```
+
+The Python wrapper mirrors it as `list_trajectories(source=..., root=None,
+cursor=None, limit=None)`.
+
+Each item's `path` is the locator for the next step: the transcript file to
+read (`claude-code`, `codex`, `letta`, `openclaw`), the SQLite store holding
+the session (`hermes`, `deepagents` — feed the item's `id` to the export
+query or `normalizeCheckpoint`), or the session's event directory
+(`openhands`). Every adapter README documents its default store location;
+`root` overrides it, and a missing store yields an empty listing. Listing the
+SQLite-backed sources requires a runtime with built-in SQLite (Node.js 22.5+
+or Bun). Pagination is positional over a newest-first snapshot and degrades
+gracefully when the store changes between pages.
+
 ## Normalized records
 
 A trajectory is an ordered array containing:

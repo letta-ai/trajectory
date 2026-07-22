@@ -1,0 +1,56 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "openclaw",
+      "cwd": "/home/user/notes",
+      "model": "claude-opus-4-8"
+    },
+    {
+      "role": "user",
+      "content": "Summarize the meeting photo I sent.\n[image]",
+      "timestamp": "2026-07-06T14:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_oc_err",
+          "name": "image_describe",
+          "args": "{\"target\":\"latest\"}"
+        }
+      ],
+      "timestamp": "2026-07-06T14:00:05.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_oc_err",
+      "content": "Error: no image attachment found",
+      "timestamp": "2026-07-06T14:00:06.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I could not find the photo attachment; could you resend it?",
+      "timestamp": "2026-07-06T14:00:08.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Reminder sent: meeting notes are due at 5pm.",
+      "timestamp": "2026-07-06T14:00:10.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 3.",
+      "inputLine": 3
+    },
+    {
+      "code": "orphan_tool_result",
+      "message": "Dropped a tool result without a preceding call for \"call_oc_gone\".",
+      "recordIndex": 6,
+      "inputLine": 9
+    }
+  ]
+}

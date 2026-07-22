@@ -2,6 +2,7 @@ import { claudeCodeAdapter } from "./adapters/claude-code.js";
 import { codexAdapter } from "./adapters/codex.js";
 import { hermesAdapter } from "./adapters/hermes.js";
 import { lettaAdapter } from "./adapters/letta.js";
+import { openClawAdapter } from "./adapters/openclaw.js";
 import { openHandsAdapter } from "./adapters/openhands.js";
 import { decodeDeepAgentsCheckpoint } from "./adapters/deepagents.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
@@ -28,6 +29,7 @@ const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   codex: codexAdapter,
   hermes: hermesAdapter,
   letta: lettaAdapter,
+  openclaw: openClawAdapter,
   openhands: openHandsAdapter,
 };
 

@@ -115,6 +115,7 @@ and is empty when the transcript required no recoverable cleanup.
 | `codex` | Native Codex rollout JSONL | `codex` |
 | `hermes` | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
 | `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
+| `openclaw` | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | `deepagents` | User-supplied Python LangGraph `SqliteSaver` database plus `threadId` | `deepagents` |
 
@@ -144,6 +145,19 @@ decoded forms, handles both the OpenAI-style and the simplified id-less
 tool rows when unambiguous), prefers `reasoning_content` over `reasoning`
 while ignoring single-space thinking-mode pads, and skips soft-deleted
 (`active = 0`) rewound rows, which Hermes itself excludes from replay.
+
+OpenClaw session transcripts are the pi-coding-agent SessionManager JSONL files
+written to `~/.openclaw/agents/<agentId>/sessions/<sessionId>.jsonl` (legacy
+state directories such as `~/.clawdbot` use the same layout): one
+`type: "session"` header row carrying the session id, ISO timestamp, and cwd,
+followed by `type: "message"` wrapper rows whose `message` holds `user`,
+`assistant` (with `text`, `thinking`, and `toolCall` content blocks plus model
+metadata), and `toolResult` messages. The whole file is the transcript string.
+Compaction, custom, and other lifecycle entry types are ignored, matching
+OpenClaw's own transcript readers, and failed tool results (`isError`) gain an
+`Error:` prefix. Assistant rows mirrored from external CLI backends under the
+`delivery-mirror` placeholder model keep their prose but do not contribute
+model metadata.
 
 ## Normalized records
 

@@ -5,6 +5,7 @@ export type TrajectorySource =
   | "codex"
   | "hermes"
   | "letta"
+  | "openclaw"
   | "openhands";
 
 export type TranscriptTrajectorySource = TrajectorySource;

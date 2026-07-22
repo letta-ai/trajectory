@@ -14,6 +14,8 @@ const fixtures = [
   { source: "claude-code", name: "claude-code/cleanup" },
   { source: "codex", name: "codex/tool-calls" },
   { source: "codex", name: "codex/cleanup" },
+  { source: "hermes", name: "hermes/tool-calls" },
+  { source: "hermes", name: "hermes/cleanup" },
   { source: "letta", name: "letta/tool-call" },
   { source: "letta", name: "letta/cleanup" },
   { source: "letta", name: "letta/local-v3" },
@@ -36,6 +38,7 @@ describe("golden fixtures", () => {
       const input = fixtureText(
         fixture.name,
         fixture.source === "openhands" ||
+          fixture.source === "hermes" ||
           (fixture.source === "letta" && !fixture.name.startsWith("letta/local-"))
           ? "input.json"
           : "input.jsonl",
@@ -93,6 +96,15 @@ describe("public API", () => {
         code: "missing_user_records",
       }),
     );
+  });
+
+  test("rejects an invalid Hermes document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "hermes",
+        transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });
 
   test("rejects an invalid OpenHands document shape", () => {

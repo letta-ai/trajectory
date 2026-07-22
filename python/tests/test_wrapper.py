@@ -25,6 +25,8 @@ FIXTURES = (
     ("claude-code", "claude-code/cleanup", "input.jsonl"),
     ("codex", "codex/tool-calls", "input.jsonl"),
     ("codex", "codex/cleanup", "input.jsonl"),
+    ("hermes", "hermes/tool-calls", "input.json"),
+    ("hermes", "hermes/cleanup", "input.json"),
     ("letta", "letta/tool-call", "input.json"),
     ("letta", "letta/cleanup", "input.json"),
     ("letta", "letta/local-v3", "input.jsonl"),

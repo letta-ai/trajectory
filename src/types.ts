@@ -3,6 +3,7 @@ import type { ResolvedNormalizationBounds } from "./bounds.js";
 export type TrajectorySource =
   | "claude-code"
   | "codex"
+  | "hermes"
   | "letta"
   | "openhands";
 

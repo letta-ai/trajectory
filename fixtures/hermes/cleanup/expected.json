@@ -1,0 +1,58 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "hermes"
+    },
+    {
+      "role": "user",
+      "content": "Describe this screenshot.",
+      "timestamp": "2026-07-03T17:33:21.500Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_adopted_1",
+          "name": "screenshot_inspect",
+          "args": "{\"region\": \"full\"}"
+        }
+      ],
+      "timestamp": "2026-07-03T17:33:23.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_adopted_1",
+      "content": "A terminal window with two panes.",
+      "timestamp": "2026-07-03T17:33:24.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "Summarize the tool output for the user.",
+      "timestamp": "2026-07-03T17:33:25.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The screenshot shows a terminal window with two panes.",
+      "timestamp": "2026-07-03T17:33:25.000Z"
+    },
+    {
+      "role": "user",
+      "content": "Thanks.",
+      "timestamp": "2026-07-03T17:33:27.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You're welcome.",
+      "timestamp": "2026-07-03T17:33:28.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "orphan_tool_result",
+      "message": "Dropped a tool result without a preceding call for \"call_missing\".",
+      "recordIndex": 6
+    }
+  ]
+}

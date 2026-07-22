@@ -28,6 +28,7 @@ const HEX_64 = /^[0-9a-f]{64}$/;
 const goldenFixtures = [
   { source: "claude-code", name: "claude-code/tool-call", golden: "claude-code__tool-call" },
   { source: "codex", name: "codex/tool-calls", golden: "codex__tool-calls" },
+  { source: "hermes", name: "hermes/tool-calls", golden: "hermes__tool-calls" },
   { source: "letta", name: "letta/tool-call", golden: "letta__tool-call" },
   { source: "openhands", name: "openhands/tool-calls", golden: "openhands__tool-calls" },
 ] as const satisfies ReadonlyArray<{
@@ -40,7 +41,7 @@ describe("canonical golden fixtures", () => {
   for (const fixture of goldenFixtures) {
     test(fixture.name, () => {
       const inputFile =
-        fixture.source === "openhands" || fixture.source === "letta"
+        fixture.source === "openhands" || fixture.source === "hermes" || fixture.source === "letta"
           ? "input.json"
           : "input.jsonl";
       const transcript = fixtureText(fixture.name, inputFile);
@@ -62,7 +63,7 @@ describe("canonical invariants", () => {
   for (const fixture of goldenFixtures) {
     test(fixture.name, () => {
       const inputFile =
-        fixture.source === "openhands" || fixture.source === "letta"
+        fixture.source === "openhands" || fixture.source === "hermes" || fixture.source === "letta"
           ? "input.json"
           : "input.jsonl";
       const result = normalizeToCanonical({

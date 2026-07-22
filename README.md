@@ -113,6 +113,7 @@ and is empty when the transcript required no recoverable cleanup.
 | --- | --- | --- |
 | `claude-code` | Native Claude Code JSONL | `claude-code` |
 | `codex` | Native Codex rollout JSONL | `codex` |
+| `hermes` | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
 | `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
 | `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | `deepagents` | User-supplied Python LangGraph `SqliteSaver` database plus `threadId` | `deepagents` |
@@ -129,6 +130,20 @@ The separate `~/.letta/transcripts` tree contains reflection artifacts and is
 not a supported native input. OpenHands inputs are serialized exports; when a
 native store uses individual event files, assembling the event array remains
 the caller's responsibility.
+
+Hermes (the `hermes-agent` harness) persists sessions in a SQLite store
+(`~/.hermes/state.db`), so the caller exports one session as JSON: either the
+message-row array for a session (`SELECT * FROM messages WHERE session_id = ?
+ORDER BY id`, or the rows returned by `HermesState.get_messages()`), or an
+envelope `{"session": <sessions row>, "messages": [<message rows>]}` whose
+session row supplies the model, working directory, start time, and group
+identity. The adapter accepts both raw column values (JSON-string `tool_calls`,
+`\x00json:`-prefixed multimodal content, epoch-second timestamps) and their
+decoded forms, handles both the OpenAI-style and the simplified id-less
+`{name, arguments}` tool-call shapes (adopting call ids from the answering
+tool rows when unambiguous), prefers `reasoning_content` over `reasoning`
+while ignoring single-space thinking-mode pads, and skips soft-deleted
+(`active = 0`) rewound rows, which Hermes itself excludes from replay.
 
 ## Normalized records
 

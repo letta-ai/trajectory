@@ -20,6 +20,8 @@ const fixtures = [
   { source: "letta", name: "letta/cleanup" },
   { source: "letta", name: "letta/local-v3" },
   { source: "letta", name: "letta/local-legacy" },
+  { source: "openclaw", name: "openclaw/tool-calls" },
+  { source: "openclaw", name: "openclaw/cleanup" },
   { source: "openhands", name: "openhands/tool-calls" },
   { source: "openhands", name: "openhands/cleanup" },
 ] as const satisfies ReadonlyArray<{ source: TrajectorySource; name: string }>;
@@ -102,6 +104,15 @@ describe("public API", () => {
     expect(() =>
       normalizeTranscript({
         source: "hermes",
+        transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects an invalid OpenClaw document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "openclaw",
         transcript: "{}",
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));

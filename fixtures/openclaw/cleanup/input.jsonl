@@ -1,0 +1,9 @@
+{"type":"session","version":7,"id":"openclaw-session-0002","timestamp":"2026-07-06T14:00:00.000Z","cwd":"/home/user/notes"}
+{"type":"message","id":"entry-10","parentId":null,"timestamp":"2026-07-06T14:00:01.000Z","message":{"role":"user","content":[{"type":"text","text":"Summarize the meeting photo I sent."},{"type":"image","data":"AAAA","mimeType":"image/png"}]}}
+{"type":"message"
+{"type":"custom","id":"entry-11","timestamp":"2026-07-06T14:00:02.000Z","data":{"kind":"heartbeat"}}
+{"type":"message","id":"entry-12","parentId":"entry-10","timestamp":"2026-07-06T14:00:05.000Z","message":{"role":"assistant","content":[{"type":"toolCall","id":"call_oc_err","name":"image_describe","arguments":{"target":"latest"}}],"provider":"anthropic","model":"claude-opus-4-8","stopReason":"toolUse"}}
+{"type":"message","id":"entry-13","parentId":"entry-12","timestamp":"2026-07-06T14:00:06.000Z","message":{"role":"toolResult","toolCallId":"call_oc_err","toolName":"image_describe","content":[{"type":"text","text":"no image attachment found"}],"isError":true}}
+{"type":"message","id":"entry-14","parentId":"entry-13","timestamp":"2026-07-06T14:00:08.000Z","message":{"role":"assistant","content":[{"type":"text","text":"I could not find the photo attachment; could you resend it?"}],"provider":"anthropic","model":"claude-opus-4-8","stopReason":"stop"}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"Reminder sent: meeting notes are due at 5pm."}],"api":"openai-responses","provider":"openclaw","model":"delivery-mirror","stopReason":"stop","timestamp":1783346410000}}
+{"type":"message","id":"entry-16","parentId":"entry-14","timestamp":"2026-07-06T14:01:00.000Z","message":{"role":"toolResult","toolCallId":"call_oc_gone","toolName":"bash","content":[{"type":"text","text":"stale output"}]}}

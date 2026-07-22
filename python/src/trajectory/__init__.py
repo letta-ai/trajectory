@@ -1,6 +1,11 @@
 """Normalize native agent transcripts using the canonical trajectory runtime."""
 
-from ._client import normalize_checkpoint, normalize_many, normalize_transcript
+from ._client import (
+    list_trajectories,
+    normalize_checkpoint,
+    normalize_many,
+    normalize_transcript,
+)
 from ._errors import NodeUnavailableError, NormalizationError, TrajectoryRuntimeError
 from ._types import (
     AssistantMessageRecord,
@@ -11,6 +16,7 @@ from ._types import (
     DeepAgentsCheckpointLocation,
     Diagnostic,
     DiagnosticCode,
+    ListTrajectoriesResult,
     MetaRecord,
     NormalizationBounds,
     NormalizationErrorCode,
@@ -18,6 +24,7 @@ from ._types import (
     NormalizeInput,
     NormalizeRequest,
     NormalizeResult,
+    TrajectoryListing,
     ReasoningRecord,
     ToolCall,
     ToolArgumentBounds,
@@ -37,6 +44,7 @@ __all__ = [
     "DeepAgentsCheckpointLocation",
     "Diagnostic",
     "DiagnosticCode",
+    "ListTrajectoriesResult",
     "MetaRecord",
     "NodeUnavailableError",
     "NormalizationBounds",
@@ -52,9 +60,11 @@ __all__ = [
     "ToolResultBounds",
     "ToolResultRecord",
     "ToolResultTruncationStrategy",
+    "TrajectoryListing",
     "TrajectoryRuntimeError",
     "TrajectorySource",
     "UserRecord",
+    "list_trajectories",
     "normalize_many",
     "normalize_checkpoint",
     "normalize_transcript",

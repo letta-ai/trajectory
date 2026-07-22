@@ -14,6 +14,8 @@ from typing import cast
 
 from ._errors import NodeUnavailableError, NormalizationError, TrajectoryRuntimeError
 from ._types import (
+    AnyTrajectorySource,
+    ListTrajectoriesResult,
     NormalizationBounds,
     NormalizationErrorCode,
     NormalizeInput,
@@ -66,6 +68,31 @@ def normalize_checkpoint(
     if bounds is not None:
         request["bounds"] = bounds
     return normalize_many([request])[0]
+
+
+def list_trajectories(
+    *,
+    source: AnyTrajectorySource,
+    root: str | Path | None = None,
+    cursor: str | None = None,
+    limit: int | None = None,
+) -> ListTrajectoriesResult:
+    """List the trajectories in a source's local store, newest first.
+
+    Returns ``{"items": [...], "nextCursor": ...}``; ``nextCursor`` is present
+    exactly when more items remain. ``root`` overrides the source's standard
+    store location.
+    """
+
+    query: dict[str, object] = {"source": source}
+    if root is not None:
+        query["root"] = str(root)
+    if cursor is not None:
+        query["cursor"] = cursor
+    if limit is not None:
+        query["limit"] = limit
+    result = normalize_many([cast(NormalizeRequest, {"list": query})])[0]
+    return cast(ListTrajectoriesResult, result)
 
 
 def normalize_many(inputs: Iterable[NormalizeRequest]) -> list[NormalizeResult]:

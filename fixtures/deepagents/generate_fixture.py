@@ -196,6 +196,13 @@ def main() -> None:
             task_path="pull,overwrite",
         )
 
+    # Commit the fixture in rollback-journal mode so read-only consumers (and
+    # the repository) never need WAL sidecar files.
+    import sqlite3
+
+    with sqlite3.connect(output) as connection:
+        connection.execute("PRAGMA journal_mode=DELETE")
+
     print(output)
 
 

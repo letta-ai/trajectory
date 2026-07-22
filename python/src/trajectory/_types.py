@@ -38,10 +38,30 @@ NormalizationErrorCode = Literal[
     "checkpoint_not_found",
     "checkpoint_messages_missing",
     "invalid_checkpoint_state",
+    "listing_unavailable",
     "missing_user_records",
     "missing_assistant_records",
     "invalid_normalized_transcript",
 ]
+
+
+class _TrajectoryListingOptional(TypedDict, total=False):
+    updatedAt: str
+    title: str
+    sizeBytes: int
+
+
+class TrajectoryListing(_TrajectoryListingOptional):
+    id: str
+    path: str
+
+
+class _ListTrajectoriesResultOptional(TypedDict, total=False):
+    nextCursor: str
+
+
+class ListTrajectoriesResult(_ListTrajectoriesResultOptional):
+    items: list[TrajectoryListing]
 
 
 class ToolArgumentBounds(TypedDict, total=False):

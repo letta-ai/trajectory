@@ -11,3 +11,9 @@ The adapter decodes `MessageEvent` (user/agent prose), `ActionEvent` (thought
 call ids so an observation arriving before its action still links instead of
 being dropped as an orphan. OpenHands event `id`s provide native record
 identity.
+
+## Listing
+
+`listTrajectories({ source: "openhands" })` lists the session directories
+under `~/.openhands/sessions`; assembling a directory's event files into the
+transcript array remains the caller's step.

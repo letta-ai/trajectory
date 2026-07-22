@@ -2308,6 +2308,384 @@ function isAIData(value) {
 function isToolCall(value) {
   return isObject3(value) && "args" in value && (value.id === undefined || typeof value.id === "string") && (value.name === undefined || typeof value.name === "string");
 }
+// src/adapters/claude-code/list.ts
+import { homedir as homedir2 } from "node:os";
+import { basename, join as join3 } from "node:path";
+
+// src/adapters/listing-shared.ts
+import { readdirSync, statSync } from "node:fs";
+import { join as join2 } from "node:path";
+function sortListings(items) {
+  return items.sort((left, right) => {
+    const l = left.updatedAt ?? "";
+    const r = right.updatedAt ?? "";
+    if (l !== r)
+      return l < r ? 1 : -1;
+    return left.id < right.id ? -1 : left.id > right.id ? 1 : 0;
+  });
+}
+function safeReadDir(path) {
+  try {
+    return readdirSync(path, { withFileTypes: true }).map((entry) => ({
+      name: entry.name,
+      isDirectory: entry.isDirectory(),
+      isFile: entry.isFile()
+    }));
+  } catch {
+    return [];
+  }
+}
+function safeStat(path) {
+  try {
+    const stats = statSync(path);
+    return { mtimeMs: stats.mtimeMs, sizeBytes: stats.size };
+  } catch {
+    return;
+  }
+}
+function listingFromFile(id, path) {
+  const facts = safeStat(path);
+  if (!facts)
+    return;
+  return {
+    id,
+    path,
+    updatedAt: new Date(facts.mtimeMs).toISOString(),
+    sizeBytes: facts.sizeBytes
+  };
+}
+function collectFiles(root, extension, depth) {
+  if (depth < 0)
+    return [];
+  const collected = [];
+  for (const entry of safeReadDir(root)) {
+    const full = join2(root, entry.name);
+    if (entry.isFile && entry.name.endsWith(extension)) {
+      collected.push(full);
+    } else if (entry.isDirectory) {
+      collected.push(...collectFiles(full, extension, depth - 1));
+    }
+  }
+  return collected;
+}
+var dynamicImport = (specifier) => import(specifier);
+async function openSqliteReadOnly(path) {
+  let moduleError;
+  try {
+    const sqlite = await dynamicImport("node:sqlite");
+    const DatabaseSync = sqlite.DatabaseSync;
+    return openWithWalFallback((readOnly) => {
+      const database = readOnly ? new DatabaseSync(path, { readOnly: true }) : new DatabaseSync(path);
+      return {
+        all: (sql, ...params) => database.prepare(sql).all(...params),
+        close: () => database.close()
+      };
+    }, path);
+  } catch (error) {
+    if (error instanceof NormalizationError)
+      throw error;
+    if (!isModuleMissing(error))
+      throw sqliteOpenFailure(path, error);
+    moduleError = error;
+  }
+  try {
+    const sqlite = await dynamicImport("bun:sqlite");
+    const Database = sqlite.Database;
+    return openWithWalFallback((readOnly) => {
+      const database = readOnly ? new Database(path, { readonly: true }) : new Database(path);
+      return {
+        all: (sql, ...params) => database.query(sql).all(...params),
+        close: () => database.close()
+      };
+    }, path);
+  } catch (error) {
+    if (error instanceof NormalizationError)
+      throw error;
+    if (isModuleMissing(error)) {
+      throw new NormalizationError("listing_unavailable", `Listing this source requires a runtime with built-in SQLite (Node.js 22.5+ or Bun): ${String(moduleError instanceof Error ? moduleError.message : moduleError)}`);
+    }
+    throw sqliteOpenFailure(path, error);
+  }
+}
+function openWithWalFallback(open, path) {
+  let readOnlyError;
+  for (const readOnly of [true, false]) {
+    let handle;
+    try {
+      handle = open(readOnly);
+      handle.all("SELECT 1");
+      return handle;
+    } catch (error) {
+      try {
+        handle?.close();
+      } catch {}
+      if (readOnly) {
+        readOnlyError = error;
+        continue;
+      }
+      throw sqliteOpenFailure(path, readOnlyError ?? error);
+    }
+  }
+  throw sqliteOpenFailure(path, readOnlyError);
+}
+function sqliteOpenFailure(path, error) {
+  return new NormalizationError("invalid_input", `Could not open SQLite store ${JSON.stringify(path)}: ${error instanceof Error ? error.message : String(error)}`);
+}
+function isModuleMissing(error) {
+  if (error === null || typeof error !== "object")
+    return false;
+  const code = error.code;
+  const message = error.message;
+  return code === "ERR_MODULE_NOT_FOUND" || code === "MODULE_NOT_FOUND" || code === "ERR_UNKNOWN_BUILTIN_MODULE" || typeof message === "string" && /Cannot find (module|package)|No such built-in module/i.test(message);
+}
+
+// src/adapters/claude-code/list.ts
+async function listClaudeCodeTrajectories(root) {
+  const base = root ?? join3(homedir2(), ".claude", "projects");
+  const items = [];
+  for (const project of safeReadDir(base)) {
+    if (!project.isDirectory)
+      continue;
+    const projectPath = join3(base, project.name);
+    for (const entry of safeReadDir(projectPath)) {
+      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+        continue;
+      const path = join3(projectPath, entry.name);
+      const listing = listingFromFile(basename(entry.name, ".jsonl"), path);
+      if (listing)
+        items.push(listing);
+    }
+  }
+  return sortListings(items);
+}
+
+// src/adapters/codex/list.ts
+import { homedir as homedir3 } from "node:os";
+import { basename as basename2, join as join4 } from "node:path";
+async function listCodexTrajectories(root) {
+  const base = root ?? join4(homedir3(), ".codex", "sessions");
+  const items = [];
+  for (const path of collectFiles(base, ".jsonl", 4)) {
+    const listing = listingFromFile(basename2(path, ".jsonl"), path);
+    if (listing)
+      items.push(listing);
+  }
+  return sortListings(items);
+}
+
+// src/adapters/deepagents/list.ts
+import { homedir as homedir4 } from "node:os";
+import { join as join5 } from "node:path";
+async function listDeepAgentsTrajectories(root) {
+  const path = resolveStorePath(root);
+  if (!safeStat(path))
+    return [];
+  const database = await openSqliteReadOnly(path);
+  try {
+    const rows = database.all("SELECT thread_id, MAX(checkpoint_id) AS latest FROM checkpoints " + "WHERE checkpoint_ns = '' GROUP BY thread_id ORDER BY latest DESC, thread_id");
+    const items = [];
+    for (const row of rows) {
+      if (typeof row.thread_id !== "string" || !row.thread_id)
+        continue;
+      items.push({ id: row.thread_id, path });
+    }
+    return items;
+  } finally {
+    database.close();
+  }
+}
+function resolveStorePath(root) {
+  if (root === undefined)
+    return join5(homedir4(), ".deepagents", "sessions.db");
+  return root.endsWith(".db") ? root : join5(root, "sessions.db");
+}
+
+// src/adapters/hermes/list.ts
+import { homedir as homedir5 } from "node:os";
+import { join as join6 } from "node:path";
+async function listHermesTrajectories(root) {
+  const path = resolveStorePath2(root);
+  if (!safeStat(path))
+    return [];
+  const database = await openSqliteReadOnly(path);
+  try {
+    const rows = database.all("SELECT id, title, started_at, ended_at FROM sessions");
+    const items = [];
+    for (const row of rows) {
+      if (typeof row.id !== "string" || !row.id)
+        continue;
+      const updated = numeric(row.ended_at) ?? numeric(row.started_at);
+      items.push({
+        id: row.id,
+        path,
+        ...updated !== undefined ? { updatedAt: new Date(updated * 1000).toISOString() } : {},
+        ...typeof row.title === "string" && row.title ? { title: row.title } : {}
+      });
+    }
+    return sortListings(items);
+  } finally {
+    database.close();
+  }
+}
+function resolveStorePath2(root) {
+  if (root === undefined)
+    return join6(homedir5(), ".hermes", "state.db");
+  return root.endsWith(".db") ? root : join6(root, "state.db");
+}
+function numeric(value) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
+}
+
+// src/adapters/letta/list.ts
+import { homedir as homedir6 } from "node:os";
+import { join as join7 } from "node:path";
+async function listLettaTrajectories(root) {
+  const base = root ?? join7(homedir6(), ".letta", "lc-local-backend", "conversations");
+  const items = [];
+  for (const entry of safeReadDir(base)) {
+    if (!entry.isDirectory)
+      continue;
+    const path = join7(base, entry.name, "messages.jsonl");
+    const listing = listingFromFile(conversationId(entry.name), path);
+    if (listing)
+      items.push(listing);
+  }
+  return sortListings(items);
+}
+function conversationId(directoryName) {
+  try {
+    const decoded = Buffer.from(directoryName, "base64").toString("utf8");
+    if (decoded && Buffer.from(decoded, "utf8").toString("base64").replace(/=+$/, "") === directoryName.replace(/=+$/, "")) {
+      return decoded;
+    }
+  } catch {}
+  return directoryName;
+}
+
+// src/adapters/openclaw/list.ts
+import { existsSync } from "node:fs";
+import { homedir as homedir7 } from "node:os";
+import { basename as basename3, join as join8 } from "node:path";
+async function listOpenClawTrajectories(root) {
+  const base = root ?? defaultStateDir();
+  const items = [];
+  const agentsPath = join8(base, "agents");
+  for (const agent of safeReadDir(agentsPath)) {
+    if (!agent.isDirectory)
+      continue;
+    const sessionsPath = join8(agentsPath, agent.name, "sessions");
+    for (const entry of safeReadDir(sessionsPath)) {
+      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+        continue;
+      const path = join8(sessionsPath, entry.name);
+      const listing = listingFromFile(basename3(entry.name, ".jsonl"), path);
+      if (listing)
+        items.push(listing);
+    }
+  }
+  return sortListings(items);
+}
+function defaultStateDir() {
+  const override = process.env.OPENCLAW_STATE_DIR?.trim() || process.env.CLAWDBOT_STATE_DIR?.trim();
+  if (override)
+    return override;
+  const current = join8(homedir7(), ".openclaw");
+  if (existsSync(current))
+    return current;
+  return join8(homedir7(), ".clawdbot");
+}
+
+// src/adapters/openhands/list.ts
+import { homedir as homedir8 } from "node:os";
+import { join as join9 } from "node:path";
+async function listOpenHandsTrajectories(root) {
+  const base = root ?? join9(homedir8(), ".openhands", "sessions");
+  const items = [];
+  for (const entry of safeReadDir(base)) {
+    if (!entry.isDirectory)
+      continue;
+    const path = join9(base, entry.name);
+    const facts = safeStat(path);
+    items.push({
+      id: entry.name,
+      path,
+      ...facts ? { updatedAt: new Date(facts.mtimeMs).toISOString() } : {}
+    });
+  }
+  return sortListings(items);
+}
+
+// src/listing.ts
+var DEFAULT_LIMIT = 50;
+var MAX_LIMIT = 1000;
+var LISTERS = {
+  "claude-code": listClaudeCodeTrajectories,
+  codex: listCodexTrajectories,
+  deepagents: listDeepAgentsTrajectories,
+  hermes: listHermesTrajectories,
+  letta: listLettaTrajectories,
+  openclaw: listOpenClawTrajectories,
+  openhands: listOpenHandsTrajectories
+};
+async function listTrajectories(input) {
+  if (!input || typeof input !== "object") {
+    throw new NormalizationError("invalid_input", "Input must be an object.");
+  }
+  const lister = LISTERS[input.source];
+  if (!lister) {
+    throw new NormalizationError("unknown_source", `Unknown trajectory source ${JSON.stringify(input.source)}. Supported sources: ${Object.keys(LISTERS).join(", ")}.`);
+  }
+  if (input.root !== undefined && (typeof input.root !== "string" || !input.root)) {
+    throw new NormalizationError("invalid_input", "root must be a non-empty string when provided.");
+  }
+  const limit = resolveLimit2(input.limit);
+  const items = await lister(input.root);
+  return paginate(items, input.cursor, limit);
+}
+function resolveLimit2(limit) {
+  if (limit === undefined)
+    return DEFAULT_LIMIT;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIMIT) {
+    throw new NormalizationError("invalid_input", `limit must be an integer between 1 and ${MAX_LIMIT}.`);
+  }
+  return limit;
+}
+function paginate(items, cursor, limit) {
+  let start = 0;
+  if (cursor !== undefined) {
+    const state = decodeCursor(cursor);
+    const index = items.findIndex((item) => item.id === state.id);
+    start = index >= 0 ? index + 1 : Math.min(state.i + 1, items.length);
+  }
+  const page = items.slice(start, start + limit);
+  const end = start + page.length;
+  const last = page[page.length - 1];
+  if (end >= items.length || last === undefined) {
+    return { items: page };
+  }
+  return {
+    items: page,
+    nextCursor: encodeCursor({ v: 1, id: last.id, i: end - 1 })
+  };
+}
+function encodeCursor(state) {
+  return Buffer.from(JSON.stringify(state), "utf8").toString("base64url");
+}
+function decodeCursor(cursor) {
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+  } catch {
+    throw invalidCursor();
+  }
+  if (parsed === null || typeof parsed !== "object" || parsed.v !== 1 || typeof parsed.id !== "string" || !Number.isInteger(parsed.i) || parsed.i < 0) {
+    throw invalidCursor();
+  }
+  return parsed;
+}
+function invalidCursor() {
+  return new NormalizationError("invalid_input", "cursor is not a valid trajectory-listing cursor.");
+}
 
 // src/index.ts
 var ADAPTERS = {
@@ -2343,7 +2721,7 @@ async function main() {
   const results = [];
   for (const input of request.requests) {
     try {
-      const result = input !== null && typeof input === "object" && "source" in input && input.source === "deepagents" ? await normalizeCheckpoint(input) : normalizeTranscript(input);
+      const result = input !== null && typeof input === "object" && "list" in input ? await listTrajectories(input.list) : input !== null && typeof input === "object" && ("source" in input) && input.source === "deepagents" ? await normalizeCheckpoint(input) : normalizeTranscript(input);
       results.push({
         ok: true,
         result

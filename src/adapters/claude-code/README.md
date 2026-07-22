@@ -18,3 +18,8 @@ Dropped input:
   title/mode bookkeeping, and similar), skipped silently.
 - Harness-noise user rows (local-command output, command wrappers), reported
   by the shared core as `noise_record_dropped`.
+
+## Listing
+
+`listTrajectories({ source: "claude-code" })` scans `~/.claude/projects/*/`
+for `<sessionId>.jsonl` files; each item's `path` is the transcript file.

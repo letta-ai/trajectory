@@ -131,6 +131,13 @@ export {
 } from "./adapters/deepagents/index.js";
 export { CANONICAL_SCHEMA_VERSION, NORMALIZER_VERSION } from "./version.js";
 
+export {
+  listTrajectories,
+  type ListTrajectoriesInput,
+  type ListTrajectoriesResult,
+  type TrajectoryListing,
+} from "./listing.js";
+
 export { DEFAULT_NORMALIZATION_BOUNDS } from "./bounds.js";
 export { validateTranscript } from "./validate.js";
 export {

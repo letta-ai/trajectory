@@ -47,3 +47,9 @@ result = normalize_checkpoint(
 `loadDeepAgentsCheckpoint()` exposes the decoded checkpoint data directly. The
 canonical group identity encodes the `(threadId, checkpointNamespace)` pair;
 see [`CANONICAL.md`](../../../CANONICAL.md).
+
+## Listing
+
+`listTrajectories({ source: "deepagents" })` lists the distinct root-namespace
+threads in `~/.deepagents/sessions.db`, newest first by latest checkpoint id;
+feed an item's `id` to `normalizeCheckpoint` as `threadId`.

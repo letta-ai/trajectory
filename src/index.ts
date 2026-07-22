@@ -1,7 +1,7 @@
 import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
 import { codexAdapter } from "./adapters/codex/index.js";
 import { hermesAdapter } from "./adapters/hermes/index.js";
-import { lettaAdapter } from "./adapters/letta/index.js";
+import { lettaCodeAdapter } from "./adapters/letta-code/index.js";
 import { openClawAdapter } from "./adapters/openclaw/index.js";
 import { openHandsAdapter } from "./adapters/openhands/index.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
@@ -24,7 +24,7 @@ const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
   hermes: hermesAdapter,
-  letta: lettaAdapter,
+  "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,
   openhands: openHandsAdapter,
 };

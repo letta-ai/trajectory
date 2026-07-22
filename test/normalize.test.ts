@@ -16,10 +16,8 @@ const fixtures = [
   { source: "codex", name: "codex/cleanup" },
   { source: "hermes", name: "hermes/tool-calls" },
   { source: "hermes", name: "hermes/cleanup" },
-  { source: "letta", name: "letta/tool-call" },
-  { source: "letta", name: "letta/cleanup" },
-  { source: "letta", name: "letta/local-v3" },
-  { source: "letta", name: "letta/local-legacy" },
+  { source: "letta-code", name: "letta-code/tool-calls" },
+  { source: "letta-code", name: "letta-code/cleanup" },
   { source: "openclaw", name: "openclaw/tool-calls" },
   { source: "openclaw", name: "openclaw/cleanup" },
   { source: "openhands", name: "openhands/tool-calls" },
@@ -39,9 +37,7 @@ describe("golden fixtures", () => {
     test(fixture.name, () => {
       const input = fixtureText(
         fixture.name,
-        fixture.source === "openhands" ||
-          fixture.source === "hermes" ||
-          (fixture.source === "letta" && !fixture.name.startsWith("letta/local-"))
+        fixture.source === "openhands" || fixture.source === "hermes"
           ? "input.json"
           : "input.jsonl",
       );
@@ -127,20 +123,29 @@ describe("public API", () => {
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });
 
-  test("rejects a non-flat Letta document shape", () => {
+  test("rejects Letta API message arrays", () => {
     expect(() =>
       normalizeTranscript({
-        source: "letta",
-        transcript: '[[{"message_type":"user_message"}]]',
+        source: "letta-code",
+        transcript: '[{"message_type":"user_message","seq_id":1}]',
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });
 
-  test("rejects an unsupported Letta local transcript version", () => {
+  test("rejects local-backend native messages", () => {
     expect(() =>
       normalizeTranscript({
-        source: "letta",
-        transcript: '{"type":"session","version":4}',
+        source: "letta-code",
+        transcript: '{"type":"message","message":{"role":"user","content":"hello"}}',
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects generated reflection payloads", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "letta-code",
+        transcript: '[{"role":"user","content":"hello"}]',
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });

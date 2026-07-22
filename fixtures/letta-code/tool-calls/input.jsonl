@@ -1,0 +1,5 @@
+{"kind":"user","text":"Inspect the entry point.","captured_at":"2026-07-22T12:00:00.000Z","source_line_id":"line-user-1"}
+{"kind":"reasoning","text":"I should read the file first.","captured_at":"2026-07-22T12:00:01.000Z","source_line_id":"line-reasoning-1","source_message_id":"message-assistant-1"}
+{"kind":"assistant","text":"I will inspect it now.","captured_at":"2026-07-22T12:00:01.000Z","source_line_id":"line-assistant-1","source_message_id":"message-assistant-1"}
+{"kind":"tool_call","name":"Read","argsText":"{\"file_path\":\"src/app.ts\"}","resultText":"export const value = 1;","resultOk":true,"captured_at":"2026-07-22T12:00:02.000Z","source_line_id":"call-read-1"}
+{"kind":"assistant","text":"The entry point exports value 1.","captured_at":"2026-07-22T12:00:03.000Z","source_line_id":"line-assistant-2","source_message_id":"message-assistant-2"}

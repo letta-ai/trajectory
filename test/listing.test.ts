@@ -39,12 +39,15 @@ beforeAll(() => {
     utimesSync(file, time, time);
   }
 
-  // letta: base64 conversation directories, one without messages.jsonl.
-  const conversations = join(base, "letta");
-  const encoded = Buffer.from("conversation:local-conv-1", "utf8").toString("base64");
-  mkdirSync(join(conversations, encoded), { recursive: true });
-  writeFileSync(join(conversations, encoded, "messages.jsonl"), "{}\n");
-  mkdirSync(join(conversations, "bm90LXBlcnNpc3RlZA"), { recursive: true });
+  // letta-code: agent/conversation transcript logs; empty logs are skipped.
+  const lettaCode = join(base, "letta-code", "agent-1");
+  mkdirSync(join(lettaCode, "conversation-1"), { recursive: true });
+  writeFileSync(
+    join(lettaCode, "conversation-1", "transcript.jsonl"),
+    '{"kind":"user"}\n',
+  );
+  mkdirSync(join(lettaCode, "empty-conversation"), { recursive: true });
+  writeFileSync(join(lettaCode, "empty-conversation", "transcript.jsonl"), "");
 
   // openclaw: agents/<id>/sessions layout.
   const openclawSessions = join(base, "openclaw", "agents", "main", "sessions");
@@ -112,10 +115,15 @@ describe("listTrajectories", () => {
     expect(result.items.map((item) => item.id)).toEqual(["rollout-b", "rollout-a"]);
   });
 
-  test("decodes letta conversation ids and skips unpersisted dirs", async () => {
-    const result = await listTrajectories({ source: "letta", root: join(base, "letta") });
-    expect(result.items.map((item) => item.id)).toEqual(["conversation:local-conv-1"]);
-    expect(result.items[0]?.path.endsWith("messages.jsonl")).toBe(true);
+  test("lists nonempty Letta Code client transcripts", async () => {
+    const result = await listTrajectories({
+      source: "letta-code",
+      root: join(base, "letta-code"),
+    });
+    expect(result.items.map((item) => item.id)).toEqual([
+      "agent-1/conversation-1",
+    ]);
+    expect(result.items[0]?.path.endsWith("transcript.jsonl")).toBe(true);
   });
 
   test("lists openclaw sessions and ignores the session store file", async () => {
@@ -203,4 +211,3 @@ describe("listTrajectories", () => {
     expect(resumed.items.map((item) => item.id)).toEqual(["rollout-a"]);
   });
 });
-

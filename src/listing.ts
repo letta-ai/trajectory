@@ -14,7 +14,7 @@ import { listClaudeCodeTrajectories } from "./adapters/claude-code/list.js";
 import { listCodexTrajectories } from "./adapters/codex/list.js";
 import { listDeepAgentsTrajectories } from "./adapters/deepagents/list.js";
 import { listHermesTrajectories } from "./adapters/hermes/list.js";
-import { listLettaTrajectories } from "./adapters/letta/list.js";
+import { listLettaCodeTrajectories } from "./adapters/letta-code/list.js";
 import { listOpenClawTrajectories } from "./adapters/openclaw/list.js";
 import { listOpenHandsTrajectories } from "./adapters/openhands/list.js";
 import type { AnyTrajectorySource } from "./types.js";
@@ -62,7 +62,7 @@ const LISTERS: Record<AnyTrajectorySource, SourceLister> = {
   codex: listCodexTrajectories,
   deepagents: listDeepAgentsTrajectories,
   hermes: listHermesTrajectories,
-  letta: listLettaTrajectories,
+  "letta-code": listLettaCodeTrajectories,
   openclaw: listOpenClawTrajectories,
   openhands: listOpenHandsTrajectories,
 };

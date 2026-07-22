@@ -1,0 +1,47 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "letta-code"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the entry point.",
+      "timestamp": "2026-07-22T12:00:00.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I should read the file first.",
+      "timestamp": "2026-07-22T12:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I will inspect it now.",
+      "timestamp": "2026-07-22T12:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-read-1",
+          "name": "Read",
+          "args": "{\"file_path\":\"src/app.ts\"}"
+        }
+      ],
+      "timestamp": "2026-07-22T12:00:02.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-read-1",
+      "content": "export const value = 1;",
+      "timestamp": "2026-07-22T12:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The entry point exports value 1.",
+      "timestamp": "2026-07-22T12:00:03.000Z"
+    }
+  ],
+  "diagnostics": []
+}

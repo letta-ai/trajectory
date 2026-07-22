@@ -12,13 +12,13 @@ interface DecodedEventBase {
   /**
    * Source-native, arrival-order-independent identity of the source record
    * this event was decoded from (for example a Claude Code line `uuid`, a Letta
-   * message `id`, or an OpenHands event `id`). Adapters set this only when the
-   * source exposes a stable per-record identifier.
+   * Code `source_message_id`, or an OpenHands event `id`). Adapters set this
+   * only when the source exposes a stable per-record identifier.
    */
   sourceRecordId?: string;
   /**
    * Source-native monotonic ordering key within the group when the source
-   * exposes one (for example a Letta `seq_id`). Used only as an order tie-break.
+   * exposes one. Used only as an order tie-break.
    */
   sourceSequence?: number;
   /**

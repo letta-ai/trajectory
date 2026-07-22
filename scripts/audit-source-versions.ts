@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { normalizeTranscript, NormalizationError } from "../src/index.js";
 
-type Source = "claude-code" | "codex" | "letta";
+type Source = "claude-code" | "codex" | "letta-code";
 
 interface ParsedFile {
   records: Record<string, unknown>[];
@@ -119,13 +119,15 @@ process.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
 
 function usage(): never {
   process.stderr.write(
-    "Usage: bun scripts/audit-source-versions.ts <claude-code|codex|letta> [--normalize] <file-or-directory> [...]\n",
+    "Usage: bun scripts/audit-source-versions.ts <claude-code|codex|letta-code> [--normalize] <file-or-directory> [...]\n",
   );
   process.exit(2);
 }
 
 function isSource(value: string | undefined): value is Source {
-  return value === "claude-code" || value === "codex" || value === "letta";
+  return (
+    value === "claude-code" || value === "codex" || value === "letta-code"
+  );
 }
 
 async function collectFiles(inputs: string[]): Promise<string[]> {
@@ -140,9 +142,7 @@ async function collectFiles(inputs: string[]): Promise<string[]> {
     if (!info.isDirectory()) continue;
 
     const patterns =
-      sourceArg === "letta"
-        ? ["**/messages.jsonl"]
-        : ["**/*.jsonl"];
+      sourceArg === "letta-code" ? ["**/transcript.jsonl"] : ["**/*.jsonl"];
     for (const pattern of patterns) {
       const glob = new Bun.Glob(pattern);
       for await (const match of glob.scan({ cwd: path, onlyFiles: true })) {
@@ -211,12 +211,6 @@ function sourceVersion(
       if (typeof payload.cli_version === "string") {
         candidates.add(payload.cli_version);
       }
-    } else if (
-      source === "letta" &&
-      record.type === "session" &&
-      (typeof record.version === "string" || typeof record.version === "number")
-    ) {
-      candidates.add(String(record.version));
     }
   }
   if (candidates.size === 0) return "unknown";
@@ -227,7 +221,7 @@ function sourceVersion(
 function signature(source: Source, record: Record<string, unknown>): string {
   if (source === "claude-code") return claudeSignature(record);
   if (source === "codex") return codexSignature(record);
-  return lettaSignature(record);
+  return lettaCodeSignature(record);
 }
 
 function claudeSignature(record: Record<string, unknown>): string {
@@ -253,20 +247,20 @@ function codexSignature(record: Record<string, unknown>): string {
   return parts.join("|");
 }
 
-function lettaSignature(record: Record<string, unknown>): string {
-  const message =
-    record.type === "message" && isObject(record.message)
-      ? record.message
-      : record;
-  const parts = [
-    `entry_type:${tag(record.type)}`,
-    `entry_keys:${keys(record)}`,
-    `message_type:${tag(message.message_type)}`,
-    `role:${tag(message.role)}`,
-    `message_keys:${keys(message)}`,
-  ];
-  if ("content" in message) parts.push(`content:${contentShape(message.content)}`);
-  if (Array.isArray(message.tool_calls)) parts.push("tool_calls:array");
+function lettaCodeSignature(record: Record<string, unknown>): string {
+  const parts = [`kind:${tag(record.kind)}`, `keys:${keys(record)}`];
+  for (const field of [
+    "text",
+    "name",
+    "argsText",
+    "resultText",
+    "resultOk",
+    "captured_at",
+    "source_message_id",
+    "source_line_id",
+  ]) {
+    if (field in record) parts.push(`${field}:${valueKind(record[field])}`);
+  }
   return parts.join("|");
 }
 

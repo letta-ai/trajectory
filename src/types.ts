@@ -4,7 +4,7 @@ export type TrajectorySource =
   | "claude-code"
   | "codex"
   | "hermes"
-  | "letta"
+  | "letta-code"
   | "openclaw"
   | "openhands";
 

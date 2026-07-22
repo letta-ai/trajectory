@@ -15,16 +15,17 @@ LangGraph SQLite store by thread ID; see
 
 ## Installation
 
-Neither package has been published yet. Install the TypeScript package directly
-from GitHub:
+The TypeScript package is published as
+[`@letta-ai/trajectory`](https://www.npmjs.com/package/@letta-ai/trajectory):
 
 ```sh
-npm install github:letta-ai/trajectory
+npm install @letta-ai/trajectory
 ```
 
 The Python distribution is named `letta-trajectory` and imports as
 `trajectory`. It includes the bundled normalizer and has no Python runtime
-dependencies, but it requires Node.js 20 or newer:
+dependencies, but it requires Node.js 20 or newer. It is not yet published to
+PyPI; install it from GitHub:
 
 ```sh
 pip install "letta-trajectory @ git+ssh://git@github.com/letta-ai/trajectory.git"

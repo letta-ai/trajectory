@@ -9,8 +9,9 @@ TypeScript API that turns those formats into deterministic,
 structured records for training, evaluation, analysis, and inference.
 
 The caller supplies a transcript string and its source. The one exception is
-Deep Agents, whose sessions are read from its local store instead; see
-[Deep Agents local sessions](#deep-agents-local-sessions).
+Deep Agents, whose sessions `normalizeCheckpoint` reads from its local
+LangGraph SQLite store by thread ID; see
+[`src/adapters/deepagents/`](src/adapters/deepagents/).
 
 ## Installation
 
@@ -104,53 +105,17 @@ and is empty when the transcript required no recoverable cleanup.
 
 | `source` | Accepted input format | Normalized `meta.source` |
 | --- | --- | --- |
-| `claude-code` | Native Claude Code JSONL | `claude-code` |
-| `codex` | Native Codex rollout JSONL | `codex` |
-| `hermes` | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
-| `letta` | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
-| `openclaw` | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |
-| `openhands` | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
-| `deepagents` | Deep Agents CLI LangGraph SQLite store (`~/.deepagents/sessions.db` by default) plus `threadId` | `deepagents` |
+| [`claude-code`](src/adapters/claude-code/) | Native Claude Code JSONL | `claude-code` |
+| [`codex`](src/adapters/codex/) | Native Codex rollout JSONL | `codex` |
+| [`hermes`](src/adapters/hermes/) | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
+| [`letta`](src/adapters/letta/) | Cloud/API message array or local conversation JSONL (legacy and v3) | `letta` |
+| [`openclaw`](src/adapters/openclaw/) | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |
+| [`openhands`](src/adapters/openhands/) | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
+| [`deepagents`](src/adapters/deepagents/) | Deep Agents CLI LangGraph SQLite store plus `threadId` | `deepagents` |
 
-Letta messages use native `message_type` values such as `user_message`,
-`reasoning_message`, `assistant_message`, `tool_call_message`,
-`approval_request_message`, and `tool_return_message`. The adapter orders a
-complete response by `seq_id`, handles singular and batched tool fields, and
-ignores system and approval-control records. It also accepts Letta's actual
-local conversation files from `lc-local-backend/conversations/*/messages.jsonl`:
-legacy headerless message rows and version 3 session-entry JSONL. Compaction
-entries are excluded because they summarize existing conversation context.
-The separate `~/.letta/transcripts` tree contains reflection artifacts and is
-not a supported native input. OpenHands inputs are serialized exports; when a
-native store uses individual event files, assembling the event array remains
-the caller's responsibility.
-
-Hermes (the `hermes-agent` harness) persists sessions in a SQLite store
-(`~/.hermes/state.db`), so the caller exports one session as JSON: either the
-message-row array for a session (`SELECT * FROM messages WHERE session_id = ?
-ORDER BY id`, or the rows returned by `HermesState.get_messages()`), or an
-envelope `{"session": <sessions row>, "messages": [<message rows>]}` whose
-session row supplies the model, working directory, start time, and group
-identity. The adapter accepts both raw column values (JSON-string `tool_calls`,
-`\x00json:`-prefixed multimodal content, epoch-second timestamps) and their
-decoded forms, handles both the OpenAI-style and the simplified id-less
-`{name, arguments}` tool-call shapes (adopting call ids from the answering
-tool rows when unambiguous), prefers `reasoning_content` over `reasoning`
-while ignoring single-space thinking-mode pads, and skips soft-deleted
-(`active = 0`) rewound rows, which Hermes itself excludes from replay.
-
-OpenClaw session transcripts are the pi-coding-agent SessionManager JSONL files
-written to `~/.openclaw/agents/<agentId>/sessions/<sessionId>.jsonl` (legacy
-state directories such as `~/.clawdbot` use the same layout): one
-`type: "session"` header row carrying the session id, ISO timestamp, and cwd,
-followed by `type: "message"` wrapper rows whose `message` holds `user`,
-`assistant` (with `text`, `thinking`, and `toolCall` content blocks plus model
-metadata), and `toolResult` messages. The whole file is the transcript string.
-Compaction, custom, and other lifecycle entry types are ignored, matching
-OpenClaw's own transcript readers, and failed tool results (`isError`) gain an
-`Error:` prefix. Assistant rows mirrored from external CLI backends under the
-`delivery-mirror` placeholder model keep their prose but do not contribute
-model metadata.
+Each adapter lives in its own folder under [`src/adapters/`](src/adapters/)
+with a README documenting the exact input contract, decoding behavior, and
+what the adapter drops.
 
 ## Normalized records
 
@@ -172,51 +137,6 @@ The public function is:
 
 ```ts
 normalizeTranscript(input: NormalizeInput): NormalizeResult
-```
-
-### Deep Agents local sessions
-
-Deep Agents has no transcript format: all conversation persistence goes
-through a LangGraph checkpointer, so the on-disk data is checkpoint state, not
-messages. The one standard local store is the Deep Agents CLI database at
-`~/.deepagents/sessions.db`, where every session is a thread in the root
-checkpoint namespace. `normalizeCheckpoint` reads that store by default and
-normalizes the latest state of one thread; pass `path` only for a non-default
-store (for example an SDK application's own `SqliteSaver` database, whose
-threads must live in the root namespace).
-
-```ts
-import { normalizeCheckpoint } from "@letta-ai/trajectory";
-
-const result = await normalizeCheckpoint({
-  source: "deepagents",
-  checkpoint: {
-    threadId: "abc12345", // as listed by the CLI session picker
-    // path: "custom/sessions.db",              // optional store override
-    // pythonExecutable: "/path/to/venv/python", // optional interpreter
-  },
-});
-```
-
-Decoding delegates to the installed Python LangGraph packages (Python
-checkpoint serialization is not readable from JavaScript), so the selected
-interpreter must contain `langgraph` and `langgraph-checkpoint-sqlite` — both
-already present in a typical Deep Agents environment. Pass `pythonExecutable`
-or set `PYTHON` when `python3` is not the right environment. The Python
-wrapper reuses its own interpreter automatically, and its optional extra
-installs the LangGraph dependencies:
-
-```sh
-pip install "letta-trajectory[deepagents] @ git+ssh://git@github.com/letta-ai/trajectory.git"
-```
-
-```python
-from trajectory import normalize_checkpoint
-
-result = normalize_checkpoint(
-    thread_id="abc12345",
-    # path="custom/sessions.db",  # optional; defaults to ~/.deepagents/sessions.db
-)
 ```
 
 An unknown source, an invalid source-level container, or a transcript that

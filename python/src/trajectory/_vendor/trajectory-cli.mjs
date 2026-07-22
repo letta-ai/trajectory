@@ -94,7 +94,7 @@ function jsonString(value) {
   return serialized === undefined ? "{}" : serialized;
 }
 
-// src/adapters/claude-code.ts
+// src/adapters/claude-code/index.ts
 var TRANSPORT_TYPES = new Set([
   "progress",
   "queue-operation",
@@ -274,7 +274,7 @@ function toolResultEvent(content, callId, inputLine, timestamp) {
   };
 }
 
-// src/adapters/codex.ts
+// src/adapters/codex/index.ts
 var INJECTED_PREFIXES = [
   "<environment_context>",
   "<user_instructions>",
@@ -453,7 +453,7 @@ function outputText(output) {
   return output == null ? "" : String(output);
 }
 
-// src/adapters/hermes.ts
+// src/adapters/hermes/index.ts
 var CONTENT_JSON_PREFIX = "\x00json:";
 var hermesAdapter = {
   source: "hermes",
@@ -706,7 +706,7 @@ function invalidHermesTranscript() {
   return new NormalizationError("invalid_input", "Hermes transcript must be a JSON array of session-store message rows or an object with a messages array.");
 }
 
-// src/adapters/letta.ts
+// src/adapters/letta/index.ts
 var lettaAdapter = {
   source: "letta",
   decode(transcript) {
@@ -1020,7 +1020,7 @@ function invalidLettaTranscript() {
   return new NormalizationError("invalid_input", "Letta transcript must be a native message array or local conversation JSONL.");
 }
 
-// src/adapters/openclaw.ts
+// src/adapters/openclaw/index.ts
 var DELIVERY_MIRROR_MODEL = "delivery-mirror";
 var openClawAdapter = {
   source: "openclaw",
@@ -1155,7 +1155,7 @@ function toolArguments2(value) {
   return jsonString(value);
 }
 
-// src/adapters/openhands.ts
+// src/adapters/openhands/index.ts
 var openHandsAdapter = {
   source: "openhands",
   decode(transcript) {
@@ -2074,7 +2074,7 @@ function sliceCodePoints(text, start, end) {
   return result;
 }
 
-// src/deepagents.ts
+// src/adapters/deepagents/index.ts
 import { spawn } from "node:child_process";
 import { accessSync, constants } from "node:fs";
 import { homedir } from "node:os";
@@ -2265,7 +2265,7 @@ function validateLocation(checkpoint) {
 }
 function resolveHelperPath() {
   const candidates = [
-    fileURLToPath(new URL("../helpers/deepagents_checkpoint.py", import.meta.url)),
+    fileURLToPath(new URL("../../../helpers/deepagents_checkpoint.py", import.meta.url)),
     fileURLToPath(new URL("./deepagents_checkpoint.py", import.meta.url))
   ];
   for (const candidate of candidates) {

@@ -45,10 +45,13 @@ the native single-transcript export when one exists. If the native store uses
 many event files, accept a documented JSON array or export envelope as the
 transcript string; locating and assembling those files remains caller work.
 
-Implement the source as a focused adapter under src/adapters/:
+Implement the source as a focused adapter in its own folder,
+src/adapters/<SOURCE_NAME>/:
 
+- Put the adapter in index.ts and document the exact input contract, decoding
+  behavior, and dropped input in a README.md beside it.
 - Add the source literal to TrajectorySource and register the adapter in
-  src/index.ts.
+  src/index.ts. Link the folder from the README source table.
 - Decode native records into DecodedEvent values and SessionContext. Keep
   shared normalization, bounds, validation, and repair behavior in the core.
 - Preserve meaningful prose, reasoning, tool names, structured arguments,
@@ -71,7 +74,8 @@ Add tests and documentation:
   relevant to this source.
 - Validate every golden output with both the runtime validator and JSON Schema.
 - Add a public-API test for unrecoverable input shape when applicable.
-- Document the source name and exact expected transcript container in README.md.
+- Add the source's row to the top-level README table; keep the detailed
+  contract in the adapter folder's README.md.
 - Record corpus and reference-parity results in PARITY.md using aggregate counts
   only. Never include private transcript content or identifiable paths.
 

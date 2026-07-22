@@ -57,7 +57,12 @@ export const lettaCodeAdapter: SourceAdapter = {
       const sourceMessageId = nonemptyString(row.source_message_id);
       const sourceLineId = nonemptyString(row.source_line_id);
       const sourceRecordId = sourceMessageId ?? sourceLineId;
-      const sourceFields = sourceRecordId ? { sourceRecordId } : {};
+      const sourceFields = sourceRecordId
+        ? { sourceRecordId }
+        : {
+            sourceOffset: line - 1,
+            sourceAnchorKind: "ordinal" as const,
+          };
 
       if (
         row.kind === "user" ||
@@ -104,7 +109,7 @@ export const lettaCodeAdapter: SourceAdapter = {
       // Older client rows can lack both source ids. The generated value exists
       // only to link the call/result emitted from this one row; source identity
       // still follows source_message_id ?? source_line_id and otherwise uses the
-      // canonical content fallback.
+      // row position assigned above.
       const callId =
         sourceLineId ?? sourceMessageId ?? `letta-code-tool-line-${line}`;
       const name = nonemptyString(row.name);

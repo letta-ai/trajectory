@@ -751,7 +751,10 @@ var lettaCodeAdapter = {
       const sourceMessageId = nonemptyString(row.source_message_id);
       const sourceLineId = nonemptyString(row.source_line_id);
       const sourceRecordId = sourceMessageId ?? sourceLineId;
-      const sourceFields = sourceRecordId ? { sourceRecordId } : {};
+      const sourceFields = sourceRecordId ? { sourceRecordId } : {
+        sourceOffset: line - 1,
+        sourceAnchorKind: "ordinal"
+      };
       if (row.kind === "user" || row.kind === "assistant" || row.kind === "reasoning") {
         if (typeof row.text !== "string" || row.text.length === 0) {
           diagnostics.push({

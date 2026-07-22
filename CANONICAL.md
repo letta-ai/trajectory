@@ -122,7 +122,8 @@ confidently it can interpret conflicts:
   exact-duplicate dedup **and** conflicting-version detection.
 - `location` — a stable source-native location anchor when no native id exists:
   an absolute UTF-8 byte offset for Codex and id-less Claude Code/OpenClaw rows
-  (chunkable via `baseByteOffset`) or a whole-decode ordinal for Deep Agents.
+  (chunkable via `baseByteOffset`), a whole-decode ordinal for Deep Agents, or
+  the JSONL row position for id-less Letta Code rows.
   The anchor unit is part of the identity, so byte and ordinal anchors never
   collide. Supports dedup and conflict detection for append-only assembly.
 - `content` — content-addressed fallback when neither a native id nor a stable

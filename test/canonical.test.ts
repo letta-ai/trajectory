@@ -370,7 +370,7 @@ describe("letta-code source identity", () => {
     expect(tool?.tool_call_id).toBe("call-read-1");
   });
 
-  test("older id-less tool rows link without byte-offset identity", () => {
+  test("older id-less tool rows use row-position identity", () => {
     const result = normalizeToCanonical({
       source: "letta-code",
       transcript: fixtureText("letta-code/cleanup", "input.jsonl"),
@@ -388,14 +388,99 @@ describe("letta-code source identity", () => {
 
     expect(call?.tool_call_id).toBe("letta-code-tool-line-5");
     expect(tool?.tool_call_id).toBe(call?.tool_call_id ?? "");
-    expect(call?.source_identity_kind).toBe("content");
-    expect(tool?.source_identity_kind).toBe("content");
+    expect(call?.source_identity_kind).toBe("location");
+    expect(tool?.source_identity_kind).toBe("location");
+    expect(tool?.stable_source_record_id).toBe(
+      call?.stable_source_record_id ?? "",
+    );
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
       "orphan_tool_result",
     );
     expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
       "tool_call_id_synthesized",
     );
+  });
+
+  test("keeps identical id-less messages on different rows distinct", () => {
+    const transcript = [
+      {
+        kind: "user",
+        text: "same text",
+        captured_at: "2026-07-22T14:00:00.000Z",
+      },
+      {
+        kind: "assistant",
+        text: "same text",
+        captured_at: "2026-07-22T14:00:01.000Z",
+      },
+      {
+        kind: "user",
+        text: "same text",
+        captured_at: "2026-07-22T14:00:02.000Z",
+      },
+      {
+        kind: "assistant",
+        text: "same text",
+        captured_at: "2026-07-22T14:00:03.000Z",
+      },
+    ]
+      .map((row) => JSON.stringify(row))
+      .join("\n");
+    const result = normalizeToCanonical({ source: "letta-code", transcript });
+    const messages = result.records.filter(
+      (record) =>
+        record.record_type === "user" || record.record_type === "assistant",
+    );
+
+    expect(messages).toHaveLength(4);
+    expect(messages.every((record) => record.source_identity_kind === "location"))
+      .toBe(true);
+    expect(new Set(messages.map((record) => record.stable_source_record_id)).size)
+      .toBe(4);
+    expect(new Set(messages.map((record) => record.record_id)).size).toBe(4);
+  });
+
+  test("keeps id-less row identities stable when later rows are appended", () => {
+    const prefixRows = [
+      {
+        kind: "user",
+        text: "first question",
+        captured_at: "2026-07-22T15:00:00.000Z",
+      },
+      {
+        kind: "assistant",
+        text: "first answer",
+        captured_at: "2026-07-22T15:00:01.000Z",
+      },
+    ];
+    const appendedRows = [
+      {
+        kind: "user",
+        text: "second question",
+        captured_at: "2026-07-22T15:00:02.000Z",
+      },
+      {
+        kind: "assistant",
+        text: "second answer",
+        captured_at: "2026-07-22T15:00:03.000Z",
+      },
+    ];
+    const normalizeRows = (rows: typeof prefixRows) =>
+      normalizeToCanonical({
+        source: "letta-code",
+        transcript: rows.map((row) => JSON.stringify(row)).join("\n"),
+      });
+    const prefix = normalizeRows(prefixRows);
+    const appended = normalizeRows([...prefixRows, ...appendedRows]);
+
+    for (const content of ["first question", "first answer"]) {
+      const before = prefix.records.find((record) => record.content === content);
+      const after = appended.records.find((record) => record.content === content);
+      expect(after?.stable_source_record_id).toBe(
+        before?.stable_source_record_id ?? "",
+      );
+      expect(after?.record_id).toBe(before?.record_id ?? "");
+    }
   });
 });
 

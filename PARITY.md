@@ -53,10 +53,12 @@ backend conversation-history store.
   including older rows without source ids, failed tool results, and unfinished
   calls. All 21,991 completed tool rows normalized as linked call/result pairs;
   no orphan-result or synthesized-call-id diagnostics remained.
+- Canonical replay assigned row-position identities to 17,104 records emitted
+  from historical id-less rows, with no duplicate record ids within a log.
 - Sanitized fixtures cover source-message versus source-line identity,
   reasoning/assistant components from one source message, completed and
   unfinished tools, failed results, malformed lines, error rows, unsupported
-  row kinds, and older tool rows without source ids.
+  row kinds, and row-position identity for older rows without source ids.
 
 OpenHands message, action, observation, agent-error, and user-rejection event
 shapes were checked against the `dream-pipeline` OpenHands source. Both the

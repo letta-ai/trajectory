@@ -122,6 +122,7 @@ Coverage:
   `tool_call` source rows.
 - The format does not embed a producer or schema version, so the audit reports
   the source version as `unknown`.
+- 10,817 historical rows across 91 files lack both source-id fields.
 
 Text rows consistently use `text` and `captured_at`. Newer rows carry
 `source_line_id`; reasoning and assistant rows may additionally share a
@@ -137,8 +138,10 @@ Normalization outcome:
 - Completed tool rows all remained linked call/result pairs, including 6,288
   older rows without source ids. These rows receive a line-scoped call id only
   for linkage; canonical source identity still follows
-  `source_message_id ?? source_line_id` and otherwise uses the shared content
-  fallback. No byte-offset identity is introduced.
+  `source_message_id ?? source_line_id` and otherwise uses the row's position
+  within the provided JSONL. No byte-offset identity is introduced.
+- A canonical replay emitted 17,104 row-position identities with no duplicate
+  `record_id` values within a transcript.
 - Bounds produced 94 argument-reshape, 21 argument-truncation, and 5,043
   result-truncation diagnostics. One empty text row was dropped as noise.
 

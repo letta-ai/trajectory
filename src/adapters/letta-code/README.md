@@ -12,8 +12,9 @@ or `error`. Text rows use `text`; tool rows use `name`, `argsText`,
 `resultText`, and `resultOk`; `captured_at` supplies the record timestamp.
 `source_message_id` is the preferred source identity when present, with
 `source_line_id` as the fallback. If neither exists, canonical normalization
-uses its content-addressed fallback; it does not substitute a byte offset. A
-completed tool row expands into a linked assistant tool call and tool result.
+uses the row's position within the provided JSONL; it does not substitute a
+byte offset or require caller metadata. A completed tool row expands into a
+linked assistant tool call and tool result.
 For an older tool row with neither source id, a line-scoped call id links those
 two emitted records without becoming the row's source identity. An unfinished
 tool row without result fields emits only the call. Failed results gain an

@@ -1,5 +1,6 @@
 import { claudeCodeAdapter } from "./adapters/claude-code.js";
 import { codexAdapter } from "./adapters/codex.js";
+import { hermesAdapter } from "./adapters/hermes.js";
 import { lettaAdapter } from "./adapters/letta.js";
 import { openHandsAdapter } from "./adapters/openhands.js";
 import { decodeDeepAgentsCheckpoint } from "./adapters/deepagents.js";
@@ -25,6 +26,7 @@ import { CANONICAL_SCHEMA_VERSION, NORMALIZER_VERSION } from "./version.js";
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  hermes: hermesAdapter,
   letta: lettaAdapter,
   openhands: openHandsAdapter,
 };

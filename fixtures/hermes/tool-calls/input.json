@@ -1,0 +1,65 @@
+{
+  "session": {
+    "id": "hermes-session-0001",
+    "source": "tui",
+    "model": "gpt-5.2",
+    "cwd": "/workspace/demo",
+    "system_prompt": "You are Hermes.",
+    "started_at": 1783000000.0,
+    "title": "Inspect the working directory"
+  },
+  "messages": [
+    {
+      "id": 101,
+      "session_id": "hermes-session-0001",
+      "role": "user",
+      "content": "Check the current directory.",
+      "timestamp": 1783000001.25,
+      "observed": 0,
+      "active": 1
+    },
+    {
+      "id": 102,
+      "session_id": "hermes-session-0001",
+      "role": "assistant",
+      "content": null,
+      "reasoning": "The user wants the working directory; run pwd.",
+      "reasoning_content": "The user wants the working directory; run pwd.",
+      "tool_calls": [
+        {
+          "id": "call_hermes_1",
+          "type": "function",
+          "function": {
+            "name": "terminal",
+            "arguments": "{\"command\":\"pwd\"}"
+          }
+        }
+      ],
+      "finish_reason": "tool_calls",
+      "timestamp": 1783000004.5,
+      "observed": 0,
+      "active": 1
+    },
+    {
+      "id": 103,
+      "session_id": "hermes-session-0001",
+      "role": "tool",
+      "tool_call_id": "call_hermes_1",
+      "tool_name": "terminal",
+      "content": "/workspace/demo",
+      "timestamp": 1783000006.0,
+      "observed": 0,
+      "active": 1
+    },
+    {
+      "id": 104,
+      "session_id": "hermes-session-0001",
+      "role": "assistant",
+      "content": "You are in /workspace/demo.",
+      "finish_reason": "stop",
+      "timestamp": 1783000008.75,
+      "observed": 0,
+      "active": 1
+    }
+  ]
+}

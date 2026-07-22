@@ -1,0 +1,85 @@
+[
+  {
+    "id": 201,
+    "session_id": "hermes-session-0002",
+    "role": "user",
+    "content": "\u0000json:[{\"type\": \"text\", \"text\": \"Describe this screenshot.\"}, {\"type\": \"image_url\", \"image_url\": {\"url\": \"data:image/png;base64,AAAA\"}}]",
+    "timestamp": 1783100001.5,
+    "observed": 0,
+    "active": 1
+  },
+  {
+    "id": 202,
+    "session_id": "hermes-session-0002",
+    "role": "assistant",
+    "content": "",
+    "reasoning": " ",
+    "reasoning_content": " ",
+    "tool_calls": "[{\"name\": \"screenshot_inspect\", \"arguments\": \"{\\\"region\\\": \\\"full\\\"}\"}]",
+    "finish_reason": "tool_calls",
+    "timestamp": 1783100003.0,
+    "observed": 0,
+    "active": 1
+  },
+  {
+    "id": 204,
+    "session_id": "hermes-session-0002",
+    "role": "assistant",
+    "content": "The screenshot shows a terminal window with two panes.",
+    "reasoning": "Summarize the tool output for the user.",
+    "finish_reason": "stop",
+    "timestamp": 1783100005.0,
+    "observed": 0,
+    "active": 1
+  },
+  {
+    "id": 203,
+    "session_id": "hermes-session-0002",
+    "role": "tool",
+    "tool_call_id": "call_adopted_1",
+    "tool_name": "screenshot_inspect",
+    "content": "A terminal window with two panes.",
+    "timestamp": 1783100004.0,
+    "observed": 0,
+    "active": 1
+  },
+  {
+    "id": 205,
+    "session_id": "hermes-session-0002",
+    "role": "user",
+    "content": "Ignore that, wrong window.",
+    "timestamp": 1783100006.0,
+    "observed": 0,
+    "active": 0
+  },
+  {
+    "id": 206,
+    "session_id": "hermes-session-0002",
+    "role": "tool",
+    "tool_call_id": "call_missing",
+    "tool_name": "terminal",
+    "content": "stale output from a rewound turn",
+    "timestamp": 1783100006.5,
+    "observed": 0,
+    "active": 1
+  },
+  {
+    "id": 207,
+    "session_id": "hermes-session-0002",
+    "role": "user",
+    "content": "Thanks.",
+    "timestamp": 1783100007.0,
+    "observed": 0,
+    "active": 1
+  },
+  {
+    "id": 208,
+    "session_id": "hermes-session-0002",
+    "role": "assistant",
+    "content": "You're welcome.",
+    "finish_reason": "stop",
+    "timestamp": 1783100008.0,
+    "observed": 0,
+    "active": 1
+  }
+]

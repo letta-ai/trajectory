@@ -453,12 +453,265 @@ function outputText(output) {
   return output == null ? "" : String(output);
 }
 
+// src/adapters/hermes.ts
+var CONTENT_JSON_PREFIX = "\x00json:";
+var hermesAdapter = {
+  source: "hermes",
+  decode(transcript) {
+    const diagnostics = [];
+    const events = [];
+    const parsed = parseTranscript(transcript);
+    const rows = orderRows(parsed.messages.filter((row) => row.active !== 0 && row.active !== false));
+    const callsByRow = planToolCalls(rows, diagnostics);
+    for (let index = 0;index < rows.length; index += 1) {
+      const row = rows[index];
+      if (row === undefined)
+        continue;
+      const timestamp = hermesTimestamp(row.timestamp);
+      const id = rowId(row);
+      let componentIndex = 0;
+      const emit = (event) => {
+        events.push({
+          ...event,
+          ...id !== undefined ? { sourceRecordId: String(id) } : { sourceOffset: index, sourceAnchorKind: "ordinal" },
+          ...typeof id === "number" ? { sourceSequence: id } : {},
+          componentIndex: componentIndex++
+        });
+      };
+      if (row.role === "user") {
+        const content = contentText(row.content);
+        if (content) {
+          emit({
+            type: "message",
+            role: "user",
+            content,
+            ...timestamp ? { timestamp } : {}
+          });
+        }
+        continue;
+      }
+      if (row.role === "assistant") {
+        const reasoning = reasoningText(row);
+        if (reasoning) {
+          emit({
+            type: "reasoning",
+            content: reasoning,
+            ...timestamp ? { timestamp } : {}
+          });
+        }
+        const content = contentText(row.content);
+        if (content) {
+          emit({
+            type: "message",
+            role: "assistant",
+            content,
+            ...timestamp ? { timestamp } : {}
+          });
+        }
+        for (const call of callsByRow.get(index) ?? []) {
+          emit({
+            type: "tool_call",
+            args: call.args,
+            ...call.id ? { id: call.id } : {},
+            ...call.name ? { name: call.name } : {},
+            ...timestamp ? { timestamp } : {}
+          });
+        }
+        continue;
+      }
+      if (row.role === "tool") {
+        emit({
+          type: "tool_result",
+          content: contentText(row.content),
+          ...typeof row.tool_call_id === "string" && row.tool_call_id ? { callId: row.tool_call_id } : {},
+          ...timestamp ? { timestamp } : {}
+        });
+      }
+    }
+    const session = parsed.session ?? {};
+    const model = typeof session.model === "string" && session.model ? session.model : undefined;
+    const cwd = typeof session.cwd === "string" && session.cwd ? session.cwd : undefined;
+    const createdAt = hermesTimestamp(session.started_at);
+    const sourceGroupId = resolveGroupId(session, parsed.messages);
+    return {
+      events,
+      context: {
+        source: "hermes",
+        ...cwd ? { cwd } : {},
+        ...model ? { model } : {},
+        ...createdAt ? { createdAt } : {},
+        ...sourceGroupId ? { sourceGroupId } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function parseTranscript(transcript) {
+  let parsed;
+  try {
+    parsed = JSON.parse(transcript);
+  } catch {
+    throw invalidHermesTranscript();
+  }
+  if (Array.isArray(parsed)) {
+    if (!parsed.every(isObject))
+      throw invalidHermesTranscript();
+    return { messages: parsed };
+  }
+  if (isObject(parsed) && Array.isArray(parsed.messages)) {
+    if (!parsed.messages.every(isObject))
+      throw invalidHermesTranscript();
+    return {
+      messages: parsed.messages,
+      ...isObject(parsed.session) ? { session: parsed.session } : {}
+    };
+  }
+  throw invalidHermesTranscript();
+}
+function orderRows(rows) {
+  if (!rows.every((row) => typeof row.id === "number"))
+    return rows;
+  return rows.map((row, index) => ({ row, index })).sort((left, right) => left.row.id - right.row.id || left.index - right.index).map(({ row }) => row);
+}
+function planToolCalls(rows, diagnostics) {
+  const plan = new Map;
+  for (let index = 0;index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row === undefined || row.role !== "assistant")
+      continue;
+    const calls = rowToolCalls(row, index, diagnostics);
+    if (calls.length === 0)
+      continue;
+    const idless = calls.filter((call) => !call.id);
+    if (idless.length > 0) {
+      const claimed = new Set(calls.flatMap((call) => call.id ? [call.id] : []));
+      const available = [];
+      for (let cursor = index + 1;cursor < rows.length; cursor += 1) {
+        const next = rows[cursor];
+        if (next === undefined)
+          continue;
+        if (next.role !== "tool")
+          break;
+        if (typeof next.tool_call_id === "string" && next.tool_call_id && !claimed.has(next.tool_call_id)) {
+          available.push(next.tool_call_id);
+        }
+      }
+      if (available.length === idless.length) {
+        for (let position = 0;position < idless.length; position += 1) {
+          const call = idless[position];
+          const adopted = available[position];
+          if (call && adopted !== undefined)
+            call.id = adopted;
+        }
+      }
+    }
+    plan.set(index, calls);
+  }
+  return plan;
+}
+function rowToolCalls(row, index, diagnostics) {
+  let raw = row.tool_calls;
+  if (typeof raw === "string" && raw) {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      diagnostics.push({
+        code: "invalid_json_line",
+        message: `Skipped undecodable tool_calls on message ${index + 1}.`,
+        inputLine: index + 1
+      });
+      return [];
+    }
+  }
+  if (!Array.isArray(raw))
+    return [];
+  const calls = [];
+  for (const entry of raw) {
+    if (!isObject(entry))
+      continue;
+    const fn = isObject(entry.function) ? entry.function : undefined;
+    const name = firstString(fn?.name, entry.name);
+    const id = firstString(entry.id, entry.call_id);
+    const args = fn !== undefined ? fn.arguments : entry.arguments;
+    calls.push({
+      args: typeof args === "string" && args ? args : jsonString(args),
+      ...id ? { id } : {},
+      ...name ? { name } : {}
+    });
+  }
+  return calls;
+}
+function contentText(content) {
+  if (typeof content === "string") {
+    if (content.startsWith(CONTENT_JSON_PREFIX)) {
+      const encoded = content.slice(CONTENT_JSON_PREFIX.length);
+      try {
+        return contentText(JSON.parse(encoded));
+      } catch {
+        return encoded;
+      }
+    }
+    return content;
+  }
+  if (Array.isArray(content))
+    return blocksText(content);
+  if (content === null || content === undefined)
+    return "";
+  if (isObject(content))
+    return jsonString(content);
+  return String(content);
+}
+function reasoningText(row) {
+  if (typeof row.reasoning_content === "string" && row.reasoning_content.trim()) {
+    return row.reasoning_content;
+  }
+  if (typeof row.reasoning === "string" && row.reasoning.trim()) {
+    return row.reasoning;
+  }
+  return "";
+}
+function hermesTimestamp(value) {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    const milliseconds = value > 100000000000 ? value : value * 1000;
+    const date = new Date(Math.round(milliseconds));
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+  return parseTimestamp(value);
+}
+function rowId(row) {
+  if (typeof row.id === "number" && Number.isFinite(row.id))
+    return row.id;
+  if (typeof row.id === "string" && row.id)
+    return row.id;
+  return;
+}
+function resolveGroupId(session, messages) {
+  if (typeof session.id === "string" && session.id)
+    return session.id;
+  for (const row of messages) {
+    if (typeof row.session_id === "string" && row.session_id) {
+      return row.session_id;
+    }
+  }
+  return;
+}
+function firstString(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value)
+      return value;
+  }
+  return;
+}
+function invalidHermesTranscript() {
+  return new NormalizationError("invalid_input", "Hermes transcript must be a JSON array of session-store message rows or an object with a messages array.");
+}
+
 // src/adapters/letta.ts
 var lettaAdapter = {
   source: "letta",
   decode(transcript) {
     const events = [];
-    const parsed = parseTranscript(transcript);
+    const parsed = parseTranscript2(transcript);
     if (parsed.format === "local") {
       for (const entry of parsed.messages) {
         decodeLocalMessage(entry.message, entry.timestamp, entry.byteOffset, events);
@@ -541,7 +794,7 @@ var lettaAdapter = {
     };
   }
 };
-function parseTranscript(transcript) {
+function parseTranscript2(transcript) {
   let parsed;
   try {
     parsed = JSON.parse(transcript);
@@ -1914,6 +2167,7 @@ function isToolCall(value) {
 var ADAPTERS = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  hermes: hermesAdapter,
   letta: lettaAdapter,
   openhands: openHandsAdapter
 };

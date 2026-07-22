@@ -1,0 +1,44 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "hermes",
+      "cwd": "/workspace/demo",
+      "model": "gpt-5.2"
+    },
+    {
+      "role": "user",
+      "content": "Check the current directory.",
+      "timestamp": "2026-07-02T13:46:41.250Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "The user wants the working directory; run pwd.",
+      "timestamp": "2026-07-02T13:46:44.500Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_hermes_1",
+          "name": "terminal",
+          "args": "{\"command\":\"pwd\"}"
+        }
+      ],
+      "timestamp": "2026-07-02T13:46:44.500Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_hermes_1",
+      "content": "/workspace/demo",
+      "timestamp": "2026-07-02T13:46:46.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "You are in /workspace/demo.",
+      "timestamp": "2026-07-02T13:46:48.750Z"
+    }
+  ],
+  "diagnostics": []
+}

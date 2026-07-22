@@ -1,6 +1,6 @@
 {
   "name": "@letta-ai/trajectory",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packageManager": "bun@1.3.0",
   "description": "Normalize native agent transcripts into a shared trajectory format.",
   "license": "Apache-2.0",

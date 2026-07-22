@@ -98,9 +98,8 @@ class WrapperTests(unittest.TestCase):
             database = Path(directory) / "checkpoint.db"
             shutil.copyfile(ROOT / "fixtures/deepagents/checkpoint.db", database)
             result = normalize_checkpoint(
-                path=database,
                 thread_id="thread-123",
-                checkpoint_namespace="sdk",
+                path=database,
             )
             batch = normalize_many(
                 [
@@ -108,8 +107,7 @@ class WrapperTests(unittest.TestCase):
                         "source": "deepagents",
                         "checkpoint": {
                             "path": str(database),
-                            "threadId": "thread-123",
-                            "checkpointNamespace": "other",
+                            "threadId": "thread-basic",
                         },
                     }
                 ]
@@ -122,7 +120,7 @@ class WrapperTests(unittest.TestCase):
             ["meta", "user", "reasoning", "assistant", "assistant", "tool", "assistant"],
         )
         self.assertEqual(result["records"][-1]["content"], "It is sunny and 22 C in Paris.")
-        self.assertEqual(batch[0]["records"][1]["content"], "Other namespace")
+        self.assertEqual(batch[0]["records"][1]["content"], "Basic thread")
 
 
 if __name__ == "__main__":

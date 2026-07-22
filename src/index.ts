@@ -4,25 +4,21 @@ import { hermesAdapter } from "./adapters/hermes.js";
 import { lettaAdapter } from "./adapters/letta.js";
 import { openClawAdapter } from "./adapters/openclaw.js";
 import { openHandsAdapter } from "./adapters/openhands.js";
-import { decodeDeepAgentsCheckpoint } from "./adapters/deepagents.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
 import { resolveBounds } from "./bounds.js";
-import { buildCanonicalRecords, GROUP_SENTINEL } from "./canonical.js";
+import { finalizeCanonical, GROUP_SENTINEL } from "./canonical.js";
 import {
   normalizeDecodedSession,
   normalizeDecodedSessionInternal,
 } from "./core.js";
-import { loadDeepAgentsCheckpoint } from "./deepagents-checkpoint.js";
 import type { DecodedSession, SourceAdapter } from "./internal.js";
 import type {
   CanonicalResult,
-  DeepAgentsCheckpointInput,
   NormalizeInput,
   NormalizeResult,
   TranscriptTrajectorySource,
 } from "./types.js";
 import { NormalizationError } from "./types.js";
-import { CANONICAL_SCHEMA_VERSION, NORMALIZER_VERSION } from "./version.js";
 
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
@@ -120,62 +116,19 @@ function resolveGroupId(
   return resolved || GROUP_SENTINEL;
 }
 
-/** Normalize a Python Deep Agents SDK checkpoint selected by path and thread. */
-export async function normalizeCheckpoint(
-  input: DeepAgentsCheckpointInput,
-): Promise<NormalizeResult> {
-  const { decoded, bounds } = await decodeCheckpoint(input);
-  return normalizeDecodedSession(decoded, bounds);
-}
-
-/** Canonical view of a Deep Agents SDK checkpoint, mirroring {@link normalizeToCanonical}. */
-export async function normalizeCheckpointToCanonical(
-  input: DeepAgentsCheckpointInput,
-): Promise<CanonicalResult> {
-  const { decoded, bounds } = await decodeCheckpoint(input);
-  const internal = normalizeDecodedSessionInternal(decoded, bounds);
-  return finalizeCanonical(internal, bounds, {
-    groupId: internal.context.sourceGroupId || GROUP_SENTINEL,
-    baseByteOffset: 0,
-    emitMeta: true,
-  });
-}
-
-async function decodeCheckpoint(input: DeepAgentsCheckpointInput): Promise<{
-  decoded: DecodedSession;
-  bounds: ResolvedNormalizationBounds;
-}> {
-  if (!input || typeof input !== "object") {
-    throw new NormalizationError("invalid_input", "Input must be an object.");
-  }
-  if (input.source !== "deepagents") {
-    throw new NormalizationError(
-      "unknown_source",
-      `Checkpoint source must be "deepagents"; received ${JSON.stringify(input.source)}.`,
-    );
-  }
-  const checkpoint = await loadDeepAgentsCheckpoint(input.checkpoint);
-  return {
-    decoded: decodeDeepAgentsCheckpoint(checkpoint),
-    bounds: resolveBounds(input.bounds),
-  };
-}
-
-function finalizeCanonical(
-  internal: ReturnType<typeof normalizeDecodedSessionInternal>,
-  bounds: ResolvedNormalizationBounds,
-  options: { groupId: string; baseByteOffset: number; emitMeta: boolean },
-): CanonicalResult {
-  return {
-    records: buildCanonicalRecords(internal, options),
-    diagnostics: internal.diagnostics,
-    normalizer_version: NORMALIZER_VERSION,
-    canonical_schema_version: CANONICAL_SCHEMA_VERSION,
-    config: { bounds },
-  };
-}
-
-export { loadDeepAgentsCheckpoint } from "./deepagents-checkpoint.js";
+export {
+  loadDeepAgentsCheckpoint,
+  normalizeCheckpoint,
+  normalizeCheckpointToCanonical,
+  type DeepAgentsAIMessageData,
+  type DeepAgentsCheckpointData,
+  type DeepAgentsCheckpointInput,
+  type DeepAgentsCheckpointLocation,
+  type DeepAgentsHumanMessageData,
+  type DeepAgentsMessageData,
+  type DeepAgentsToolCall,
+  type DeepAgentsToolMessageData,
+} from "./deepagents.js";
 export { CANONICAL_SCHEMA_VERSION, NORMALIZER_VERSION } from "./version.js";
 
 export { DEFAULT_NORMALIZATION_BOUNDS } from "./bounds.js";
@@ -191,14 +144,6 @@ export {
   type CheckpointTrajectorySource,
   type Diagnostic,
   type DiagnosticCode,
-  type DeepAgentsAIMessageData,
-  type DeepAgentsCheckpointData,
-  type DeepAgentsCheckpointInput,
-  type DeepAgentsCheckpointLocation,
-  type DeepAgentsHumanMessageData,
-  type DeepAgentsMessageData,
-  type DeepAgentsToolCall,
-  type DeepAgentsToolMessageData,
   type MetaRecord,
   type NormalizationBounds,
   type NormalizationErrorCode,

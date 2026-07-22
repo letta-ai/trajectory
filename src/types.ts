@@ -72,69 +72,6 @@ export interface NormalizeInput {
   sourceContext?: SourceContext;
 }
 
-export interface DeepAgentsCheckpointLocation {
-  /** Path to a SQLite database created by Python LangGraph SqliteSaver. */
-  path: string;
-  /** LangGraph thread_id. Required because Deep Agents has no standard local store. */
-  threadId: string;
-  /** LangGraph checkpoint_ns. Defaults to the root namespace (empty string). */
-  checkpointNamespace?: string;
-  /** Select one checkpoint. When omitted, SqliteSaver selects the latest checkpoint. */
-  checkpointId?: string;
-  /** Python interpreter containing LangGraph and langgraph-checkpoint-sqlite. */
-  pythonExecutable?: string;
-}
-
-export interface DeepAgentsCheckpointInput {
-  source: "deepagents";
-  checkpoint: DeepAgentsCheckpointLocation;
-  bounds?: NormalizationBounds;
-}
-
-export interface DeepAgentsToolCall {
-  id?: string;
-  name?: string;
-  args: unknown;
-}
-
-export interface DeepAgentsHumanMessageData {
-  role: "human";
-  content: string;
-  timestamp?: string;
-}
-
-export interface DeepAgentsAIMessageData {
-  role: "ai";
-  content: string;
-  reasoning: string[];
-  toolCalls: DeepAgentsToolCall[];
-  model?: string;
-  timestamp?: string;
-}
-
-export interface DeepAgentsToolMessageData {
-  role: "tool";
-  content: string;
-  toolCallId: string;
-  timestamp?: string;
-}
-
-export type DeepAgentsMessageData =
-  | DeepAgentsHumanMessageData
-  | DeepAgentsAIMessageData
-  | DeepAgentsToolMessageData;
-
-export interface DeepAgentsCheckpointData {
-  /** LangGraph thread_id the checkpoint was selected by; part of the group identity. */
-  threadId: string;
-  checkpointId: string;
-  checkpointNamespace: string;
-  checkpointTimestamp: string;
-  cwd?: string;
-  model?: string;
-  messages: DeepAgentsMessageData[];
-}
-
 export type DiagnosticCode =
   | "invalid_json_line"
   | "non_object_json_line"

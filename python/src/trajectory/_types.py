@@ -68,13 +68,11 @@ class NormalizeInput(_NormalizeInputOptional):
 
 
 class _DeepAgentsCheckpointLocationOptional(TypedDict, total=False):
-    checkpointNamespace: str
-    checkpointId: str
+    path: str
     pythonExecutable: str
 
 
 class DeepAgentsCheckpointLocation(_DeepAgentsCheckpointLocationOptional):
-    path: str
     threadId: str
 
 

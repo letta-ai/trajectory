@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
+import type { ResolvedNormalizationBounds } from "./bounds.js";
 import type { CanonicalSourceBasis, InternalNormalization } from "./internal.js";
 import type {
   CanonicalRecord,
   CanonicalRecordType,
+  CanonicalResult,
   NormalizedRecord,
   SourceIdentityKind,
 } from "./types.js";
+import { CANONICAL_SCHEMA_VERSION, NORMALIZER_VERSION } from "./version.js";
 
 export const GROUP_SENTINEL = "default";
 const META_ORDER_TIMESTAMP = "0000-00-00T00:00:00.000Z";
@@ -308,4 +311,19 @@ function sortKeys(value: unknown): unknown {
 
 function sha256Hex(input: string): string {
   return createHash("sha256").update(input, "utf8").digest("hex");
+}
+
+/** Assemble the complete canonical result from an internal normalization. */
+export function finalizeCanonical(
+  internal: InternalNormalization,
+  bounds: ResolvedNormalizationBounds,
+  options: CanonicalOptions,
+): CanonicalResult {
+  return {
+    records: buildCanonicalRecords(internal, options),
+    diagnostics: internal.diagnostics,
+    normalizer_version: NORMALIZER_VERSION,
+    canonical_schema_version: CANONICAL_SCHEMA_VERSION,
+    config: { bounds },
+  };
 }

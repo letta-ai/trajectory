@@ -37,7 +37,6 @@ describe("Deep Agents Python checkpoints", () => {
     const checkpoint = await loadDeepAgentsCheckpoint({
       path: databasePath,
       threadId: "thread-123",
-      checkpointNamespace: "sdk",
       pythonExecutable: PYTHON!,
     });
 
@@ -67,7 +66,6 @@ describe("Deep Agents Python checkpoints", () => {
       checkpoint: {
         path: databasePath,
         threadId: "thread-123",
-        checkpointNamespace: "sdk",
         pythonExecutable: PYTHON!,
       },
     });
@@ -121,34 +119,12 @@ describe("Deep Agents Python checkpoints", () => {
     ]);
   });
 
-  integrationTest("selects an explicit checkpoint id", async () => {
+  integrationTest("keeps threads in one store separate", async () => {
     const result = await normalizeCheckpoint({
       source: "deepagents",
       checkpoint: {
         path: databasePath,
-        threadId: "thread-123",
-        checkpointNamespace: "sdk",
-        checkpointId: "00000000-0000-6000-8000-000000000001",
-        pythonExecutable: PYTHON!,
-      },
-    });
-
-    expect(result.records.some((record) =>
-      record.role === "assistant" &&
-      record.content === "It is sunny and 22 C in Paris."
-    )).toBe(false);
-    expect(result.records.at(-1)).toEqual(
-      expect.objectContaining({ role: "tool", content: "Sunny, 22 C" }),
-    );
-  });
-
-  integrationTest("selects a checkpoint namespace", async () => {
-    const result = await normalizeCheckpoint({
-      source: "deepagents",
-      checkpoint: {
-        path: databasePath,
-        threadId: "thread-123",
-        checkpointNamespace: "other",
+        threadId: "thread-basic",
         pythonExecutable: PYTHON!,
       },
     });
@@ -159,7 +135,7 @@ describe("Deep Agents Python checkpoints", () => {
       "assistant",
     ]);
     expect(result.records[1]).toEqual(
-      expect.objectContaining({ content: "Other namespace" }),
+      expect.objectContaining({ content: "Basic thread" }),
     );
   });
 
@@ -168,8 +144,7 @@ describe("Deep Agents Python checkpoints", () => {
       source: "deepagents",
       checkpoint: {
         path: databasePath,
-        threadId: "thread-123",
-        checkpointNamespace: "overwrite",
+        threadId: "thread-overwrite",
         pythonExecutable: PYTHON!,
       },
     });
@@ -192,7 +167,6 @@ describe("Deep Agents Python checkpoints", () => {
       loadDeepAgentsCheckpoint({
         path: databasePath,
         threadId: "missing-thread",
-        checkpointNamespace: "sdk",
         pythonExecutable: PYTHON!,
       }),
     ).rejects.toEqual(expect.objectContaining({ code: "checkpoint_not_found" }));

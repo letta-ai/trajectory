@@ -52,7 +52,10 @@ describe("canonical golden fixtures", () => {
 
       const result = normalizeToCanonical({ source: fixture.source, transcript });
 
-      expect(result).toEqual(expected);
+      // Goldens must not pin the package version: the release workflow bumps
+      // package.json before running the check, and normalizer_version tracks
+      // the exact package version. The live value is asserted separately below.
+      expect(result).toEqual({ ...expected, normalizer_version: NORMALIZER_VERSION });
       expect(validateCanonical(result.records)).toBe(true);
       expect(result.normalizer_version).toBe(NORMALIZER_VERSION);
       expect(result.canonical_schema_version).toBe(CANONICAL_SCHEMA_VERSION);

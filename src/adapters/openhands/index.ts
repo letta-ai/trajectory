@@ -2,14 +2,14 @@ import type {
   DecodedEvent,
   DecodedSession,
   SourceAdapter,
-} from "../internal.js";
-import type { Diagnostic } from "../types.js";
-import { NormalizationError } from "../types.js";
+} from "../../internal.js";
+import type { Diagnostic } from "../../types.js";
+import { NormalizationError } from "../../types.js";
 import {
   isObject,
   jsonString,
   parseTimestamp,
-} from "./shared.js";
+} from "../shared.js";
 
 export const openHandsAdapter: SourceAdapter = {
   source: "openhands",

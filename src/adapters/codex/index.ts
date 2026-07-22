@@ -2,15 +2,15 @@ import type {
   DecodedEvent,
   DecodedSession,
   SourceAdapter,
-} from "../internal.js";
-import type { Diagnostic } from "../types.js";
+} from "../../internal.js";
+import type { Diagnostic } from "../../types.js";
 import {
   blocksText,
   isObject,
   jsonString,
   parseJsonLines,
   parseTimestamp,
-} from "./shared.js";
+} from "../shared.js";
 
 const INJECTED_PREFIXES = [
   "<environment_context>",

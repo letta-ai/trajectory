@@ -14,22 +14,22 @@ import { accessSync, constants } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { jsonString, parseTimestamp } from "./adapters/shared.js";
-import type { ResolvedNormalizationBounds } from "./bounds.js";
-import { resolveBounds } from "./bounds.js";
-import { finalizeCanonical, GROUP_SENTINEL } from "./canonical.js";
+import { jsonString, parseTimestamp } from "../shared.js";
+import type { ResolvedNormalizationBounds } from "../../bounds.js";
+import { resolveBounds } from "../../bounds.js";
+import { finalizeCanonical, GROUP_SENTINEL } from "../../canonical.js";
 import {
   normalizeDecodedSession,
   normalizeDecodedSessionInternal,
-} from "./core.js";
-import type { DecodedEvent, DecodedSession } from "./internal.js";
+} from "../../core.js";
+import type { DecodedEvent, DecodedSession } from "../../internal.js";
 import type {
   CanonicalResult,
   NormalizationBounds,
   NormalizationErrorCode,
   NormalizeResult,
-} from "./types.js";
-import { NormalizationError } from "./types.js";
+} from "../../types.js";
+import { NormalizationError } from "../../types.js";
 
 const MAX_HELPER_OUTPUT_BYTES = 64 * 1024 * 1024;
 
@@ -406,7 +406,7 @@ function validateLocation(checkpoint: DeepAgentsCheckpointLocation): void {
 
 function resolveHelperPath(): string {
   const candidates = [
-    fileURLToPath(new URL("../helpers/deepagents_checkpoint.py", import.meta.url)),
+    fileURLToPath(new URL("../../../helpers/deepagents_checkpoint.py", import.meta.url)),
     fileURLToPath(new URL("./deepagents_checkpoint.py", import.meta.url)),
   ];
   for (const candidate of candidates) {

@@ -1,9 +1,9 @@
-import { claudeCodeAdapter } from "./adapters/claude-code.js";
-import { codexAdapter } from "./adapters/codex.js";
-import { hermesAdapter } from "./adapters/hermes.js";
-import { lettaAdapter } from "./adapters/letta.js";
-import { openClawAdapter } from "./adapters/openclaw.js";
-import { openHandsAdapter } from "./adapters/openhands.js";
+import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
+import { codexAdapter } from "./adapters/codex/index.js";
+import { hermesAdapter } from "./adapters/hermes/index.js";
+import { lettaAdapter } from "./adapters/letta/index.js";
+import { openClawAdapter } from "./adapters/openclaw/index.js";
+import { openHandsAdapter } from "./adapters/openhands/index.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
 import { resolveBounds } from "./bounds.js";
 import { finalizeCanonical, GROUP_SENTINEL } from "./canonical.js";
@@ -128,7 +128,7 @@ export {
   type DeepAgentsMessageData,
   type DeepAgentsToolCall,
   type DeepAgentsToolMessageData,
-} from "./deepagents.js";
+} from "./adapters/deepagents/index.js";
 export { CANONICAL_SCHEMA_VERSION, NORMALIZER_VERSION } from "./version.js";
 
 export { DEFAULT_NORMALIZATION_BOUNDS } from "./bounds.js";

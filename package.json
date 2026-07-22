@@ -31,7 +31,6 @@
     "README.md",
     "PARITY.md",
     "CANONICAL.md",
-    "DEEPAGENTS.md",
     "SOURCE_VERSION_AUDIT.md"
   ],
   "scripts": {

@@ -2,14 +2,14 @@ import type {
   DecodedEvent,
   DecodedSession,
   SourceAdapter,
-} from "../internal.js";
-import { NormalizationError } from "../types.js";
+} from "../../internal.js";
+import { NormalizationError } from "../../types.js";
 import {
   blocksText,
   isObject,
   jsonString,
   parseTimestamp,
-} from "./shared.js";
+} from "../shared.js";
 
 export const lettaAdapter: SourceAdapter = {
   source: "letta",

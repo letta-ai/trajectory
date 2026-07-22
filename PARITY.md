@@ -37,16 +37,26 @@ repeat forever or stop above the total cap when several fields collectively
 cannot fit. `trajectory` preserves the legacy output whenever it terminates
 under the cap, then uses a strictly decreasing fallback otherwise.
 
-## Letta and OpenHands adapters
+## Letta Code and OpenHands adapters
 
-The Letta adapter was checked directly against persisted message arrays
-returned by the installed Letta CLI for a configured conversation, without
-printing or retaining message content or identifiers. The live response
-confirmed a flat array ordered by `seq_id`, block-based user content, reasoning
-and assistant messages, approval request/response records, and singular fields
-duplicated in batched `tool_calls` and `tool_returns` arrays. The chronological
-sample normalized successfully with its native call/result linkage intact; a
-newest-only slice correctly reported that it lacked a user turn.
+The Letta Code adapter was checked on 2026-07-22 against the complete local
+`~/.letta/transcripts` tree without printing or retaining transcript content,
+tool payloads, paths, or identifiers. This is the append-only client-side
+`transcript.jsonl` used for reflection slicing and payload generation, not a
+backend conversation-history store.
+
+- The store contained 1,924 transcript files: 274 nonempty logs and 1,650
+  empty logs. The nonempty logs contained 37,243 valid JSONL rows.
+- All 274 nonempty logs normalized successfully. Empty logs correctly failed
+  with `invalid_input` and are omitted by `listTrajectories()`.
+- The corpus exercised `user`, `assistant`, `reasoning`, and `tool_call` rows,
+  including older rows without source ids, failed tool results, and unfinished
+  calls. All 21,991 completed tool rows normalized as linked call/result pairs;
+  no orphan-result or synthesized-call-id diagnostics remained.
+- Sanitized fixtures cover source-message versus source-line identity,
+  reasoning/assistant components from one source message, completed and
+  unfinished tools, failed results, malformed lines, error rows, unsupported
+  row kinds, and older tool rows without source ids.
 
 OpenHands message, action, observation, agent-error, and user-rejection event
 shapes were checked against the `dream-pipeline` OpenHands source. Both the

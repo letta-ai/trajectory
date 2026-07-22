@@ -29,7 +29,7 @@ const goldenFixtures = [
   { source: "claude-code", name: "claude-code/tool-call", golden: "claude-code__tool-call" },
   { source: "codex", name: "codex/tool-calls", golden: "codex__tool-calls" },
   { source: "hermes", name: "hermes/tool-calls", golden: "hermes__tool-calls" },
-  { source: "letta", name: "letta/tool-call", golden: "letta__tool-call" },
+  { source: "letta-code", name: "letta-code/tool-calls", golden: "letta-code__tool-calls" },
   { source: "openclaw", name: "openclaw/tool-calls", golden: "openclaw__tool-calls" },
   { source: "openhands", name: "openhands/tool-calls", golden: "openhands__tool-calls" },
 ] as const satisfies ReadonlyArray<{
@@ -42,7 +42,7 @@ describe("canonical golden fixtures", () => {
   for (const fixture of goldenFixtures) {
     test(fixture.name, () => {
       const inputFile =
-        fixture.source === "openhands" || fixture.source === "hermes" || fixture.source === "letta"
+        fixture.source === "openhands" || fixture.source === "hermes"
           ? "input.json"
           : "input.jsonl";
       const transcript = fixtureText(fixture.name, inputFile);
@@ -67,7 +67,7 @@ describe("canonical invariants", () => {
   for (const fixture of goldenFixtures) {
     test(fixture.name, () => {
       const inputFile =
-        fixture.source === "openhands" || fixture.source === "hermes" || fixture.source === "letta"
+        fixture.source === "openhands" || fixture.source === "hermes"
           ? "input.json"
           : "input.jsonl";
       const result = normalizeToCanonical({
@@ -320,43 +320,82 @@ describe("canonical continuation (partial) chunks", () => {
     ).toThrow(expect.objectContaining({ code: "missing_user_records" }));
   });
 
-  test("a one-row v3 local Letta continuation is routed through the local parser", () => {
+  test("a one-row Letta Code continuation uses its client line identity", () => {
     const chunk = normalizeToCanonical({
-      source: "letta",
-      transcript: lettaLocalMessage("assistant", "single continuation row"),
-      sourceContext: { groupId: "letta-session", baseByteOffset: 2048 },
+      source: "letta-code",
+      transcript: JSON.stringify({
+        kind: "assistant",
+        text: "single continuation row",
+        captured_at: "2026-07-22T12:00:00.000Z",
+        source_line_id: "line-assistant-1",
+      }),
+      sourceContext: { groupId: "letta-code-session", partial: true },
     });
-    expect(chunk.records.filter((record) => record.record_type === "assistant")).toHaveLength(1);
+    const assistant = chunk.records.find((record) => record.record_type === "assistant");
+    expect(assistant?.stable_source_record_id).toBe("line-assistant-1");
+    expect(assistant?.source_identity_kind).toBe("native");
   });
 });
 
-describe("local letta chunked-upload byte anchoring", () => {
-  // Multibyte content before the split proves the anchor is bytes, not chars.
-  const m1 = lettaLocalMessage("user", "héllo 😀 first");
-  const m2 = lettaLocalMessage("assistant", "réply 😀 one");
-  const m3 = lettaLocalMessage("user", "second question");
-  const m4 = lettaLocalMessage("assistant", "second answer");
-  const session = JSON.stringify({ type: "session", version: 3, timestamp: "2026-06-01T09:00:00.000Z" });
-
-  test("identity matches between full file and a standalone continuation", () => {
-    const full = normalizeToCanonical({
-      source: "letta",
-      transcript: [session, m1, m2, m3, m4].join("\n"),
-      sourceContext: { groupId: "letta-session" },
-    });
-    const baseByteOffset = utf8Len([session, m1, m2].join("\n") + "\n");
-    const chunk = normalizeToCanonical({
-      source: "letta",
-      transcript: [m3, m4].join("\n"),
-      sourceContext: { groupId: "letta-session", baseByteOffset },
+describe("letta-code source identity", () => {
+  test("prefers message ids, falls back to line ids, and links tool rows", () => {
+    const result = normalizeToCanonical({
+      source: "letta-code",
+      transcript: fixtureText("letta-code/tool-calls", "input.jsonl"),
+      sourceContext: { groupId: "letta-code-session" },
     });
 
-    const fullSecond = full.records.find((record) => record.content === "second question");
-    const chunkSecond = chunk.records.find((record) => record.content === "second question");
-    expect(chunkSecond?.source_identity_kind).toBe("location");
-    expect(chunkSecond?.stable_source_record_id).toBe(fullSecond?.stable_source_record_id ?? "");
-    expect(chunkSecond?.record_id).toBe(fullSecond?.record_id ?? "");
-    expect(chunk.records.some((record) => record.record_type === "meta")).toBe(false);
+    const user = result.records.find((record) => record.record_type === "user");
+    const reasoning = result.records.find(
+      (record) => record.record_type === "reasoning",
+    );
+    const firstAssistant = result.records.find(
+      (record) =>
+        record.record_type === "assistant" &&
+        record.stable_source_record_id === "message-assistant-1",
+    );
+    const call = result.records.find(
+      (record) => record.record_type === "assistant-tool-call",
+    );
+    const tool = result.records.find((record) => record.record_type === "tool");
+
+    expect(user?.stable_source_record_id).toBe("line-user-1");
+    expect(reasoning?.stable_source_record_id).toBe("message-assistant-1");
+    expect(firstAssistant?.stable_source_record_id).toBe("message-assistant-1");
+    expect(reasoning?.component_index).toBe(0);
+    expect(firstAssistant?.component_index).toBe(1);
+    expect(call?.stable_source_record_id).toBe("call-read-1");
+    expect(tool?.stable_source_record_id).toBe("call-read-1");
+    expect(call?.tool_call_id).toBe("call-read-1");
+    expect(tool?.tool_call_id).toBe("call-read-1");
+  });
+
+  test("older id-less tool rows link without byte-offset identity", () => {
+    const result = normalizeToCanonical({
+      source: "letta-code",
+      transcript: fixtureText("letta-code/cleanup", "input.jsonl"),
+    });
+    const call = result.records.find(
+      (record) =>
+        record.record_type === "assistant-tool-call" &&
+        record.tool_name === "Bash",
+    );
+    const tool = result.records.find(
+      (record) =>
+        record.record_type === "tool" &&
+        record.tool_call_id === "letta-code-tool-line-5",
+    );
+
+    expect(call?.tool_call_id).toBe("letta-code-tool-line-5");
+    expect(tool?.tool_call_id).toBe(call?.tool_call_id ?? "");
+    expect(call?.source_identity_kind).toBe("content");
+    expect(tool?.source_identity_kind).toBe("content");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "orphan_tool_result",
+    );
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "tool_call_id_synthesized",
+    );
   });
 });
 
@@ -578,11 +617,6 @@ function ccAssistantCwd(uuid: string, text: string, cwd: string, timestamp: stri
   });
 }
 
-function lettaLocalMessage(role: "user" | "assistant", content: string): string {
-  // Version-3 wrapper row with no native message id, so identity uses the byte anchor.
-  return JSON.stringify({ type: "message", message: { role, content } });
-}
-
 function codexMeta(id: string, cwd: string, timestamp: string): string {
   return JSON.stringify({ type: "session_meta", payload: { id, cwd, timestamp } });
 }
@@ -605,10 +639,6 @@ function codexFunctionOutput(callId: string, output: string, timestamp: string):
     timestamp,
     payload: { type: "function_call_output", call_id: callId, output },
   });
-}
-
-function utf8Len(text: string): number {
-  return new TextEncoder().encode(text).length;
 }
 
 function checkpointData(threadId: string, checkpointNamespace: string): DeepAgentsCheckpointData {
@@ -678,4 +708,8 @@ function fixtureText(name: string, file: string): string {
   const relative = name ? `../fixtures/${name}/${file}` : file;
   const url = new URL(relative, import.meta.url);
   return readFileSync(fileURLToPath(url), "utf8");
+}
+
+function utf8Len(value: string): number {
+  return Buffer.byteLength(value, "utf8");
 }

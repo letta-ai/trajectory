@@ -1,0 +1,7 @@
+not-json
+{"kind":"user","text":"Run the check.","captured_at":"2026-07-22T13:00:00.000Z","source_line_id":"line-user-1"}
+{"kind":"error","text":"temporary stream warning","captured_at":"2026-07-22T13:00:01.000Z","source_line_id":"line-error-1"}
+{"kind":"status","text":"working","captured_at":"2026-07-22T13:00:01.500Z","source_line_id":"line-status-1"}
+{"kind":"tool_call","name":"Bash","argsText":"{\"command\":\"bun test\"}","resultText":"command failed","resultOk":false,"captured_at":"2026-07-22T13:00:02.000Z"}
+{"kind":"tool_call","name":"Read","argsText":"{\"file_path\":\"pending.txt\"}","captured_at":"2026-07-22T13:00:03.000Z","source_line_id":"call-read-pending"}
+{"kind":"assistant","text":"The check failed; the read is still pending.","captured_at":"2026-07-22T13:00:04.000Z","source_line_id":"line-assistant-1","source_message_id":"message-assistant-1"}

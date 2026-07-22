@@ -1,0 +1,65 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "letta-code"
+    },
+    {
+      "role": "user",
+      "content": "Run the check.",
+      "timestamp": "2026-07-22T13:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "letta-code-tool-line-5",
+          "name": "Bash",
+          "args": "{\"command\":\"bun test\"}"
+        }
+      ],
+      "timestamp": "2026-07-22T13:00:02.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "letta-code-tool-line-5",
+      "content": "Error: command failed",
+      "timestamp": "2026-07-22T13:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-read-pending",
+          "name": "Read",
+          "args": "{\"file_path\":\"pending.txt\"}"
+        }
+      ],
+      "timestamp": "2026-07-22T13:00:03.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The check failed; the read is still pending.",
+      "timestamp": "2026-07-22T13:00:04.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 1.",
+      "inputLine": 1
+    },
+    {
+      "code": "noise_record_dropped",
+      "message": "Skipped Letta Code runtime error row on line 3.",
+      "inputLine": 3
+    },
+    {
+      "code": "noise_record_dropped",
+      "message": "Skipped unsupported Letta Code transcript row on line 4.",
+      "inputLine": 4
+    }
+  ]
+}

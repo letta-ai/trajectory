@@ -69,8 +69,8 @@ normalizeToCanonical({ source, transcript, sourceContext: { groupId, baseByteOff
   can be quarantined.
 - `baseByteOffset` — the absolute UTF-8 byte offset of this transcript within its
   source generation. It is added only to **byte-anchored** location identities
-  (Codex, and local Letta rows without a native id), making them stable
-  regardless of chunk boundaries. Ordinal anchors (Deep Agents) ignore it, and the
+  (Codex and id-less Claude Code/OpenClaw rows), making them stable regardless
+  of chunk boundaries. Ordinal anchors (Deep Agents) ignore it, and the
   anchor unit is part of the identity so byte and ordinal anchors never collide.
 
 Codex is `location`-anchored and therefore **requires** a resolved group
@@ -117,12 +117,12 @@ transport-arrival position — so it is stable across re-runs and across the ord
 the worker coalesces upload chunks. `source_identity_kind` tells the worker how
 confidently it can interpret conflicts:
 
-- `native` — a source-native per-record id (Claude Code line `uuid`, Letta
-  message `id`, OpenHands event `id`). Supports exact-duplicate dedup **and**
-  conflicting-version detection.
+- `native` — a source-native per-record id (Claude Code line `uuid`, Letta Code
+  `source_message_id`/`source_line_id`, OpenHands event `id`). Supports
+  exact-duplicate dedup **and** conflicting-version detection.
 - `location` — a stable source-native location anchor when no native id exists:
-  an absolute UTF-8 byte offset for Codex and local Letta (chunkable via
-  `baseByteOffset`), a whole-decode ordinal for Deep Agents, or a Letta `seq_id`.
+  an absolute UTF-8 byte offset for Codex and id-less Claude Code/OpenClaw rows
+  (chunkable via `baseByteOffset`) or a whole-decode ordinal for Deep Agents.
   The anchor unit is part of the identity, so byte and ordinal anchors never
   collide. Supports dedup and conflict detection for append-only assembly.
 - `content` — content-addressed fallback when neither a native id nor a stable

@@ -10,6 +10,7 @@ import trajectory._client as client
 from trajectory import (
     NodeUnavailableError,
     NormalizationError,
+    SourceContext,
     list_trajectories,
     normalize_checkpoint,
     normalize_many,
@@ -39,6 +40,37 @@ FIXTURES = (
 
 def fixture_text(name: str, filename: str) -> str:
     return (ROOT / "fixtures" / name / filename).read_text(encoding="utf-8")
+
+
+def codex_message(role: str, text: str) -> str:
+    return json.dumps(
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "message",
+                "role": role,
+                "content": [
+                    {
+                        "type": "input_text" if role == "user" else "output_text",
+                        "text": text,
+                    }
+                ],
+            },
+        }
+    )
+
+
+def codex_function_output(call_id: str, output: str) -> str:
+    return json.dumps(
+        {
+            "type": "response_item",
+            "payload": {
+                "type": "function_call_output",
+                "call_id": call_id,
+                "output": output,
+            },
+        }
+    )
 
 
 class WrapperTests(unittest.TestCase):
@@ -81,6 +113,54 @@ class WrapperTests(unittest.TestCase):
 
     def test_empty_batch_avoids_starting_node(self) -> None:
         self.assertEqual(normalize_many([]), [])
+
+    def test_normalizes_single_role_partial_fragments(self) -> None:
+        source_context: SourceContext = {"partial": True}
+        for role in ("user", "assistant"):
+            with self.subTest(role=role):
+                result = normalize_transcript(
+                    source="codex",
+                    transcript=codex_message(role, f"{role} fragment"),
+                    source_context=source_context,
+                )
+                self.assertEqual(
+                    [record["role"] for record in result["records"]],
+                    ["meta", role],
+                )
+
+        continued = normalize_transcript(
+            source="codex",
+            transcript=codex_message("assistant", "continued answer"),
+            source_context={"baseByteOffset": 4096},
+        )
+        self.assertEqual(
+            [record["role"] for record in continued["records"]],
+            ["meta", "assistant"],
+        )
+
+    def test_partial_fragment_keeps_external_tool_result(self) -> None:
+        result = normalize_transcript(
+            source="codex",
+            transcript=codex_function_output("call_earlier", "command output"),
+            source_context={"partial": True},
+        )
+        tool = next(record for record in result["records"] if record["role"] == "tool")
+
+        self.assertEqual(tool["tool_call_id"], "call_earlier")
+        self.assertEqual(tool["content"], "command output")
+        self.assertNotIn(
+            "orphan_tool_result",
+            [diagnostic["code"] for diagnostic in result["diagnostics"]],
+        )
+
+    def test_partial_fragment_is_opt_in(self) -> None:
+        with self.assertRaises(NormalizationError) as raised:
+            normalize_transcript(
+                source="codex",
+                transcript=codex_message("assistant", "unprompted answer"),
+            )
+
+        self.assertEqual(raised.exception.code, "missing_user_records")
 
     def test_requires_node_20_or_newer(self) -> None:
         client._node_executable.cache_clear()

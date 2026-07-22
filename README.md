@@ -141,6 +141,22 @@ conditions—such as malformed JSONL lines, orphaned tool results, duplicate cal
 IDs, truncated content, or synthesized timestamps—are returned as structured
 diagnostics.
 
+Whole transcripts require at least one user and one assistant record by default.
+For a fragment selected from a larger transcript, set `sourceContext.partial`:
+
+```ts
+const result = normalizeTranscript({
+  source: "codex",
+  transcript: rawFragment,
+  sourceContext: { partial: true },
+});
+```
+
+Partial mode accepts single-role fragments and keeps a tool result whose matching
+call is outside the fragment, linked by its source call ID. A non-zero
+`sourceContext.baseByteOffset` also implies partial mode. Omitting both signals
+preserves strict whole-transcript validation.
+
 ## Bounds
 
 Tool payload bounds are optional and use compatibility-preserving defaults:

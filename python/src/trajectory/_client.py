@@ -21,6 +21,7 @@ from ._types import (
     NormalizeInput,
     NormalizeRequest,
     NormalizeResult,
+    SourceContext,
     TrajectorySource,
 )
 
@@ -34,12 +35,20 @@ def normalize_transcript(
     source: TrajectorySource,
     transcript: str,
     bounds: NormalizationBounds | None = None,
+    source_context: SourceContext | None = None,
 ) -> NormalizeResult:
-    """Normalize one native transcript."""
+    """Normalize one native transcript or an explicitly partial fragment.
+
+    ``source_context`` mirrors the TypeScript ``sourceContext`` input. Set
+    ``{"partial": True}`` for an offset-zero fragment; a non-zero
+    ``baseByteOffset`` also implies partial mode.
+    """
 
     request: NormalizeInput = {"source": source, "transcript": transcript}
     if bounds is not None:
         request["bounds"] = bounds
+    if source_context is not None:
+        request["sourceContext"] = source_context
     return normalize_many([request])[0]
 
 

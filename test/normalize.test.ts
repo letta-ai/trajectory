@@ -389,6 +389,55 @@ describe("public API", () => {
   });
 });
 
+describe("partial transcript fragments", () => {
+  for (const role of ["user", "assistant"] as const) {
+    test(`accepts an explicitly partial ${role}-only fragment`, () => {
+      const result = normalizeTranscript({
+        source: "codex",
+        transcript: codexMessage(role, `${role} fragment`),
+        sourceContext: { partial: true },
+      });
+
+      expect(result.records.map((record) => record.role)).toEqual(["meta", role]);
+      expect(() => validateTranscript(result.records, { partial: true })).not.toThrow();
+    });
+  }
+
+  test("keeps strict whole-transcript validation by default", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "codex",
+        transcript: codexMessage("user", "unanswered question"),
+      }),
+    ).toThrow(expect.objectContaining({ code: "missing_assistant_records" }));
+  });
+
+  test("treats a non-zero source offset as partial", () => {
+    const result = normalizeTranscript({
+      source: "codex",
+      transcript: codexMessage("assistant", "continued answer"),
+      sourceContext: { baseByteOffset: 4096 },
+    });
+
+    expect(result.records.map((record) => record.role)).toEqual(["meta", "assistant"]);
+  });
+
+  test("keeps a tool result whose call is outside the fragment", () => {
+    const result = normalizeTranscript({
+      source: "codex",
+      transcript: codexFunctionOutput("call_earlier", "command output"),
+      sourceContext: { partial: true },
+    });
+    const tool = result.records.find((record) => record.role === "tool");
+
+    expect(tool?.tool_call_id).toBe("call_earlier");
+    expect(tool?.content).toBe("command output");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "orphan_tool_result",
+    );
+  });
+});
+
 describe("validation", () => {
   test("rejects tool arguments that do not encode an object", () => {
     const invalid = [
@@ -458,4 +507,15 @@ function codexToolTranscript(output: string): string {
       },
     }),
   ].join("\n");
+}
+
+function codexFunctionOutput(callId: string, output: string): string {
+  return JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "function_call_output",
+      call_id: callId,
+      output,
+    },
+  });
 }

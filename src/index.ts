@@ -56,7 +56,9 @@ function decodeTranscript(input: NormalizeInput): {
 
 export function normalizeTranscript(input: NormalizeInput): NormalizeResult {
   const { decoded, bounds } = decodeTranscript(input);
-  return normalizeDecodedSession(decoded, bounds);
+  return normalizeDecodedSession(decoded, bounds, {
+    partial: isPartialTranscript(input),
+  });
 }
 
 /**
@@ -72,7 +74,7 @@ export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
   // offset: a non-zero offset always implies a continuation, but an initial chunk
   // at offset 0 can also be partial. Meta emission tracks the byte offset only,
   // so an offset-0 partial still emits the authoritative meta.
-  const partial = (input.sourceContext?.partial ?? false) || baseByteOffset > 0;
+  const partial = isPartialTranscript(input);
   const internal = normalizeDecodedSessionInternal(decoded, bounds, { partial });
   const groupId = resolveGroupId(
     input.source,
@@ -86,6 +88,13 @@ export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
     // range (offset 0) emits the authoritative meta even when it is a partial chunk.
     emitMeta: baseByteOffset === 0,
   });
+}
+
+function isPartialTranscript(input: NormalizeInput): boolean {
+  return (
+    (input.sourceContext?.partial ?? false) ||
+    (input.sourceContext?.baseByteOffset ?? 0) > 0
+  );
 }
 
 /**

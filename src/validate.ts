@@ -13,10 +13,9 @@ const TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
 /**
  * Options for {@link validateTranscript}.
  *
- * `partial` relaxes the whole-conversation invariants for a canonical
- * continuation chunk: it no longer requires a user and an assistant turn, and a
- * tool result may reference a tool call that lived in an earlier chunk (not
- * present here). `normalizeTranscript()` always validates strictly.
+ * `partial` relaxes the whole-conversation invariants for a transcript fragment:
+ * it no longer requires a user and an assistant turn, and a tool result may
+ * reference a tool call that lived outside the fragment (not present here).
  */
 export interface ValidateOptions {
   partial?: boolean;

@@ -1389,8 +1389,8 @@ function planEvents(events) {
   }
   return { calls, openCalls, components };
 }
-function normalizeDecodedSession(decoded, bounds) {
-  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+function normalizeDecodedSession(decoded, bounds, options) {
+  const internal = normalizeDecodedSessionInternal(decoded, bounds, options);
   return { records: internal.records, diagnostics: internal.diagnostics };
 }
 function normalizeDecodedSessionInternal(decoded, bounds, options) {
@@ -2519,7 +2519,12 @@ function decodeTranscript(input) {
 }
 function normalizeTranscript(input) {
   const { decoded, bounds } = decodeTranscript(input);
-  return normalizeDecodedSession(decoded, bounds);
+  return normalizeDecodedSession(decoded, bounds, {
+    partial: isPartialTranscript(input)
+  });
+}
+function isPartialTranscript(input) {
+  return (input.sourceContext?.partial ?? false) || (input.sourceContext?.baseByteOffset ?? 0) > 0;
 }
 
 // src/python-cli.ts

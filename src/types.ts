@@ -35,9 +35,10 @@ export interface NormalizationBounds {
 }
 
 /**
- * Optional caller-supplied source context. Lets the Cloud normalizer worker
- * anchor identity absolutely across chunked uploads of one append-only source
- * generation, independent of how the transcript was segmented.
+ * Optional caller-supplied source context. Enables partial-transcript semantics
+ * for transcript fragments and lets the Cloud normalizer worker anchor identity
+ * absolutely across chunked uploads of one append-only source generation,
+ * independent of how the transcript was segmented.
  */
 export interface SourceContext {
   /**

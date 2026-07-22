@@ -80,11 +80,11 @@ would turn missing context into durable bad identity. Absolute byte offsets are
 only stable within one append-only generation; a truncation/replacement is a new
 generation upstream (worker-owned).
 
-`normalizeToCanonical` supports **partial-transcript semantics** for a chunk of
-a larger conversation (while `normalizeTranscript()` stays strict). Partial mode
-is enabled by an explicit `sourceContext.partial: true`, and is also implied by a
-non-zero `baseByteOffset` (a continuation necessarily follows earlier content).
-It is decoupled from meta emission:
+Both `normalizeTranscript()` and `normalizeToCanonical()` support
+**partial-transcript semantics** for a fragment of a larger conversation.
+Partial mode is enabled by an explicit `sourceContext.partial: true`, and is also
+implied by a non-zero `baseByteOffset` (a continuation necessarily follows
+earlier content). For canonical output, it is decoupled from meta emission:
 
 - **Meta emission tracks the byte offset only.** Meta is emitted for the initial
   byte range (`baseByteOffset === 0` or absent) and omitted for a continuation
@@ -101,8 +101,9 @@ It is decoupled from meta emission:
   an orphan); the worker resolves cross-chunk linkage. A duplicate result (call
   present and already consumed) is still dropped.
 
-`normalizeTranscript()` and non-partial canonical callers always require a user
-and an assistant turn, drop orphan tool results, and include meta.
+Non-partial callers always require a user and an assistant turn and drop orphan
+tool results. `normalizeTranscript()` always includes meta; canonical meta
+emission follows the byte-offset rule above.
 
 Deep Agents identity is grouped by the `(threadId, checkpointNamespace)` pair,
 encoded as `JSON.stringify([threadId, checkpointNamespace])`. The supported CLI

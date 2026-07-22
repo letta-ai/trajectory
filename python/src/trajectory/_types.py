@@ -78,8 +78,15 @@ class NormalizationBounds(TypedDict, total=False):
     toolResults: ToolResultBounds
 
 
+class SourceContext(TypedDict, total=False):
+    groupId: str
+    baseByteOffset: int
+    partial: bool
+
+
 class _NormalizeInputOptional(TypedDict, total=False):
     bounds: NormalizationBounds
+    sourceContext: SourceContext
 
 
 class NormalizeInput(_NormalizeInputOptional):
@@ -96,7 +103,11 @@ class DeepAgentsCheckpointLocation(_DeepAgentsCheckpointLocationOptional):
     threadId: str
 
 
-class DeepAgentsCheckpointInput(_NormalizeInputOptional):
+class _DeepAgentsCheckpointInputOptional(TypedDict, total=False):
+    bounds: NormalizationBounds
+
+
+class DeepAgentsCheckpointInput(_DeepAgentsCheckpointInputOptional):
     source: Literal["deepagents"]
     checkpoint: DeepAgentsCheckpointLocation
 

@@ -148,11 +148,12 @@ interface StringLeaf {
 export function normalizeDecodedSession(
   decoded: DecodedSession,
   bounds: ResolvedNormalizationBounds,
+  options?: NormalizeInternalOptions,
 ): {
   records: NormalizedRecord[];
   diagnostics: Diagnostic[];
 } {
-  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+  const internal = normalizeDecodedSessionInternal(decoded, bounds, options);
   return { records: internal.records, diagnostics: internal.diagnostics };
 }
 
@@ -163,10 +164,10 @@ export function normalizeDecodedSession(
  */
 export interface NormalizeInternalOptions {
   /**
-   * Partial (canonical continuation) mode: the transcript is one chunk of a
-   * larger conversation, so whole-conversation invariants are relaxed. It does
-   * not require user/assistant turns, and a tool result whose call lived in an
-   * earlier chunk is kept (linked by its source call id) instead of dropped.
+   * Partial-transcript mode: the input is one fragment of a larger conversation,
+   * so whole-conversation invariants are relaxed. It does not require
+   * user/assistant turns, and a tool result whose call lived outside the fragment
+   * is kept (linked by its source call id) instead of dropped.
    */
   partial?: boolean;
 }

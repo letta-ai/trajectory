@@ -22,15 +22,6 @@ The TypeScript package is published as
 npm install @letta-ai/trajectory
 ```
 
-The Python distribution is named `letta-trajectory` and imports as
-`trajectory`. It includes the bundled normalizer and has no Python runtime
-dependencies, but it requires Node.js 20 or newer. It is not yet published to
-PyPI; install it from GitHub:
-
-```sh
-pip install "letta-trajectory @ git+ssh://git@github.com/letta-ai/trajectory.git"
-```
-
 ## Quick start
 
 ```ts
@@ -40,31 +31,6 @@ const { records, diagnostics } = normalizeTranscript({
   source: "codex",
   transcript: rawJsonl,
 });
-```
-
-The Python wrapper exposes the same inputs and returns ordinary dictionaries:
-
-```python
-from trajectory import normalize_transcript
-
-result = normalize_transcript(
-    source="codex",
-    transcript=raw_jsonl,
-)
-records = result["records"]
-diagnostics = result["diagnostics"]
-```
-
-For training pipelines, `normalize_many()` sends a complete batch through one
-Node process instead of starting a process for every transcript:
-
-```python
-from trajectory import normalize_many
-
-results = normalize_many([
-    {"source": "codex", "transcript": codex_jsonl},
-    {"source": "letta", "transcript": letta_json},
-])
 ```
 
 `records` contains the normalized trajectory. `diagnostics` is always present
@@ -136,9 +102,6 @@ do {
   cursor = page.nextCursor;
 } while (cursor);
 ```
-
-The Python wrapper mirrors it as `list_trajectories(source=..., root=None,
-cursor=None, limit=None)`.
 
 Each item's `path` is the locator for the next step: the transcript file to
 read (`claude-code`, `codex`, `letta`, `openclaw`), the SQLite store holding

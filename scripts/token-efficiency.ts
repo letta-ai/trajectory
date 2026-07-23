@@ -4,16 +4,19 @@
  *   1. native      — the session file exactly as the harness wrote it
  *   2. trajectory  — this repo's normalized JSONL (default bounds, and
  *                    optionally with tool-result truncation disabled)
- *   3. atif        — Harbor's ATIF (RFC 0001) built from the same normalized
- *                    records, serialized compact. This is a content-matched
- *                    projection: it measures ATIF *syntax* on trajectory's
- *                    content selection. Harbor's own converters additionally
- *                    keep untruncated results, structured result payloads,
- *                    and per-step metrics, so their files are much larger.
+ *   3. atif        — Harbor ATIF (RFC 0001) produced by Harbor's own
+ *                    converters (`ClaudeCode`/`Codex`._convert_events_to_trajectory),
+ *                    driven by scripts/harbor_atif_convert.py. Reported both
+ *                    minified and as Harbor persists it (indent=2). Note
+ *                    Harbor's converters keep untruncated tool results,
+ *                    structured result payloads, and per-step metrics, so
+ *                    ATIF carries more content than trajectory by design.
  *
  * Tokens are counted with the Anthropic count-tokens API
  * (POST /v1/messages/count_tokens), chunked at 500K characters per request.
- * Requires ANTHROPIC_API_KEY in the environment.
+ * Requires ANTHROPIC_API_KEY in the environment, plus `uv` and `git` on PATH
+ * (a harbor checkout is cloned to ~/.cache/trajectory/harbor-repo on first
+ * use; override with HARBOR_REPO=<path>).
  *
  * Usage:
  *   bun scripts/token-efficiency.ts <session-file> [options]
@@ -27,7 +30,11 @@
  *   --untruncated                  Also report trajectory with truncation disabled
  */
 
-import { readFileSync } from "fs";
+import { spawnSync } from "child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "fs";
+import { homedir, tmpdir } from "os";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { normalizeTranscript } from "../src/index.js";
 import type { NormalizeInput } from "../src/index.js";
 
@@ -81,70 +88,65 @@ function detectSource(transcript: string): string {
   return "claude-code";
 }
 
-/** Canonical records -> Harbor ATIF (compact JSON). */
-function toAtif(records: CanonicalRecord[]): string {
-  const meta = records.find((r) => r.role === "meta");
-  const steps: any[] = [];
-  const callOwner = new Map<string, any>();
-  let pendingReasoning: string[] = [];
+const HARBOR_GIT_URL = "https://github.com/harbor-framework/harbor.git";
 
-  const newStep = (source: string, rec: CanonicalRecord) => {
-    const s: any = { step_id: steps.length + 1, source, message: rec.content ?? "" };
-    if (rec.timestamp) s.timestamp = rec.timestamp;
-    steps.push(s);
-    return s;
-  };
-
-  for (const r of records) {
-    if (r.role === "meta") continue;
-    if (r.role === "user") {
-      newStep("user", r);
-    } else if (r.role === "reasoning") {
-      pendingReasoning.push(r.content ?? "");
-    } else if (r.role === "assistant") {
-      const s = newStep("agent", r);
-      if (pendingReasoning.length > 0) {
-        s.reasoning_content = pendingReasoning.join("\n\n");
-        pendingReasoning = [];
-      }
-      if (r.tool_calls) {
-        s.tool_calls = r.tool_calls.map((tc) => {
-          let args: unknown;
-          try {
-            args = JSON.parse(tc.args);
-          } catch {
-            args = { _raw: tc.args };
-          }
-          callOwner.set(tc.id, s);
-          return { tool_call_id: tc.id, function_name: tc.name, arguments: args };
-        });
-      }
-    } else if (r.role === "tool") {
-      const owner = callOwner.get(r.tool_call_id ?? "") ?? steps.at(-1);
-      if (!owner) continue;
-      owner.observation ??= { results: [] };
-      owner.observation.results.push({
-        source_call_id: r.tool_call_id ?? null,
-        content: r.content ?? "",
-      });
-    }
+function ensureHarborCheckout(): string {
+  const repo = process.env.HARBOR_REPO ?? join(homedir(), ".cache", "trajectory", "harbor-repo");
+  if (existsSync(join(repo, "src", "harbor"))) return repo;
+  if (process.env.HARBOR_REPO) {
+    console.error(`HARBOR_REPO=${repo} is not a harbor checkout`);
+    process.exit(1);
   }
-
-  if (pendingReasoning.length > 0) {
-    const tail = [...steps].reverse().find((s) => s.source === "agent");
-    if (tail) {
-      tail.reasoning_content = [tail.reasoning_content, ...pendingReasoning]
-        .filter(Boolean)
-        .join("\n\n");
-    }
-  }
-
-  return JSON.stringify({
-    schema_version: "ATIF-v1.7",
-    session_id: null,
-    agent: { name: meta?.source ?? "unknown", version: "unknown", model_name: meta?.model ?? null },
-    steps,
+  console.error(`cloning harbor into ${repo} ...`);
+  mkdirSync(dirname(repo), { recursive: true });
+  const clone = spawnSync("git", ["clone", "--depth", "1", HARBOR_GIT_URL, repo], {
+    stdio: ["ignore", "inherit", "inherit"],
   });
+  if (clone.status !== 0) {
+    console.error("git clone of harbor failed");
+    process.exit(1);
+  }
+  return repo;
+}
+
+/** Run Harbor's own converter via scripts/harbor_atif_convert.py. */
+function harborAtif(sessionFile: string, source: string): { compact: string; pretty: string } {
+  const harborRepo = ensureHarborCheckout();
+  const scriptsDir = dirname(fileURLToPath(import.meta.url));
+  const outDir = mkdtempSync(join(tmpdir(), "harbor-atif-"));
+  const out = join(outDir, "atif.min.json");
+  const outPretty = join(outDir, "atif.json");
+  try {
+    const run = spawnSync(
+      "uv",
+      [
+        "run",
+        "--no-project",
+        "--python",
+        "3.12",
+        "--with",
+        "pydantic",
+        join(scriptsDir, "harbor_atif_convert.py"),
+        sessionFile,
+        "--source",
+        source,
+        "--harbor",
+        harborRepo,
+        "--out",
+        out,
+        "--out-pretty",
+        outPretty,
+      ],
+      { stdio: ["ignore", "pipe", "inherit"], encoding: "utf8" },
+    );
+    if (run.status !== 0) {
+      console.error("harbor conversion failed (is `uv` installed?)");
+      process.exit(1);
+    }
+    return { compact: readFileSync(out, "utf8"), pretty: readFileSync(outPretty, "utf8") };
+  } finally {
+    rmSync(outDir, { recursive: true, force: true });
+  }
 }
 
 async function countTokens(text: string, model: string, apiKey: string, label: string): Promise<number> {
@@ -208,12 +210,13 @@ async function main() {
 
   const defaultRecords = normalize(false);
   const trajectoryText = defaultRecords.map((r) => JSON.stringify(r)).join("\n") + "\n";
-  const atifText = toAtif(defaultRecords);
+  const atif = harborAtif(file, source);
 
   const rows: { label: string; text: string }[] = [
     { label: "native", text: transcript },
     { label: "trajectory", text: trajectoryText },
-    { label: "atif", text: atifText },
+    { label: "atif (harbor, minified)", text: atif.compact },
+    { label: "atif (harbor, persisted)", text: atif.pretty },
   ];
   if (untruncated) {
     const fullRecords = normalize(true);

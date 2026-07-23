@@ -28,12 +28,14 @@
  *   --source <claude-code|codex>   Override source auto-detection
  *   --model <id>                   Model for token counting (default claude-opus-4-8)
  *   --untruncated                  Also report trajectory with truncation disabled
+ *   --out-dir <dir>                Where to write each representation
+ *                                  (default: token-efficiency-out/<session-stem>/)
  */
 
 import { spawnSync } from "child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { homedir, tmpdir } from "os";
-import { dirname, join } from "path";
+import { basename, dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { normalizeTranscript } from "../src/index.js";
 import type { NormalizeInput } from "../src/index.js";
@@ -53,7 +55,7 @@ interface CanonicalRecord {
 
 function usage(): never {
   console.error(
-    "usage: bun scripts/token-efficiency.ts <session-file> [--source claude-code|codex] [--model <id>] [--untruncated]",
+    "usage: bun scripts/token-efficiency.ts <session-file> [--source claude-code|codex] [--model <id>] [--untruncated] [--out-dir <dir>]",
   );
   process.exit(1);
 }
@@ -64,17 +66,19 @@ function parseArgs() {
   let source: string | undefined;
   let model = "claude-opus-4-8";
   let untruncated = false;
+  let outDir: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === undefined) usage();
     else if (a === "--source") source = args[++i] ?? usage();
     else if (a === "--model") model = args[++i] ?? usage();
     else if (a === "--untruncated") untruncated = true;
+    else if (a === "--out-dir") outDir = args[++i] ?? usage();
     else if (!a.startsWith("--") && file === undefined) file = a;
     else usage();
   }
   if (!file) usage();
-  return { file, source, model, untruncated };
+  return { file, source, model, untruncated, outDir };
 }
 
 function detectSource(transcript: string): string {
@@ -185,7 +189,7 @@ async function countTokens(text: string, model: string, apiKey: string, label: s
 }
 
 async function main() {
-  const { file, source: sourceArg, model, untruncated } = parseArgs();
+  const { file, source: sourceArg, model, untruncated, outDir: outDirArg } = parseArgs();
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     console.error("ANTHROPIC_API_KEY is not set");
@@ -212,32 +216,39 @@ async function main() {
   const trajectoryText = defaultRecords.map((r) => JSON.stringify(r)).join("\n") + "\n";
   const atif = harborAtif(file, source);
 
-  const rows: { label: string; text: string }[] = [
-    { label: "native", text: transcript },
-    { label: "trajectory", text: trajectoryText },
-    { label: "atif (harbor, minified)", text: atif.compact },
-    { label: "atif (harbor, persisted)", text: atif.pretty },
+  const rows: { label: string; text: string; filename: string }[] = [
+    { label: "native", text: transcript, filename: "native.jsonl" },
+    { label: "trajectory", text: trajectoryText, filename: "trajectory.jsonl" },
+    { label: "atif (harbor, minified)", text: atif.compact, filename: "atif.min.json" },
+    { label: "atif (harbor, persisted)", text: atif.pretty, filename: "atif.json" },
   ];
   if (untruncated) {
     const fullRecords = normalize(true);
     rows.push({
       label: "trajectory-untruncated",
       text: fullRecords.map((r) => JSON.stringify(r)).join("\n") + "\n",
+      filename: "trajectory-untruncated.jsonl",
     });
   }
 
-  const results: { label: string; bytes: number; tokens: number }[] = [];
-  for (const { label, text } of rows) {
+  const sessionStem = basename(file).replace(/\.[^.]+$/, "");
+  const outDir = outDirArg ?? join("token-efficiency-out", sessionStem);
+  mkdirSync(outDir, { recursive: true });
+
+  const results: { label: string; bytes: number; tokens: number; path: string }[] = [];
+  for (const { label, text, filename } of rows) {
+    const path = join(outDir, filename);
+    writeFileSync(path, text);
     const tokens = await countTokens(text, model, apiKey, label);
-    results.push({ label, bytes: Buffer.byteLength(text), tokens });
+    results.push({ label, bytes: Buffer.byteLength(text), tokens, path });
   }
 
   const native = results[0]!;
-  console.log(`\n${"format".padEnd(24)} ${"bytes".padStart(12)} ${"tokens".padStart(12)} ${"vs native".padStart(10)}`);
+  console.log(`\n${"format".padEnd(24)} ${"bytes".padStart(12)} ${"tokens".padStart(12)} ${"vs native".padStart(10)}  file`);
   for (const r of results) {
     const factor = r === native ? "—" : `${(native.tokens / r.tokens).toFixed(1)}x`;
     console.log(
-      `${r.label.padEnd(24)} ${r.bytes.toLocaleString().padStart(12)} ${r.tokens.toLocaleString().padStart(12)} ${factor.padStart(10)}`,
+      `${r.label.padEnd(24)} ${r.bytes.toLocaleString().padStart(12)} ${r.tokens.toLocaleString().padStart(12)} ${factor.padStart(10)}  ${r.path}`,
     );
   }
 }

@@ -211,6 +211,9 @@
   "normalizer_version": "0.1.0",
   "canonical_schema_version": 1,
   "config": {
+    "filters": {
+      "toolResults": "include"
+    },
     "bounds": {
       "toolArguments": {
         "maxCharacters": 20000

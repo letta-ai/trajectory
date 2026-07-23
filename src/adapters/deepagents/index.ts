@@ -17,6 +17,8 @@ import { fileURLToPath } from "node:url";
 import { jsonString, parseTimestamp } from "../shared.js";
 import type { ResolvedNormalizationBounds } from "../../bounds.js";
 import { resolveBounds } from "../../bounds.js";
+import type { ResolvedNormalizationFilters } from "../../filters.js";
+import { resolveFilters } from "../../filters.js";
 import { finalizeCanonical, GROUP_SENTINEL } from "../../canonical.js";
 import {
   normalizeDecodedSession,
@@ -26,6 +28,7 @@ import type { DecodedEvent, DecodedSession } from "../../internal.js";
 import type {
   CanonicalResult,
   NormalizationBounds,
+  NormalizationFilters,
   NormalizationErrorCode,
   NormalizeResult,
 } from "../../types.js";
@@ -49,6 +52,7 @@ export interface DeepAgentsCheckpointInput {
   source: "deepagents";
   checkpoint: DeepAgentsCheckpointLocation;
   bounds?: NormalizationBounds;
+  filters?: NormalizationFilters;
 }
 
 export interface DeepAgentsToolCall {
@@ -99,16 +103,16 @@ export interface DeepAgentsCheckpointData {
 export async function normalizeCheckpoint(
   input: DeepAgentsCheckpointInput,
 ): Promise<NormalizeResult> {
-  const { decoded, bounds } = await decodeCheckpoint(input);
-  return normalizeDecodedSession(decoded, bounds);
+  const { decoded, bounds, filters } = await decodeCheckpoint(input);
+  return normalizeDecodedSession(decoded, bounds, { filters });
 }
 
 /** Canonical view of a Deep Agents thread, mirroring `normalizeToCanonical`. */
 export async function normalizeCheckpointToCanonical(
   input: DeepAgentsCheckpointInput,
 ): Promise<CanonicalResult> {
-  const { decoded, bounds } = await decodeCheckpoint(input);
-  const internal = normalizeDecodedSessionInternal(decoded, bounds);
+  const { decoded, bounds, filters } = await decodeCheckpoint(input);
+  const internal = normalizeDecodedSessionInternal(decoded, bounds, { filters });
   return finalizeCanonical(internal, bounds, {
     groupId: internal.context.sourceGroupId || GROUP_SENTINEL,
     baseByteOffset: 0,
@@ -119,6 +123,7 @@ export async function normalizeCheckpointToCanonical(
 async function decodeCheckpoint(input: DeepAgentsCheckpointInput): Promise<{
   decoded: DecodedSession;
   bounds: ResolvedNormalizationBounds;
+  filters: ResolvedNormalizationFilters;
 }> {
   if (!input || typeof input !== "object") {
     throw new NormalizationError("invalid_input", "Input must be an object.");
@@ -129,10 +134,13 @@ async function decodeCheckpoint(input: DeepAgentsCheckpointInput): Promise<{
       `Checkpoint source must be "deepagents"; received ${JSON.stringify(input.source)}.`,
     );
   }
+  const bounds = resolveBounds(input.bounds);
+  const filters = resolveFilters(input.filters);
   const checkpoint = await loadDeepAgentsCheckpoint(input.checkpoint);
   return {
     decoded: decodeDeepAgentsCheckpoint(checkpoint),
-    bounds: resolveBounds(input.bounds),
+    bounds,
+    filters,
   };
 }
 

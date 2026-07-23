@@ -1169,6 +1169,31 @@ function invalidBounds(message) {
   return new NormalizationError("invalid_input", message);
 }
 
+// src/filters.ts
+var DEFAULT_NORMALIZATION_FILTERS = Object.freeze({ toolResults: "include" });
+function resolveFilters(filters) {
+  if (filters === undefined)
+    return { ...DEFAULT_NORMALIZATION_FILTERS };
+  assertObject2(filters, "filters");
+  const unknown = Object.keys(filters).find((key) => key !== "toolResults");
+  if (unknown !== undefined) {
+    throw invalidFilters(`filters contains unknown option ${JSON.stringify(unknown)}.`);
+  }
+  const toolResults = filters.toolResults ?? DEFAULT_NORMALIZATION_FILTERS.toolResults;
+  if (toolResults !== "include" && toolResults !== "omit") {
+    throw invalidFilters('filters.toolResults must be either "include" or "omit".');
+  }
+  return { toolResults };
+}
+function assertObject2(value, path) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw invalidFilters(`${path} must be an object.`);
+  }
+}
+function invalidFilters(message) {
+  return new NormalizationError("invalid_input", message);
+}
+
 // src/validate.ts
 var TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 var META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model"]);
@@ -1395,6 +1420,7 @@ function normalizeDecodedSession(decoded, bounds, options) {
 }
 function normalizeDecodedSessionInternal(decoded, bounds, options) {
   const partial = options?.partial ?? false;
+  const filters = options?.filters ?? DEFAULT_NORMALIZATION_FILTERS;
   const diagnostics = [...decoded.diagnostics];
   const body = [];
   const bodyBases = [];
@@ -1408,7 +1434,7 @@ function normalizeDecodedSessionInternal(decoded, bounds, options) {
     if (event.model) {
       modelCounts.set(event.model, (modelCounts.get(event.model) ?? 0) + 1);
     }
-    const record = normalizeEvent(event, eventIndex, body.length + 1, plan, diagnostics, bounds, partial);
+    const record = normalizeEvent(event, eventIndex, body.length + 1, plan, diagnostics, bounds, filters, partial);
     if (!record)
       continue;
     const hasTimestamp = event.timestamp !== undefined && !Number.isNaN(event.timestamp.getTime());
@@ -1458,10 +1484,11 @@ function normalizeDecodedSessionInternal(decoded, bounds, options) {
     recordTimestamps,
     context: decoded.context,
     diagnostics,
-    bounds
+    bounds,
+    filters
   };
 }
-function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bounds, partial) {
+function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bounds, filters, partial) {
   if (event.type === "message") {
     if (!event.content.trim()) {
       return;
@@ -1567,6 +1594,8 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
   }
   if (openEntry)
     openEntry.consumed = true;
+  if (filters.toolResults === "omit")
+    return;
   const finalId = openEntry ? openEntry.finalId : sourceId;
   const resultLimit = bounds.toolResults.maxCharacters;
   const content = resultLimit === null ? event.content : truncateText(event.content, resultLimit, bounds.toolResults.strategy);
@@ -1894,8 +1923,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 var MAX_HELPER_OUTPUT_BYTES = 64 * 1024 * 1024;
 async function normalizeCheckpoint(input) {
-  const { decoded, bounds } = await decodeCheckpoint(input);
-  return normalizeDecodedSession(decoded, bounds);
+  const { decoded, bounds, filters } = await decodeCheckpoint(input);
+  return normalizeDecodedSession(decoded, bounds, { filters });
 }
 async function decodeCheckpoint(input) {
   if (!input || typeof input !== "object") {
@@ -1904,10 +1933,13 @@ async function decodeCheckpoint(input) {
   if (input.source !== "deepagents") {
     throw new NormalizationError("unknown_source", `Checkpoint source must be "deepagents"; received ${JSON.stringify(input.source)}.`);
   }
+  const bounds = resolveBounds(input.bounds);
+  const filters = resolveFilters(input.filters);
   const checkpoint = await loadDeepAgentsCheckpoint(input.checkpoint);
   return {
     decoded: decodeDeepAgentsCheckpoint(checkpoint),
-    bounds: resolveBounds(input.bounds)
+    bounds,
+    filters
   };
 }
 async function loadDeepAgentsCheckpoint(checkpoint) {
@@ -2515,12 +2547,17 @@ function decodeTranscript(input) {
   if (!adapter) {
     throw new NormalizationError("unknown_source", `Unknown trajectory source ${JSON.stringify(input.source)}. Supported sources: ${Object.keys(ADAPTERS).join(", ")}.`);
   }
-  return { decoded: adapter.decode(input.transcript), bounds: resolveBounds(input.bounds) };
+  return {
+    decoded: adapter.decode(input.transcript),
+    bounds: resolveBounds(input.bounds),
+    filters: resolveFilters(input.filters)
+  };
 }
 function normalizeTranscript(input) {
-  const { decoded, bounds } = decodeTranscript(input);
+  const { decoded, bounds, filters } = decodeTranscript(input);
   return normalizeDecodedSession(decoded, bounds, {
-    partial: isPartialTranscript(input)
+    partial: isPartialTranscript(input),
+    filters
   });
 }
 function isPartialTranscript(input) {

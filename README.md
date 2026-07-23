@@ -186,6 +186,34 @@ remaining valid JSON objects. Tool results support:
 Set an individual `maxCharacters` to `null` to disable that bound. Omitted
 fields use the exported `DEFAULT_NORMALIZATION_BOUNDS` values.
 
+## Filters
+
+Tool-result filtering is optional and preserves existing output by default:
+
+```ts
+const result = normalizeTranscript({
+  source: "claude-code",
+  transcript: rawJsonl,
+  filters: { toolResults: "omit" },
+});
+```
+
+`"omit"` removes normalized `tool` result records while retaining the
+assistant tool-call records that initiated them. The default is `"include"`,
+also available through the exported `DEFAULT_NORMALIZATION_FILTERS`. The same
+filter is accepted by `normalizeToCanonical()`, `normalizeCheckpoint()`, and
+`normalizeCheckpointToCanonical()`.
+
+The Python wrapper exposes the same policy:
+
+```python
+result = normalize_transcript(
+    source="claude-code",
+    transcript=raw_jsonl,
+    filters={"toolResults": "omit"},
+)
+```
+
 ## Canonical records for ingestion
 
 `normalizeToCanonical()` returns an additive, ingestion-ready view for the Cloud

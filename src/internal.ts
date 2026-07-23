@@ -1,4 +1,5 @@
 import type { ResolvedNormalizationBounds } from "./bounds.js";
+import type { ResolvedNormalizationFilters } from "./filters.js";
 import type {
   Diagnostic,
   NormalizedRecord,
@@ -130,4 +131,5 @@ export interface InternalNormalization {
   context: SessionContext;
   diagnostics: Diagnostic[];
   bounds: ResolvedNormalizationBounds;
+  filters: ResolvedNormalizationFilters;
 }

@@ -324,6 +324,6 @@ export function finalizeCanonical(
     diagnostics: internal.diagnostics,
     normalizer_version: NORMALIZER_VERSION,
     canonical_schema_version: CANONICAL_SCHEMA_VERSION,
-    config: { bounds },
+    config: { bounds, filters: internal.filters },
   };
 }

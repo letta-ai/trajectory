@@ -98,6 +98,22 @@ describe("canonical invariants", () => {
   }
 });
 
+describe("canonical filtering", () => {
+  test("omits tool results and reports the resolved filter", () => {
+    const result = normalizeToCanonical({
+      source: "claude-code",
+      transcript: fixtureText("claude-code/tool-call", "input.jsonl"),
+      filters: { toolResults: "omit" },
+    });
+
+    expect(result.records.some((record) => record.record_type === "tool")).toBe(false);
+    expect(
+      result.records.some((record) => record.record_type === "assistant-tool-call"),
+    ).toBe(true);
+    expect(result.config.filters).toEqual({ toolResults: "omit" });
+  });
+});
+
 describe("determinism", () => {
   test("identity is independent of transport-arrival order", () => {
     const lines = [

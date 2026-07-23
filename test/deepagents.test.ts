@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import {
   loadDeepAgentsCheckpoint,
   normalizeCheckpoint,
+  normalizeCheckpointToCanonical,
 } from "../src/index.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -119,6 +120,24 @@ describe("Deep Agents Python checkpoints", () => {
     ]);
   });
 
+  integrationTest("omits tool results while retaining calls", async () => {
+    const result = await normalizeCheckpoint({
+      source: "deepagents",
+      checkpoint: {
+        path: databasePath,
+        threadId: "thread-123",
+        pythonExecutable: PYTHON!,
+      },
+      filters: { toolResults: "omit" },
+    });
+    expect(result.records.some((record) => record.role === "tool")).toBe(false);
+    expect(
+      result.records.some(
+        (record) => record.role === "assistant" && record.content === null,
+      ),
+    ).toBe(true);
+  });
+
   integrationTest("keeps threads in one store separate", async () => {
     const result = await normalizeCheckpoint({
       source: "deepagents",
@@ -211,6 +230,47 @@ describe("Deep Agents Python checkpoints", () => {
         message: "install LangGraph",
       }),
     );
+  });
+
+  test("applies filters through the checkpoint entry point", async () => {
+    const fakePython = join(temporaryDirectory, "python-with-checkpoint");
+    writeFileSync(
+      fakePython,
+      `#!/bin/sh
+printf '%s' '{"ok":true,"data":{"checkpointId":"checkpoint-1","checkpointNamespace":"","checkpointTimestamp":"2026-01-02T03:04:05.000Z","messages":[{"role":"human","content":"Run it"},{"role":"ai","content":"","reasoning":[],"toolCalls":[{"id":"call-1","name":"exec","args":{}}]},{"role":"tool","content":"done","toolCallId":"call-1"},{"role":"ai","content":"Finished","reasoning":[],"toolCalls":[]}]}}'
+`,
+    );
+    chmodSync(fakePython, 0o755);
+
+    const result = await normalizeCheckpoint({
+      source: "deepagents",
+      checkpoint: {
+        path: databasePath,
+        threadId: "thread-filter",
+        pythonExecutable: fakePython,
+      },
+      filters: { toolResults: "omit" },
+    });
+    const canonical = await normalizeCheckpointToCanonical({
+      source: "deepagents",
+      checkpoint: {
+        path: databasePath,
+        threadId: "thread-filter",
+        pythonExecutable: fakePython,
+      },
+      filters: { toolResults: "omit" },
+    });
+
+    expect(result.records.some((record) => record.role === "tool")).toBe(false);
+    expect(
+      result.records.some(
+        (record) => record.role === "assistant" && record.content === null,
+      ),
+    ).toBe(true);
+    expect(canonical.records.some((record) => record.record_type === "tool")).toBe(
+      false,
+    );
+    expect(canonical.config.filters).toEqual({ toolResults: "omit" });
   });
 });
 

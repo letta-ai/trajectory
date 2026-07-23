@@ -16,6 +16,10 @@ import type {
   UserRecord,
 } from "./types.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
+import {
+  DEFAULT_NORMALIZATION_FILTERS,
+  type ResolvedNormalizationFilters,
+} from "./filters.js";
 import { NormalizationError } from "./types.js";
 import { validateTranscript } from "./validate.js";
 
@@ -170,6 +174,8 @@ export interface NormalizeInternalOptions {
    * is kept (linked by its source call id) instead of dropped.
    */
   partial?: boolean;
+  /** Resolved output filters. Internal callers default to compatibility mode. */
+  filters?: ResolvedNormalizationFilters;
 }
 
 export function normalizeDecodedSessionInternal(
@@ -178,6 +184,7 @@ export function normalizeDecodedSessionInternal(
   options?: NormalizeInternalOptions,
 ): InternalNormalization {
   const partial = options?.partial ?? false;
+  const filters = options?.filters ?? DEFAULT_NORMALIZATION_FILTERS;
   const diagnostics = [...decoded.diagnostics];
   const body: UnstampedBodyRecord[] = [];
   const bodyBases: CanonicalSourceBasis[] = [];
@@ -204,6 +211,7 @@ export function normalizeDecodedSessionInternal(
       plan,
       diagnostics,
       bounds,
+      filters,
       partial,
     );
     if (!record) continue;
@@ -284,6 +292,7 @@ export function normalizeDecodedSessionInternal(
     context: decoded.context,
     diagnostics,
     bounds,
+    filters,
   };
 }
 
@@ -294,6 +303,7 @@ function normalizeEvent(
   plan: EventPlan,
   diagnostics: Diagnostic[],
   bounds: ResolvedNormalizationBounds,
+  filters: ResolvedNormalizationFilters,
   partial: boolean,
 ): UnstampedBodyRecord | undefined {
   if (event.type === "message") {
@@ -417,6 +427,7 @@ function normalizeEvent(
     return undefined;
   }
   if (openEntry) openEntry.consumed = true;
+  if (filters.toolResults === "omit") return undefined;
   const finalId = openEntry ? openEntry.finalId : sourceId;
   const resultLimit = bounds.toolResults.maxCharacters;
   const content =

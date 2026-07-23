@@ -10,6 +10,7 @@ AnyTrajectorySource = Literal[
     "claude-code", "codex", "hermes", "letta-code", "openclaw", "openhands", "deepagents"
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
+ToolResultPolicy = Literal["include", "omit"]
 DiagnosticCode = Literal[
     "invalid_json_line",
     "non_object_json_line",
@@ -78,6 +79,10 @@ class NormalizationBounds(TypedDict, total=False):
     toolResults: ToolResultBounds
 
 
+class NormalizationFilters(TypedDict, total=False):
+    toolResults: ToolResultPolicy
+
+
 class SourceContext(TypedDict, total=False):
     groupId: str
     baseByteOffset: int
@@ -86,6 +91,7 @@ class SourceContext(TypedDict, total=False):
 
 class _NormalizeInputOptional(TypedDict, total=False):
     bounds: NormalizationBounds
+    filters: NormalizationFilters
     sourceContext: SourceContext
 
 
@@ -105,6 +111,7 @@ class DeepAgentsCheckpointLocation(_DeepAgentsCheckpointLocationOptional):
 
 class _DeepAgentsCheckpointInputOptional(TypedDict, total=False):
     bounds: NormalizationBounds
+    filters: NormalizationFilters
 
 
 class DeepAgentsCheckpointInput(_DeepAgentsCheckpointInputOptional):

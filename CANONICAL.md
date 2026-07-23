@@ -50,7 +50,7 @@ fields it must compute from stored cross-upload state.
 | `ingestion_id`, `ingested_at` | worker | opaque monotonic ingestion identity — the Dream cursor key |
 | `content_version` | worker | assigned from stored cross-upload state (see below) |
 | `record_index` | worker | authoritative ClickHouse index, assigned after sorting |
-| `normalizer_version`, `schema_version`, `config_hash` | worker | versions come from the exports above; `config_hash` from `config.bounds` |
+| `normalizer_version`, `schema_version`, `config_hash` | worker | versions come from the exports above; `config_hash` from the complete resolved `config` |
 
 ## Source context for chunked uploads
 
@@ -161,8 +161,8 @@ as worker sort input.
   same identity + same `content_hash` as a duplicate, and increment or quarantine
   when the same identity has a conflicting `content_hash` (only trustworthy for
   `native`/`location` identity kinds).
-- **`config_hash`** — hash a canonical serialization of the effective
-  configuration, including `config.bounds` from the result.
+- **`config_hash`** — hash a canonical serialization of the complete effective
+  `config` from the result, including resolved bounds and filters.
 - **`ingestion_id` / `ingested_at`** — assign per source's serialized ingestion
   lane. Never bake ingestion/cursor assumptions into the library.
 - Add a **`source_identity_kind LowCardinality(String)`** column to

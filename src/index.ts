@@ -6,6 +6,8 @@ import { openClawAdapter } from "./adapters/openclaw/index.js";
 import { openHandsAdapter } from "./adapters/openhands/index.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
 import { resolveBounds } from "./bounds.js";
+import type { ResolvedNormalizationFilters } from "./filters.js";
+import { resolveFilters } from "./filters.js";
 import { finalizeCanonical, GROUP_SENTINEL } from "./canonical.js";
 import {
   normalizeDecodedSession,
@@ -32,6 +34,7 @@ const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
 function decodeTranscript(input: NormalizeInput): {
   decoded: DecodedSession;
   bounds: ResolvedNormalizationBounds;
+  filters: ResolvedNormalizationFilters;
 } {
   if (!input || typeof input !== "object") {
     throw new NormalizationError("invalid_input", "Input must be an object.");
@@ -51,13 +54,18 @@ function decodeTranscript(input: NormalizeInput): {
     );
   }
 
-  return { decoded: adapter.decode(input.transcript), bounds: resolveBounds(input.bounds) };
+  return {
+    decoded: adapter.decode(input.transcript),
+    bounds: resolveBounds(input.bounds),
+    filters: resolveFilters(input.filters),
+  };
 }
 
 export function normalizeTranscript(input: NormalizeInput): NormalizeResult {
-  const { decoded, bounds } = decodeTranscript(input);
+  const { decoded, bounds, filters } = decodeTranscript(input);
   return normalizeDecodedSession(decoded, bounds, {
     partial: isPartialTranscript(input),
+    filters,
   });
 }
 
@@ -68,14 +76,17 @@ export function normalizeTranscript(input: NormalizeInput): NormalizeResult {
  * ordering, and hashing metadata. See CANONICAL.md for the field contract.
  */
 export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
-  const { decoded, bounds } = decodeTranscript(input);
+  const { decoded, bounds, filters } = decodeTranscript(input);
   const baseByteOffset = input.sourceContext?.baseByteOffset ?? 0;
   // Partial (chunk) semantics are an explicit signal, decoupled from the byte
   // offset: a non-zero offset always implies a continuation, but an initial chunk
   // at offset 0 can also be partial. Meta emission tracks the byte offset only,
   // so an offset-0 partial still emits the authoritative meta.
   const partial = isPartialTranscript(input);
-  const internal = normalizeDecodedSessionInternal(decoded, bounds, { partial });
+  const internal = normalizeDecodedSessionInternal(decoded, bounds, {
+    partial,
+    filters,
+  });
   const groupId = resolveGroupId(
     input.source,
     internal.context.sourceGroupId,
@@ -148,6 +159,7 @@ export {
 } from "./listing.js";
 
 export { DEFAULT_NORMALIZATION_BOUNDS } from "./bounds.js";
+export { DEFAULT_NORMALIZATION_FILTERS } from "./filters.js";
 export { validateTranscript } from "./validate.js";
 export {
   NormalizationError,
@@ -162,6 +174,7 @@ export {
   type DiagnosticCode,
   type MetaRecord,
   type NormalizationBounds,
+  type NormalizationFilters,
   type NormalizationErrorCode,
   type NormalizedRecord,
   type NormalizedTranscript,
@@ -173,6 +186,7 @@ export {
   type ToolCall,
   type ToolArgumentBounds,
   type ToolResultBounds,
+  type ToolResultPolicy,
   type ToolResultRecord,
   type ToolResultTruncationStrategy,
   type TranscriptTrajectorySource,

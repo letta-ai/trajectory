@@ -1,4 +1,5 @@
 import type { ResolvedNormalizationBounds } from "./bounds.js";
+import type { ResolvedNormalizationFilters } from "./filters.js";
 
 export type TrajectorySource =
   | "claude-code"
@@ -32,6 +33,13 @@ export interface ToolResultBounds {
 export interface NormalizationBounds {
   toolArguments?: ToolArgumentBounds;
   toolResults?: ToolResultBounds;
+}
+
+export type ToolResultPolicy = "include" | "omit";
+
+export interface NormalizationFilters {
+  /** Whether normalized `tool` result records are emitted. */
+  toolResults?: ToolResultPolicy;
 }
 
 /**
@@ -70,6 +78,7 @@ export interface NormalizeInput {
   source: TranscriptTrajectorySource;
   transcript: string;
   bounds?: NormalizationBounds;
+  filters?: NormalizationFilters;
   sourceContext?: SourceContext;
 }
 
@@ -243,6 +252,7 @@ export interface CanonicalResult {
    */
   config: {
     bounds: ResolvedNormalizationBounds;
+    filters: ResolvedNormalizationFilters;
   };
 }
 

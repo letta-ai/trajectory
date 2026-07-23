@@ -153,6 +153,37 @@ class WrapperTests(unittest.TestCase):
             [diagnostic["code"] for diagnostic in result["diagnostics"]],
         )
 
+    def test_omits_tool_results_while_retaining_calls(self) -> None:
+        result = normalize_transcript(
+            source="codex",
+            transcript="\n".join(
+                [
+                    codex_message("user", "run the command"),
+                    json.dumps(
+                        {
+                            "type": "response_item",
+                            "payload": {
+                                "type": "function_call",
+                                "name": "exec_command",
+                                "call_id": "call_1",
+                                "arguments": "{}",
+                            },
+                        }
+                    ),
+                    codex_function_output("call_1", "command output"),
+                ]
+            ),
+            filters={"toolResults": "omit"},
+        )
+
+        self.assertNotIn("tool", [record["role"] for record in result["records"]])
+        self.assertTrue(
+            any(
+                record["role"] == "assistant" and record["content"] is None
+                for record in result["records"]
+            )
+        )
+
     def test_partial_fragment_is_opt_in(self) -> None:
         with self.assertRaises(NormalizationError) as raised:
             normalize_transcript(
@@ -200,6 +231,11 @@ class WrapperTests(unittest.TestCase):
                 thread_id="thread-123",
                 path=database,
             )
+            filtered = normalize_checkpoint(
+                thread_id="thread-123",
+                path=database,
+                filters={"toolResults": "omit"},
+            )
             batch = normalize_many(
                 [
                     {
@@ -219,6 +255,7 @@ class WrapperTests(unittest.TestCase):
             ["meta", "user", "reasoning", "assistant", "assistant", "tool", "assistant"],
         )
         self.assertEqual(result["records"][-1]["content"], "It is sunny and 22 C in Paris.")
+        self.assertNotIn("tool", [record["role"] for record in filtered["records"]])
         self.assertEqual(batch[0]["records"][1]["content"], "Basic thread")
 
 

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_NORMALIZATION_BOUNDS,
+  DEFAULT_NORMALIZATION_FILTERS,
   normalizeTranscript,
   validateTranscript,
 } from "../src/index.js";
@@ -23,6 +24,10 @@ const fixtures = [
   { source: "openhands", name: "openhands/tool-calls" },
   { source: "openhands", name: "openhands/cleanup" },
 ] as const satisfies ReadonlyArray<{ source: TrajectorySource; name: string }>;
+
+const toolFixtures = fixtures.filter(
+  (fixture) => fixture.name.endsWith("tool-call") || fixture.name.endsWith("tool-calls"),
+);
 
 const schema = JSON.parse(
   readFileSync(
@@ -167,6 +172,42 @@ describe("public API", () => {
     );
   });
 
+  for (const fixture of toolFixtures) {
+    test(`omits tool results while retaining calls for ${fixture.source}`, () => {
+      const input = fixtureText(
+        fixture.name,
+        fixture.source === "openhands" || fixture.source === "hermes"
+          ? "input.json"
+          : "input.jsonl",
+      );
+      const result = normalizeTranscript({
+        source: fixture.source,
+        transcript: input,
+        filters: { toolResults: "omit" },
+      });
+
+      expect(result.records.some((record) => record.role === "tool")).toBe(false);
+      expect(
+        result.records.some(
+          (record) => record.role === "assistant" && record.content === null,
+        ),
+      ).toBe(true);
+    });
+  }
+
+  test("does not truncate tool results that are omitted", () => {
+    const result = normalizeTranscript({
+      source: "codex",
+      transcript: codexToolTranscript(`BEGIN:${"x".repeat(3_000)}:END`),
+      filters: { toolResults: "omit" },
+    });
+
+    expect(result.records.some((record) => record.role === "tool")).toBe(false);
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "tool_result_truncated",
+    );
+  });
+
   test("supports head-only tool-result truncation", () => {
     const result = normalizeTranscript({
       source: "codex",
@@ -250,6 +291,8 @@ describe("public API", () => {
     });
     expect(Object.isFrozen(DEFAULT_NORMALIZATION_BOUNDS)).toBe(true);
     expect(Object.isFrozen(DEFAULT_NORMALIZATION_BOUNDS.toolResults)).toBe(true);
+    expect(DEFAULT_NORMALIZATION_FILTERS).toEqual({ toolResults: "include" });
+    expect(Object.isFrozen(DEFAULT_NORMALIZATION_FILTERS)).toBe(true);
   });
 
   test("rejects invalid bounds", () => {
@@ -268,6 +311,24 @@ describe("public API", () => {
         bounds: {
           toolResults: { strategy: "middle" },
         } as never,
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects invalid filters", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "codex",
+        transcript: codexMessages("hello", "hi"),
+        filters: { toolResults: "drop" } as never,
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+
+    expect(() =>
+      normalizeTranscript({
+        source: "codex",
+        transcript: codexMessages("hello", "hi"),
+        filters: { unknown: true } as never,
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });

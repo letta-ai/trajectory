@@ -17,6 +17,7 @@ from ._types import (
     AnyTrajectorySource,
     ListTrajectoriesResult,
     NormalizationBounds,
+    NormalizationFilters,
     NormalizationErrorCode,
     NormalizeInput,
     NormalizeRequest,
@@ -35,6 +36,7 @@ def normalize_transcript(
     source: TrajectorySource,
     transcript: str,
     bounds: NormalizationBounds | None = None,
+    filters: NormalizationFilters | None = None,
     source_context: SourceContext | None = None,
 ) -> NormalizeResult:
     """Normalize one native transcript or an explicitly partial fragment.
@@ -47,6 +49,8 @@ def normalize_transcript(
     request: NormalizeInput = {"source": source, "transcript": transcript}
     if bounds is not None:
         request["bounds"] = bounds
+    if filters is not None:
+        request["filters"] = filters
     if source_context is not None:
         request["sourceContext"] = source_context
     return normalize_many([request])[0]
@@ -57,6 +61,7 @@ def normalize_checkpoint(
     thread_id: str,
     path: str | Path | None = None,
     bounds: NormalizationBounds | None = None,
+    filters: NormalizationFilters | None = None,
     python_executable: str | None = None,
 ) -> NormalizeResult:
     """Normalize one Deep Agents thread from its LangGraph SQLite store.
@@ -76,6 +81,8 @@ def normalize_checkpoint(
     }
     if bounds is not None:
         request["bounds"] = bounds
+    if filters is not None:
+        request["filters"] = filters
     return normalize_many([request])[0]
 
 

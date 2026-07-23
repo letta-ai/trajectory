@@ -19,7 +19,7 @@
  * use; override with HARBOR_REPO=<path>).
  *
  * Usage:
- *   bun scripts/token-efficiency.ts <session-file> [options]
+ *   bun scripts/token-efficiency/index.ts <session-file> [options]
  *
  *   <session-file>   Claude Code session (~/.claude/projects/<proj>/<id>.jsonl)
  *                    or Codex rollout (~/.codex/sessions/.../rollout-*.jsonl)
@@ -37,8 +37,8 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { homedir, tmpdir } from "os";
 import { basename, dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { normalizeTranscript } from "../src/index.js";
-import type { NormalizeInput } from "../src/index.js";
+import { normalizeTranscript } from "../../src/index.js";
+import type { NormalizeInput } from "../../src/index.js";
 
 const CHUNK_CHARS = 500_000;
 const API_URL = "https://api.anthropic.com/v1/messages/count_tokens";
@@ -55,7 +55,7 @@ interface CanonicalRecord {
 
 function usage(): never {
   console.error(
-    "usage: bun scripts/token-efficiency.ts <session-file> [--source claude-code|codex] [--model <id>] [--untruncated] [--out-dir <dir>]",
+    "usage: bun scripts/token-efficiency/index.ts <session-file> [--source claude-code|codex] [--model <id>] [--untruncated] [--out-dir <dir>]",
   );
   process.exit(1);
 }

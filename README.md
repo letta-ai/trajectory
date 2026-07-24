@@ -104,16 +104,6 @@ do {
 } while (cursor);
 ```
 
-Each item's `path` is the locator for the next step: the transcript file to
-read (`claude-code`, `codex`, `letta-code`, `openclaw`, `pi`), the SQLite store holding
-the session (`hermes`, `deepagents` — feed the item's `id` to the export
-query or `normalizeCheckpoint`), or the session's event directory
-(`openhands`). Every adapter README documents its default store location;
-`root` overrides it, and a missing store yields an empty listing. Listing the
-SQLite-backed sources requires a runtime with built-in SQLite (Node.js 22.5+
-or Bun). Pagination is positional over a newest-first snapshot and degrades
-gracefully when the store changes between pages.
-
 ## Normalized records
 
 A trajectory is an ordered array containing:
@@ -135,109 +125,6 @@ The public function is:
 ```ts
 normalizeTranscript(input: NormalizeInput): NormalizeResult
 ```
-
-An unknown source, an invalid source-level container, or a transcript that
-cannot form a valid trajectory throws `NormalizationError`. Recoverable
-conditions—such as malformed JSONL lines, orphaned tool results, duplicate call
-IDs, truncated content, or synthesized timestamps—are returned as structured
-diagnostics.
-
-Whole transcripts require at least one user and one assistant record by default.
-For a fragment selected from a larger transcript, set `sourceContext.partial`:
-
-```ts
-const result = normalizeTranscript({
-  source: "codex",
-  transcript: rawFragment,
-  sourceContext: { partial: true },
-});
-```
-
-Partial mode accepts single-role fragments and keeps a tool result whose matching
-call is outside the fragment, linked by its source call ID. A non-zero
-`sourceContext.baseByteOffset` also implies partial mode. Omitting both signals
-preserves strict whole-transcript validation.
-
-## Bounds
-
-Tool payload bounds are optional and use compatibility-preserving defaults:
-
-```ts
-const result = normalizeTranscript({
-  source: "claude-code",
-  transcript: rawJsonl,
-  bounds: {
-    toolArguments: { maxCharacters: 20_000 },
-    toolResults: {
-      maxCharacters: 2_500,
-      strategy: "head-tail",
-    },
-  },
-});
-```
-
-Bounds are measured in Unicode code points, and the truncation marker counts
-toward the configured maximum. Oversized tool arguments are shortened while
-remaining valid JSON objects. Tool results support:
-
-- `"head-tail"` (default), which preserves roughly equal portions of the
-  beginning and end.
-- `"head"`, which preserves only the beginning.
-
-Set an individual `maxCharacters` to `null` to disable that bound. Omitted
-fields use the exported `DEFAULT_NORMALIZATION_BOUNDS` values.
-
-## Filters
-
-Tool-result filtering is optional and preserves existing output by default:
-
-```ts
-const result = normalizeTranscript({
-  source: "claude-code",
-  transcript: rawJsonl,
-  filters: { toolResults: "omit" },
-});
-```
-
-`"omit"` removes normalized `tool` result records while retaining the
-assistant tool-call records that initiated them. The default is `"include"`,
-also available through the exported `DEFAULT_NORMALIZATION_FILTERS`. The same
-filter is accepted by `normalizeToCanonical()`, `normalizeCheckpoint()`, and
-`normalizeCheckpointToCanonical()`.
-
-The Python wrapper exposes the same policy:
-
-```python
-result = normalize_transcript(
-    source="claude-code",
-    transcript=raw_jsonl,
-    filters={"toolResults": "omit"},
-)
-```
-
-## Canonical records for ingestion
-
-`normalizeToCanonical()` returns an additive, ingestion-ready view for the Cloud
-normalizer worker, carrying source-native identity, logical ordering, and
-content hashing alongside the trajectory-v1 record. `normalizeTranscript()` and
-its output are unchanged.
-
-```ts
-import {
-  normalizeToCanonical,
-  NORMALIZER_VERSION,
-  CANONICAL_SCHEMA_VERSION,
-} from "@letta-ai/trajectory";
-
-const { records } = normalizeToCanonical({ source: "claude-code", transcript: rawJsonl });
-```
-
-`NORMALIZER_VERSION` (the exact package version) and `CANONICAL_SCHEMA_VERSION`
-are exported runtime constants recorded on every canonical row. See
-[`CANONICAL.md`](CANONICAL.md) for the full field contract, identity model,
-determinism guarantees, and the worker-side responsibilities. The canonical
-JSON Schema is published as
-[`schema/trajectory-canonical-v1.schema.json`](schema/trajectory-canonical-v1.schema.json).
 
 ## Adding a source
 

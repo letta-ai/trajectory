@@ -55,6 +55,15 @@ beforeAll(() => {
   writeFileSync(join(openclawSessions, "oc-1.jsonl"), `{"type":"session"}\n`);
   writeFileSync(join(openclawSessions, "sessions.json"), "{}\n");
 
+  // pi: <agentDir>/sessions/<escaped-cwd>/<timestamp>_<uuid>.jsonl layout.
+  const piSessions = join(base, "pi", "sessions", "-home-user-pi-demo--");
+  mkdirSync(piSessions, { recursive: true });
+  writeFileSync(
+    join(piSessions, "2026-07-24T06-21-03-508Z_019f92c8.jsonl"),
+    `{"type":"session"}\n`,
+  );
+  writeFileSync(join(base, "pi", "sessions", "stray.jsonl"), `{"type":"session"}\n`);
+
   // openhands: one directory per session.
   mkdirSync(join(base, "openhands", "sess-1"), { recursive: true });
   mkdirSync(join(base, "openhands", "sess-2"), { recursive: true });
@@ -132,6 +141,17 @@ describe("listTrajectories", () => {
       root: join(base, "openclaw"),
     });
     expect(result.items.map((item) => item.id)).toEqual(["oc-1"]);
+  });
+
+  test("lists pi sessions and ignores files outside project directories", async () => {
+    const result = await listTrajectories({
+      source: "pi",
+      root: join(base, "pi"),
+    });
+    expect(result.items.map((item) => item.id)).toEqual([
+      "2026-07-24T06-21-03-508Z_019f92c8",
+    ]);
+    expect(result.items[0]?.path.endsWith(".jsonl")).toBe(true);
   });
 
   test("lists openhands session directories", async () => {

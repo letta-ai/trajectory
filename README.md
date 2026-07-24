@@ -78,6 +78,7 @@ and is empty when the transcript required no recoverable cleanup.
 | [`letta-code`](src/adapters/letta-code/) | Letta Code client `transcript.jsonl` | `letta-code` |
 | [`openclaw`](src/adapters/openclaw/) | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |
 | [`openhands`](src/adapters/openhands/) | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
+| [`pi`](src/adapters/pi/) | Native pi-coding-agent session JSONL | `pi` |
 | [`deepagents`](src/adapters/deepagents/) | Deep Agents CLI LangGraph SQLite store plus `threadId` | `deepagents` |
 
 Each adapter lives in its own folder under [`src/adapters/`](src/adapters/)
@@ -104,7 +105,7 @@ do {
 ```
 
 Each item's `path` is the locator for the next step: the transcript file to
-read (`claude-code`, `codex`, `letta-code`, `openclaw`), the SQLite store holding
+read (`claude-code`, `codex`, `letta-code`, `openclaw`, `pi`), the SQLite store holding
 the session (`hermes`, `deepagents` — feed the item's `id` to the export
 query or `normalizeCheckpoint`), or the session's event directory
 (`openhands`). Every adapter README documents its default store location;

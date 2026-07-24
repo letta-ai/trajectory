@@ -8,6 +8,8 @@ followed by `type: "message"` wrapper rows whose `message` holds `user`,
 `assistant` (with `text`, `thinking`, and `toolCall` content blocks plus model
 metadata), and `toolResult` messages. The whole file is the transcript string.
 
+The decoder is shared with the [`pi`](../pi/) source (OpenClaw embeds pi's
+SessionManager); see [`../pi-session-shared.ts`](../pi-session-shared.ts).
 Compaction, custom, and other lifecycle entry types are ignored, matching
 OpenClaw's own transcript readers. Failed tool results (`isError`) gain an
 `Error:` prefix, and malformed JSONL lines are recoverable diagnostics —

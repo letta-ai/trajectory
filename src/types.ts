@@ -7,7 +7,8 @@ export type TrajectorySource =
   | "hermes"
   | "letta-code"
   | "openclaw"
-  | "openhands";
+  | "openhands"
+  | "pi";
 
 export type TranscriptTrajectorySource = TrajectorySource;
 

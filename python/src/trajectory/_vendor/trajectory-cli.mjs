@@ -832,132 +832,129 @@ function invalidLettaCodeTranscript() {
   return new NormalizationError("invalid_input", "Letta Code transcript must be client-side transcript.jsonl with kind-tagged rows.");
 }
 
-// src/adapters/openclaw/index.ts
-var DELIVERY_MIRROR_MODEL = "delivery-mirror";
-var openClawAdapter = {
-  source: "openclaw",
-  decode(transcript) {
-    const diagnostics = [];
-    const events = [];
-    let cwd;
-    let createdAt;
-    let sessionId;
-    let sawMessageRow = false;
-    for (const { value: row, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
-      if (row.type === "session") {
-        if (!cwd && typeof row.cwd === "string" && row.cwd)
-          cwd = row.cwd;
-        createdAt ??= parseTimestamp(row.timestamp);
-        if (!sessionId && typeof row.id === "string" && row.id) {
-          sessionId = row.id;
-        }
-        continue;
+// src/adapters/pi-session-shared.ts
+function decodePiSessionTranscript(transcript, options) {
+  const diagnostics = [];
+  const events = [];
+  const excludedModels = options.excludedModels ?? [];
+  let cwd;
+  let createdAt;
+  let sessionId;
+  let sawMessageRow = false;
+  for (const { value: row, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
+    if (row.type === "session") {
+      if (!cwd && typeof row.cwd === "string" && row.cwd)
+        cwd = row.cwd;
+      createdAt ??= parseTimestamp(row.timestamp);
+      if (!sessionId && typeof row.id === "string" && row.id) {
+        sessionId = row.id;
       }
-      if (row.type !== "message" || !isObject(row.message))
-        continue;
-      sawMessageRow = true;
-      const message = row.message;
-      const timestamp = parseTimestamp(row.timestamp) ?? messageTimestamp(message.timestamp);
-      const id = typeof row.id === "string" && row.id ? row.id : undefined;
-      const model = typeof message.model === "string" && message.model && message.model !== DELIVERY_MIRROR_MODEL ? message.model : undefined;
-      let componentIndex = 0;
-      const emit = (event) => {
-        events.push({
-          ...event,
-          ...id !== undefined ? { sourceRecordId: id } : { sourceOffset: byteOffset, sourceAnchorKind: "byte" },
-          componentIndex: componentIndex++
+      continue;
+    }
+    if (row.type !== "message" || !isObject(row.message))
+      continue;
+    sawMessageRow = true;
+    const message = row.message;
+    const timestamp = parseTimestamp(row.timestamp) ?? messageTimestamp(message.timestamp);
+    const id = typeof row.id === "string" && row.id ? row.id : undefined;
+    const model = typeof message.model === "string" && message.model && !excludedModels.includes(message.model) ? message.model : undefined;
+    let componentIndex = 0;
+    const emit = (event) => {
+      events.push({
+        ...event,
+        ...id !== undefined ? { sourceRecordId: id } : { sourceOffset: byteOffset, sourceAnchorKind: "byte" },
+        componentIndex: componentIndex++
+      });
+    };
+    if (message.role === "user") {
+      const content = blocksText(message.content);
+      if (content) {
+        emit({
+          type: "message",
+          role: "user",
+          content,
+          inputLine: line,
+          ...timestamp ? { timestamp } : {}
         });
-      };
-      if (message.role === "user") {
-        const content = blocksText(message.content);
-        if (content) {
+      }
+      continue;
+    }
+    if (message.role === "assistant") {
+      if (typeof message.content === "string") {
+        if (message.content) {
           emit({
             type: "message",
-            role: "user",
-            content,
+            role: "assistant",
+            content: message.content,
             inputLine: line,
-            ...timestamp ? { timestamp } : {}
+            ...timestamp ? { timestamp } : {},
+            ...model ? { model } : {}
           });
         }
         continue;
       }
-      if (message.role === "assistant") {
-        if (typeof message.content === "string") {
-          if (message.content) {
-            emit({
-              type: "message",
-              role: "assistant",
-              content: message.content,
-              inputLine: line,
-              ...timestamp ? { timestamp } : {},
-              ...model ? { model } : {}
-            });
-          }
+      for (const part of Array.isArray(message.content) ? message.content : []) {
+        if (!isObject(part))
           continue;
+        if (part.type === "thinking" && typeof part.thinking === "string") {
+          emit({
+            type: "reasoning",
+            content: part.thinking,
+            inputLine: line,
+            ...timestamp ? { timestamp } : {},
+            ...model ? { model } : {}
+          });
+        } else if (part.type === "text" && typeof part.text === "string") {
+          emit({
+            type: "message",
+            role: "assistant",
+            content: part.text,
+            inputLine: line,
+            ...timestamp ? { timestamp } : {},
+            ...model ? { model } : {}
+          });
+        } else if (part.type === "toolCall") {
+          emit({
+            type: "tool_call",
+            args: toolArguments(part.arguments),
+            inputLine: line,
+            ...typeof part.id === "string" && part.id ? { id: part.id } : {},
+            ...typeof part.name === "string" && part.name ? { name: part.name } : {},
+            ...timestamp ? { timestamp } : {},
+            ...model ? { model } : {}
+          });
         }
-        for (const part of Array.isArray(message.content) ? message.content : []) {
-          if (!isObject(part))
-            continue;
-          if (part.type === "thinking" && typeof part.thinking === "string") {
-            emit({
-              type: "reasoning",
-              content: part.thinking,
-              inputLine: line,
-              ...timestamp ? { timestamp } : {},
-              ...model ? { model } : {}
-            });
-          } else if (part.type === "text" && typeof part.text === "string") {
-            emit({
-              type: "message",
-              role: "assistant",
-              content: part.text,
-              inputLine: line,
-              ...timestamp ? { timestamp } : {},
-              ...model ? { model } : {}
-            });
-          } else if (part.type === "toolCall") {
-            emit({
-              type: "tool_call",
-              args: toolArguments(part.arguments),
-              inputLine: line,
-              ...typeof part.id === "string" && part.id ? { id: part.id } : {},
-              ...typeof part.name === "string" && part.name ? { name: part.name } : {},
-              ...timestamp ? { timestamp } : {},
-              ...model ? { model } : {}
-            });
-          }
-        }
-        continue;
       }
-      if (message.role === "toolResult" || message.role === "tool") {
-        let content = blocksText(message.content);
-        if (message.isError === true && !/^error/i.test(content)) {
-          content = `Error: ${content}`;
-        }
-        emit({
-          type: "tool_result",
-          content,
-          inputLine: line,
-          ...typeof message.toolCallId === "string" && message.toolCallId ? { callId: message.toolCallId } : {},
-          ...timestamp ? { timestamp } : {}
-        });
+      continue;
+    }
+    if (message.role === "toolResult" || message.role === "tool") {
+      let content = blocksText(message.content);
+      if (message.isError === true && !/^error/i.test(content)) {
+        content = `Error: ${content}`;
       }
+      emit({
+        type: "tool_result",
+        content,
+        inputLine: line,
+        ...typeof message.toolCallId === "string" && message.toolCallId ? { callId: message.toolCallId } : {},
+        ...timestamp ? { timestamp } : {}
+      });
     }
-    if (!sawMessageRow && sessionId === undefined) {
-      throw new NormalizationError("invalid_input", "OpenClaw transcript must be session JSONL containing a session header or message entries.");
-    }
-    return {
-      events,
-      context: {
-        source: "openclaw",
-        ...cwd ? { cwd } : {},
-        ...createdAt ? { createdAt } : {},
-        ...sessionId ? { sourceGroupId: sessionId } : {}
-      },
-      diagnostics
-    };
   }
-};
+  if (!sawMessageRow && sessionId === undefined) {
+    throw new NormalizationError("invalid_input", `${options.sourceLabel} transcript must be session JSONL containing a session header or message entries.`);
+  }
+  return {
+    events,
+    context: {
+      source: options.source,
+      ...cwd ? { cwd } : {},
+      ...createdAt ? { createdAt } : {},
+      ...sessionId ? { sourceGroupId: sessionId } : {}
+    },
+    diagnostics
+  };
+}
 function messageTimestamp(value) {
   return parseTimestamp(value);
 }
@@ -966,6 +963,19 @@ function toolArguments(value) {
     return value;
   return jsonString(value);
 }
+
+// src/adapters/openclaw/index.ts
+var DELIVERY_MIRROR_MODEL = "delivery-mirror";
+var openClawAdapter = {
+  source: "openclaw",
+  decode(transcript) {
+    return decodePiSessionTranscript(transcript, {
+      source: "openclaw",
+      sourceLabel: "OpenClaw",
+      excludedModels: [DELIVERY_MIRROR_MODEL]
+    });
+  }
+};
 
 // src/adapters/openhands/index.ts
 var openHandsAdapter = {
@@ -1095,6 +1105,17 @@ function extractToolResultText(event) {
   }
   return;
 }
+
+// src/adapters/pi/index.ts
+var piAdapter = {
+  source: "pi",
+  decode(transcript) {
+    return decodePiSessionTranscript(transcript, {
+      source: "pi",
+      sourceLabel: "pi"
+    });
+  }
+};
 
 // src/bounds.ts
 var DEFAULT_NORMALIZATION_BOUNDS = Object.freeze({
@@ -2455,6 +2476,35 @@ async function listOpenHandsTrajectories(root) {
   return sortListings(items);
 }
 
+// src/adapters/pi/list.ts
+import { homedir as homedir9 } from "node:os";
+import { basename as basename4, join as join10 } from "node:path";
+async function listPiTrajectories(root) {
+  const base = root ?? defaultAgentDir();
+  const items = [];
+  const sessionsPath = join10(base, "sessions");
+  for (const project of safeReadDir(sessionsPath)) {
+    if (!project.isDirectory)
+      continue;
+    const projectPath = join10(sessionsPath, project.name);
+    for (const entry of safeReadDir(projectPath)) {
+      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+        continue;
+      const path = join10(projectPath, entry.name);
+      const listing = listingFromFile(basename4(entry.name, ".jsonl"), path);
+      if (listing)
+        items.push(listing);
+    }
+  }
+  return sortListings(items);
+}
+function defaultAgentDir() {
+  const override = process.env.PI_CODING_AGENT_DIR?.trim();
+  if (override)
+    return override;
+  return join10(homedir9(), ".pi", "agent");
+}
+
 // src/listing.ts
 var DEFAULT_LIMIT = 50;
 var MAX_LIMIT = 1000;
@@ -2465,7 +2515,8 @@ var LISTERS = {
   hermes: listHermesTrajectories,
   "letta-code": listLettaCodeTrajectories,
   openclaw: listOpenClawTrajectories,
-  openhands: listOpenHandsTrajectories
+  openhands: listOpenHandsTrajectories,
+  pi: listPiTrajectories
 };
 async function listTrajectories(input) {
   if (!input || typeof input !== "object") {
@@ -2534,7 +2585,8 @@ var ADAPTERS = {
   hermes: hermesAdapter,
   "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,
-  openhands: openHandsAdapter
+  openhands: openHandsAdapter,
+  pi: piAdapter
 };
 function decodeTranscript(input) {
   if (!input || typeof input !== "object") {

@@ -17,6 +17,7 @@ import { listHermesTrajectories } from "./adapters/hermes/list.js";
 import { listLettaCodeTrajectories } from "./adapters/letta-code/list.js";
 import { listOpenClawTrajectories } from "./adapters/openclaw/list.js";
 import { listOpenHandsTrajectories } from "./adapters/openhands/list.js";
+import { listPiTrajectories } from "./adapters/pi/list.js";
 import type { AnyTrajectorySource } from "./types.js";
 import { NormalizationError } from "./types.js";
 
@@ -65,6 +66,7 @@ const LISTERS: Record<AnyTrajectorySource, SourceLister> = {
   "letta-code": listLettaCodeTrajectories,
   openclaw: listOpenClawTrajectories,
   openhands: listOpenHandsTrajectories,
+  pi: listPiTrajectories,
 };
 
 /**

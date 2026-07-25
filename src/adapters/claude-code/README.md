@@ -28,4 +28,9 @@ Dropped input:
 ## Listing
 
 `listTrajectories({ source: "claude-code" })` scans `~/.claude/projects/*/`
-for `<sessionId>.jsonl` files; each item's `path` is the transcript file.
+for parent `<sessionId>.jsonl` files and standalone `agent-<agentId>.jsonl`
+transcripts. It recognizes both legacy project-level agent files and the
+current `<sessionId>/subagents/` layout, including agent transcripts nested
+under `subagents/workflows/<runId>/`. Workflow `journal.jsonl` files and
+metadata sidecars are not listed. Each item's `path` is the transcript file,
+and its `id` is the native session or agent id.

@@ -2318,6 +2318,8 @@ function isModuleMissing(error) {
 }
 
 // src/adapters/claude-code/list.ts
+var AGENT_PREFIX = "agent-";
+var JSONL_SUFFIX = ".jsonl";
 async function listClaudeCodeTrajectories(root) {
   const base = root ?? join3(homedir2(), ".claude", "projects");
   const items = [];
@@ -2326,15 +2328,34 @@ async function listClaudeCodeTrajectories(root) {
       continue;
     const projectPath = join3(base, project.name);
     for (const entry of safeReadDir(projectPath)) {
-      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+      if (entry.isFile && entry.name.endsWith(JSONL_SUFFIX)) {
+        const path = join3(projectPath, entry.name);
+        const listing = listingFromFile(agentIdFromFilename(entry.name) ?? basename(entry.name, JSONL_SUFFIX), path);
+        if (listing)
+          items.push(listing);
         continue;
-      const path = join3(projectPath, entry.name);
-      const listing = listingFromFile(basename(entry.name, ".jsonl"), path);
-      if (listing)
-        items.push(listing);
+      }
+      if (!entry.isDirectory)
+        continue;
+      const subagentsRoot = join3(projectPath, entry.name, "subagents");
+      for (const path of collectFiles(subagentsRoot, JSONL_SUFFIX, 2)) {
+        const agentId = agentIdFromFilename(basename(path));
+        if (!agentId)
+          continue;
+        const listing = listingFromFile(agentId, path);
+        if (listing)
+          items.push(listing);
+      }
     }
   }
   return sortListings(items);
+}
+function agentIdFromFilename(filename) {
+  if (!filename.startsWith(AGENT_PREFIX) || !filename.endsWith(JSONL_SUFFIX)) {
+    return;
+  }
+  const agentId = filename.slice(AGENT_PREFIX.length, -JSONL_SUFFIX.length);
+  return agentId || undefined;
 }
 
 // src/adapters/codex/list.ts

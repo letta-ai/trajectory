@@ -210,6 +210,18 @@ class WrapperTests(unittest.TestCase):
             project.mkdir()
             for name in ("s1", "s2", "s3"):
                 (project / f"{name}.jsonl").write_text("{}\n", encoding="utf-8")
+            subagents = project / "s1" / "subagents"
+            workflows = subagents / "workflows" / "wf-1"
+            workflows.mkdir(parents=True)
+            (subagents / "agent-direct.jsonl").write_text(
+                "{}\n", encoding="utf-8"
+            )
+            (workflows / "agent-workflow.jsonl").write_text(
+                "{}\n", encoding="utf-8"
+            )
+            (workflows / "journal.jsonl").write_text(
+                "{}\n", encoding="utf-8"
+            )
 
             first = list_trajectories(
                 source="claude-code", root=directory, limit=2
@@ -219,10 +231,10 @@ class WrapperTests(unittest.TestCase):
             second = list_trajectories(
                 source="claude-code", root=directory, cursor=first["nextCursor"]
             )
-            self.assertEqual(len(second["items"]), 1)
+            self.assertEqual(len(second["items"]), 3)
             self.assertNotIn("nextCursor", second)
             ids = {item["id"] for item in first["items"] + second["items"]}
-            self.assertEqual(ids, {"s1", "s2", "s3"})
+            self.assertEqual(ids, {"s1", "s2", "s3", "direct", "workflow"})
 
     @unittest.skipUnless(HAS_LANGGRAPH_SQLITE, "LangGraph SQLite extra not installed")
     def test_normalizes_deepagents_checkpoint_with_current_python(self) -> None:

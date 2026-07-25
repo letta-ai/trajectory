@@ -1,0 +1,22 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "claude-code",
+      "cwd": "/workspace/project",
+      "git_branch": "main",
+      "model": "claude-sonnet"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the retry path.",
+      "timestamp": "2026-03-06T14:15:22.394Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The retry path uses bounded exponential backoff.",
+      "timestamp": "2026-03-06T14:15:23.394Z"
+    }
+  ],
+  "diagnostics": []
+}

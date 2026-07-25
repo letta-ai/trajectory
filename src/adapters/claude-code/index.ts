@@ -35,15 +35,29 @@ export const claudeCodeAdapter: SourceAdapter = {
   decode(transcript: string): DecodedSession {
     const diagnostics: Diagnostic[] = [];
     const events: DecodedEvent[] = [];
+    const rows = [...parseJsonLines(transcript, diagnostics)];
+    // Claude Code writes each subagent to its own JSONL with every conversational
+    // row marked `isSidechain: true`. The same flag is also used for sidechain
+    // rows embedded alongside a parent transcript. When ordinary conversational
+    // rows exist, preserve the parent-level view by excluding sidechain rows;
+    // when all conversational rows are sidechain rows, this is the standalone
+    // subagent transcript and those rows are the primary conversation.
+    const standaloneSidechain =
+      rows.some(({ value }) => isConversationalRecord(value) && value.isSidechain === true) &&
+      !rows.some(
+        ({ value }) =>
+          isConversationalRecord(value) && value.isSidechain !== true,
+      );
     // Resolve session context from source chronology, not input order, so the
     // meta record and its hashes do not depend on transport-arrival order.
     let cwdCandidate: ContextCandidate | undefined;
     let branchCandidate: ContextCandidate | undefined;
     const sessionIds = new Set<string>();
+    const agentIds = new Set<string>();
 
-    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
+    for (const { value: record, line, byteOffset } of rows) {
       const recordType = record.type;
-      if (record.isSidechain === true) {
+      if (record.isSidechain === true && !standaloneSidechain) {
         diagnostics.push({
           code: "sidechain_record_dropped",
           message: `Dropped a Claude Code sidechain record on line ${line}.`,
@@ -72,6 +86,13 @@ export const claudeCodeAdapter: SourceAdapter = {
       }
       if (typeof record.sessionId === "string" && record.sessionId) {
         sessionIds.add(record.sessionId);
+      }
+      if (
+        standaloneSidechain &&
+        typeof record.agentId === "string" &&
+        record.agentId
+      ) {
+        agentIds.add(record.agentId);
       }
 
       if (recordType !== "user" && recordType !== "assistant") continue;
@@ -169,7 +190,22 @@ export const claudeCodeAdapter: SourceAdapter = {
       }
     }
 
-    if (sessionIds.size > 1) {
+    if (agentIds.size > 1) {
+      throw new NormalizationError(
+        "source_group_conflict",
+        `Claude Code subagent transcript contains multiple agent ids: ${[...agentIds]
+          .map((id) => JSON.stringify(id))
+          .sort()
+          .join(", ")}.`,
+      );
+    }
+    // A standalone subagent is grouped by its own agent id, so parent session-id
+    // drift does not make its identity ambiguous. Ordinary transcripts, and
+    // older subagent transcripts without agentId, still require one session id.
+    if (
+      sessionIds.size > 1 &&
+      (!standaloneSidechain || agentIds.size === 0)
+    ) {
       throw new NormalizationError(
         "source_group_conflict",
         `Claude Code transcript contains multiple session ids: ${[...sessionIds]
@@ -179,6 +215,7 @@ export const claudeCodeAdapter: SourceAdapter = {
       );
     }
     const [sessionId] = sessionIds;
+    const [agentId] = agentIds;
     const cwd = cwdCandidate?.value;
     const gitBranch = branchCandidate?.value;
 
@@ -188,12 +225,21 @@ export const claudeCodeAdapter: SourceAdapter = {
         source: "claude-code",
         ...(cwd ? { cwd } : {}),
         ...(gitBranch ? { gitBranch } : {}),
-        ...(sessionId ? { sourceGroupId: sessionId } : {}),
+        ...(agentId || sessionId
+          ? { sourceGroupId: agentId || sessionId }
+          : {}),
       },
       diagnostics,
     };
   },
 };
+
+function isConversationalRecord(record: Record<string, unknown>): boolean {
+  return (
+    (record.type === "user" || record.type === "assistant") &&
+    isObject(record.message)
+  );
+}
 
 interface ContextKey {
   ts: number;

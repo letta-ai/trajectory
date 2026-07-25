@@ -115,12 +115,15 @@ var claudeCodeAdapter = {
   decode(transcript) {
     const diagnostics = [];
     const events = [];
+    const rows = [...parseJsonLines(transcript, diagnostics)];
+    const standaloneSidechain = rows.some(({ value }) => isConversationalRecord(value) && value.isSidechain === true) && !rows.some(({ value }) => isConversationalRecord(value) && value.isSidechain !== true);
     let cwdCandidate;
     let branchCandidate;
     const sessionIds = new Set;
-    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
+    const agentIds = new Set;
+    for (const { value: record, line, byteOffset } of rows) {
       const recordType = record.type;
-      if (record.isSidechain === true) {
+      if (record.isSidechain === true && !standaloneSidechain) {
         diagnostics.push({
           code: "sidechain_record_dropped",
           message: `Dropped a Claude Code sidechain record on line ${line}.`,
@@ -146,6 +149,9 @@ var claudeCodeAdapter = {
       }
       if (typeof record.sessionId === "string" && record.sessionId) {
         sessionIds.add(record.sessionId);
+      }
+      if (standaloneSidechain && typeof record.agentId === "string" && record.agentId) {
+        agentIds.add(record.agentId);
       }
       if (recordType !== "user" && recordType !== "assistant")
         continue;
@@ -207,10 +213,14 @@ var claudeCodeAdapter = {
         }
       }
     }
-    if (sessionIds.size > 1) {
+    if (agentIds.size > 1) {
+      throw new NormalizationError("source_group_conflict", `Claude Code subagent transcript contains multiple agent ids: ${[...agentIds].map((id) => JSON.stringify(id)).sort().join(", ")}.`);
+    }
+    if (sessionIds.size > 1 && (!standaloneSidechain || agentIds.size === 0)) {
       throw new NormalizationError("source_group_conflict", `Claude Code transcript contains multiple session ids: ${[...sessionIds].map((id) => JSON.stringify(id)).sort().join(", ")}.`);
     }
     const [sessionId] = sessionIds;
+    const [agentId] = agentIds;
     const cwd = cwdCandidate?.value;
     const gitBranch = branchCandidate?.value;
     return {
@@ -219,12 +229,15 @@ var claudeCodeAdapter = {
         source: "claude-code",
         ...cwd ? { cwd } : {},
         ...gitBranch ? { gitBranch } : {},
-        ...sessionId ? { sourceGroupId: sessionId } : {}
+        ...agentId || sessionId ? { sourceGroupId: agentId || sessionId } : {}
       },
       diagnostics
     };
   }
 };
+function isConversationalRecord(record) {
+  return (record.type === "user" || record.type === "assistant") && isObject(record.message);
+}
 function earlier(current, next) {
   if (current === undefined)
     return next;

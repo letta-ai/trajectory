@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { listTrajectories } from "../src/index.js";
 
@@ -25,6 +25,35 @@ beforeAll(() => {
     const time = new Date(at);
     utimesSync(file, time, time);
   }
+
+  // claude-code standalone subagents: current direct/workflow layouts plus the
+  // legacy project-level agent-file layout.
+  for (const [relativePath, at] of [
+    ["proj-a/s-new/subagents/agent-direct.jsonl", "2026-07-05T10:00:00Z"],
+    [
+      "proj-a/s-new/subagents/workflows/wf-1/agent-workflow.jsonl",
+      "2026-07-06T10:00:00Z",
+    ],
+    ["proj-a/agent-legacy.jsonl", "2026-07-04T10:00:00Z"],
+  ] as const) {
+    const file = join(base, "claude", relativePath);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `{"type":"user","isSidechain":true}\n`);
+    const time = new Date(at);
+    utimesSync(file, time, time);
+  }
+  const workflowRoot = join(
+    base,
+    "claude",
+    "proj-a",
+    "s-new",
+    "subagents",
+    "workflows",
+    "wf-1",
+  );
+  writeFileSync(join(workflowRoot, "journal.jsonl"), `{"type":"started"}\n`);
+  writeFileSync(join(workflowRoot, "agent-workflow.meta.json"), "{}\n");
+  writeFileSync(join(workflowRoot, "other.jsonl"), "{}\n");
 
   // codex: date-nested rollouts.
   for (const [day, name, at] of [
@@ -87,16 +116,23 @@ afterAll(() => {
 });
 
 describe("listTrajectories", () => {
-  test("lists claude-code sessions newest first", async () => {
+  test("lists claude-code parent and subagent sessions newest first", async () => {
     const result = await listTrajectories({
       source: "claude-code",
       root: join(base, "claude"),
     });
-    expect(result.items.map((item) => item.id)).toEqual(["s-new", "s-mid", "s-old"]);
+    expect(result.items.map((item) => item.id)).toEqual([
+      "workflow",
+      "direct",
+      "legacy",
+      "s-new",
+      "s-mid",
+      "s-old",
+    ]);
     expect(result.nextCursor).toBeUndefined();
-    expect(result.items[0]?.path.endsWith("s-new.jsonl")).toBe(true);
+    expect(result.items[0]?.path.endsWith("agent-workflow.jsonl")).toBe(true);
     expect(result.items[0]?.sizeBytes).toBeGreaterThan(0);
-    expect(result.items[0]?.updatedAt).toBe("2026-07-03T10:00:00.000Z");
+    expect(result.items[0]?.updatedAt).toBe("2026-07-06T10:00:00.000Z");
   });
 
   test("paginates with a cursor until exhaustion", async () => {
@@ -115,8 +151,15 @@ describe("listTrajectories", () => {
       cursor = page.nextCursor;
       pages += 1;
     } while (cursor && pages < 10);
-    expect(seen).toEqual(["s-new", "s-mid", "s-old"]);
-    expect(pages).toBe(3);
+    expect(seen).toEqual([
+      "workflow",
+      "direct",
+      "legacy",
+      "s-new",
+      "s-mid",
+      "s-old",
+    ]);
+    expect(pages).toBe(6);
   });
 
   test("lists codex rollouts across date directories", async () => {

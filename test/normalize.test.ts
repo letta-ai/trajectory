@@ -13,6 +13,7 @@ import type { NormalizeResult, TrajectorySource } from "../src/index.js";
 const fixtures = [
   { source: "claude-code", name: "claude-code/tool-call" },
   { source: "claude-code", name: "claude-code/cleanup" },
+  { source: "claude-code", name: "claude-code/subagent" },
   { source: "codex", name: "codex/tool-calls" },
   { source: "codex", name: "codex/cleanup" },
   { source: "hermes", name: "hermes/tool-calls" },

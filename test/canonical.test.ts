@@ -591,6 +591,39 @@ describe("meta determinism", () => {
       expect.objectContaining({ code: "source_group_conflict" }),
     );
   });
+
+  test("standalone Claude Code subagents use agent identity, not the parent session", () => {
+    const transcript = fixtureText("claude-code/subagent", "input.jsonl");
+    const result = normalizeToCanonical({
+      source: "claude-code",
+      transcript,
+    });
+
+    expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
+      new Set(["subagent-fixture"]),
+    );
+    expect(result.records.map((record) => record.record_type)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("subagent identity survives parent session-id drift", () => {
+    const transcript = fixtureText("claude-code/subagent", "input.jsonl").replace(
+      '"sessionId":"parent-session-fixture","cwd"',
+      '"sessionId":"resumed-parent-session","cwd"',
+    );
+    const result = normalizeToCanonical({
+      source: "claude-code",
+      transcript,
+    });
+
+    expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
+      new Set(["subagent-fixture"]),
+    );
+  });
 });
 
 describe("diagnostics surfacing", () => {

@@ -14,8 +14,7 @@ import { listingFromFile, safeReadDir, sortListings } from "../listing-shared.js
  * OMP additionally nests per-session subagent transcripts one level deeper
  * (`<timestamp>_<uuid>/<name>.jsonl`); those are not enumerated by this
  * lister, which mirrors the pi adapter and captures primary session
- * transcripts. Point `root` at a session subdirectory to enumerate nested
- * subagent transcripts.
+ * transcripts.
  */
 export async function listOmpTrajectories(
   root: string | undefined,

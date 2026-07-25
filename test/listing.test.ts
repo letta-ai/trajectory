@@ -63,6 +63,15 @@ beforeAll(() => {
     `{"type":"session"}\n`,
   );
   writeFileSync(join(base, "pi", "sessions", "stray.jsonl"), `{"type":"session"}\n`);
+  // omp: <agentDir>/sessions/<escaped-cwd>/<timestamp>_<uuid>.jsonl layout.
+  // OMP is a pi-mono fork; primary session transcripts sit one level deep,
+  // mirroring pi. Nested per-session subagent transcripts are not enumerated.
+  const ompSessions = join(base, "omp", "sessions", "-home-user-omp-demo--");
+  mkdirSync(ompSessions, { recursive: true });
+  writeFileSync(
+    join(ompSessions, "2026-07-24T06-21-03-508Z_019f92c8.jsonl"),
+    `{"type":"session"}\n`,
+  );
 
   // openhands: one directory per session.
   mkdirSync(join(base, "openhands", "sess-1"), { recursive: true });
@@ -147,6 +156,16 @@ describe("listTrajectories", () => {
     const result = await listTrajectories({
       source: "pi",
       root: join(base, "pi"),
+    });
+    expect(result.items.map((item) => item.id)).toEqual([
+      "2026-07-24T06-21-03-508Z_019f92c8",
+    ]);
+    expect(result.items[0]?.path.endsWith(".jsonl")).toBe(true);
+  });
+  test("lists omp sessions and ignores files outside project directories", async () => {
+    const result = await listTrajectories({
+      source: "omp",
+      root: join(base, "omp"),
     });
     expect(result.items.map((item) => item.id)).toEqual([
       "2026-07-24T06-21-03-508Z_019f92c8",

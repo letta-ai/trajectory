@@ -30,6 +30,7 @@ const goldenFixtures = [
   { source: "codex", name: "codex/tool-calls", golden: "codex__tool-calls" },
   { source: "hermes", name: "hermes/tool-calls", golden: "hermes__tool-calls" },
   { source: "letta-code", name: "letta-code/tool-calls", golden: "letta-code__tool-calls" },
+  { source: "omp", name: "omp/tool-calls", golden: "omp__tool-calls" },
   { source: "openclaw", name: "openclaw/tool-calls", golden: "openclaw__tool-calls" },
   { source: "openhands", name: "openhands/tool-calls", golden: "openhands__tool-calls" },
   { source: "pi", name: "pi/tool-calls", golden: "pi__tool-calls" },

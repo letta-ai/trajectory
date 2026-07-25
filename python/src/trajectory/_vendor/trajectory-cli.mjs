@@ -1106,6 +1106,17 @@ function extractToolResultText(event) {
   return;
 }
 
+// src/adapters/omp/index.ts
+var ompAdapter = {
+  source: "omp",
+  decode(transcript) {
+    return decodePiSessionTranscript(transcript, {
+      source: "omp",
+      sourceLabel: "omp"
+    });
+  }
+};
+
 // src/adapters/pi/index.ts
 var piAdapter = {
   source: "pi",
@@ -2505,6 +2516,35 @@ function defaultAgentDir() {
   return join10(homedir9(), ".pi", "agent");
 }
 
+// src/adapters/omp/list.ts
+import { homedir as homedir10 } from "node:os";
+import { basename as basename5, join as join11 } from "node:path";
+async function listOmpTrajectories(root) {
+  const base = root ?? defaultAgentDir2();
+  const items = [];
+  const sessionsPath = join11(base, "sessions");
+  for (const project of safeReadDir(sessionsPath)) {
+    if (!project.isDirectory)
+      continue;
+    const projectPath = join11(sessionsPath, project.name);
+    for (const entry of safeReadDir(projectPath)) {
+      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+        continue;
+      const path = join11(projectPath, entry.name);
+      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
+      if (listing)
+        items.push(listing);
+    }
+  }
+  return sortListings(items);
+}
+function defaultAgentDir2() {
+  const override = process.env.OMP_CODING_AGENT_DIR?.trim() || process.env.PI_CODING_AGENT_DIR?.trim();
+  if (override)
+    return override;
+  return join11(homedir10(), ".omp", "agent");
+}
+
 // src/listing.ts
 var DEFAULT_LIMIT = 50;
 var MAX_LIMIT = 1000;
@@ -2516,7 +2556,8 @@ var LISTERS = {
   "letta-code": listLettaCodeTrajectories,
   openclaw: listOpenClawTrajectories,
   openhands: listOpenHandsTrajectories,
-  pi: listPiTrajectories
+  pi: listPiTrajectories,
+  omp: listOmpTrajectories
 };
 async function listTrajectories(input) {
   if (!input || typeof input !== "object") {
@@ -2586,7 +2627,8 @@ var ADAPTERS = {
   "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,
   openhands: openHandsAdapter,
-  pi: piAdapter
+  pi: piAdapter,
+  omp: ompAdapter
 };
 function decodeTranscript(input) {
   if (!input || typeof input !== "object") {

@@ -1,0 +1,62 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "omp",
+      "cwd": "/home/user/omp-demo",
+      "model": "claude-sonnet-5"
+    },
+    {
+      "role": "user",
+      "content": "Create notes.txt with a short todo list, then show it with bash.",
+      "timestamp": "2026-07-24T06:21:03.547Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I need to create notes.txt with the requested content, then display it.",
+      "timestamp": "2026-07-24T06:21:03.578Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "toolu_omp_1",
+          "name": "write",
+          "args": "{\"path\":\"notes.txt\",\"content\":\"TODO:\\n- collect omp traces\\n- write the adapter\\n\"}"
+        }
+      ],
+      "timestamp": "2026-07-24T06:21:03.578Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_omp_1",
+      "content": "Successfully wrote 46 bytes to notes.txt",
+      "timestamp": "2026-07-24T06:21:03.580Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "toolu_omp_2",
+          "name": "bash",
+          "args": "{\"command\":\"cat notes.txt\"}"
+        }
+      ],
+      "timestamp": "2026-07-24T06:21:03.585Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_omp_2",
+      "content": "TODO:\n- collect omp traces\n- write the adapter\n",
+      "timestamp": "2026-07-24T06:21:03.640Z"
+    },
+    {
+      "role": "assistant",
+      "content": "Done. I created `notes.txt` with a short TODO list and displayed its contents above.",
+      "timestamp": "2026-07-24T06:21:03.700Z"
+    }
+  ],
+  "diagnostics": []
+}

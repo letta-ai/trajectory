@@ -4,6 +4,7 @@ import { hermesAdapter } from "./adapters/hermes/index.js";
 import { lettaCodeAdapter } from "./adapters/letta-code/index.js";
 import { openClawAdapter } from "./adapters/openclaw/index.js";
 import { openHandsAdapter } from "./adapters/openhands/index.js";
+import { ompAdapter } from "./adapters/omp/index.js";
 import { piAdapter } from "./adapters/pi/index.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
 import { resolveBounds } from "./bounds.js";
@@ -31,6 +32,7 @@ const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   openclaw: openClawAdapter,
   openhands: openHandsAdapter,
   pi: piAdapter,
+  omp: ompAdapter,
 };
 
 function decodeTranscript(input: NormalizeInput): {

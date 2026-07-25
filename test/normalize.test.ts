@@ -16,6 +16,7 @@ const fixtures = [
   { source: "claude-code", name: "claude-code/subagent" },
   { source: "codex", name: "codex/tool-calls" },
   { source: "codex", name: "codex/cleanup" },
+  { source: "droid", name: "droid/happy-path" },
   { source: "hermes", name: "hermes/tool-calls" },
   { source: "hermes", name: "hermes/cleanup" },
   { source: "letta-code", name: "letta-code/tool-calls" },
@@ -64,6 +65,67 @@ describe("golden fixtures", () => {
 });
 
 describe("public API", () => {
+  test("normalizes Droid tool-only messages and drops transport rows", () => {
+    const transcript = [
+      JSON.stringify({ type: "session_start", id: "droid-session", cwd: "/tmp/droid" }),
+      JSON.stringify({ type: "todo_state", todos: [] }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Run a command." }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [{ type: "tool_use", id: "call_only", name: "Bash", input: { cmd: "pwd" } }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "call_only", is_error: true, content: "permission denied" }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "The command failed." }],
+        },
+      }),
+      JSON.stringify({ type: "session_end" }),
+      JSON.stringify({ type: "compaction_state" }),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "droid", transcript });
+
+    expect(result.records).toEqual(
+      expect.arrayContaining([
+        { role: "meta", source: "droid", cwd: "/tmp/droid" },
+        expect.objectContaining({
+          role: "assistant",
+          content: null,
+          tool_calls: [{ id: "call_only", name: "Bash", args: '{"cmd":"pwd"}' }],
+        }),
+        expect.objectContaining({
+          role: "tool",
+          tool_call_id: "call_only",
+          content: "permission denied",
+        }),
+      ]),
+    );
+    expect(result.records.filter((record) => record.role === "assistant")).toHaveLength(2);
+    expect(result.diagnostics).toEqual(
+      expect.not.arrayContaining([
+        expect.objectContaining({ code: "noise_record_dropped" }),
+      ]),
+    );
+  });
+
   test("always returns diagnostics", () => {
     const result = normalizeTranscript({
       source: "codex",

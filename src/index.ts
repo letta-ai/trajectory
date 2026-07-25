@@ -1,5 +1,6 @@
 import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
 import { codexAdapter } from "./adapters/codex/index.js";
+import { droidAdapter } from "./adapters/droid/index.js";
 import { hermesAdapter } from "./adapters/hermes/index.js";
 import { lettaCodeAdapter } from "./adapters/letta-code/index.js";
 import { openClawAdapter } from "./adapters/openclaw/index.js";
@@ -26,6 +27,7 @@ import { NormalizationError } from "./types.js";
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  droid: droidAdapter,
   hermes: hermesAdapter,
   "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,

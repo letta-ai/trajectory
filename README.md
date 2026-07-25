@@ -74,6 +74,7 @@ and is empty when the transcript required no recoverable cleanup.
 | --- | --- | --- |
 | [`claude-code`](src/adapters/claude-code/) | Native Claude Code JSONL | `claude-code` |
 | [`codex`](src/adapters/codex/) | Native Codex rollout JSONL | `codex` |
+| [`droid`](src/adapters/droid/) | Native Droid session JSONL | `droid` |
 | [`hermes`](src/adapters/hermes/) | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
 | [`letta-code`](src/adapters/letta-code/) | Letta Code client `transcript.jsonl` | `letta-code` |
 | [`openclaw`](src/adapters/openclaw/) | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |

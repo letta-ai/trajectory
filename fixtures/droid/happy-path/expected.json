@@ -1,0 +1,49 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "droid",
+      "cwd": "/tmp/test"
+    },
+    {
+      "role": "user",
+      "content": "List files in the current directory.",
+      "timestamp": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I need to list the files.",
+      "timestamp": "2026-01-01T00:00:15.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call_1",
+          "name": "Bash",
+          "args": "{\"command\":\"ls\"}"
+        }
+      ],
+      "timestamp": "2026-01-01T00:00:30.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_1",
+      "content": "file1.txt\nfile2.txt",
+      "timestamp": "2026-01-01T00:00:45.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The directory contains file1.txt and file2.txt.",
+      "timestamp": "2026-01-01T00:01:00.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "timestamps_synthesized",
+      "message": "Synthesized timestamps for 5 normalized records.",
+      "count": 5
+    }
+  ]
+}

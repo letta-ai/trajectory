@@ -1,0 +1,6 @@
+{"type":"session_start","id":"test-uuid","title":"Test Session","sessionTitle":"Test Session","owner":"test","version":2,"cwd":"/tmp/test"}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"List files in the current directory."}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"thinking","thinking":"I need to list the files.","signature":"sig","signatureProvider":"openai"}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"tool_use","id":"call_1","name":"Bash","input":{"command":"ls"}}]}}
+{"type":"message","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"call_1","is_error":false,"content":"file1.txt\nfile2.txt"}]}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"The directory contains file1.txt and file2.txt."}]}}

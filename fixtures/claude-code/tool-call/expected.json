@@ -38,6 +38,7 @@
       "role": "tool",
       "tool_call_id": "toolu_01A",
       "content": "1\tdef retry():",
+      "ok": false,
       "timestamp": "2026-03-06T14:15:31.000Z"
     },
     {

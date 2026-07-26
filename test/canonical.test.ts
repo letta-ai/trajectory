@@ -114,9 +114,9 @@ describe("canonical tool result status", () => {
       source: "codex",
       transcript: fixtureText("codex/tool-calls", "input.jsonl"),
     });
-    expect(
-      codex.records.find((record) => record.record_type === "tool")?.tool_result_ok,
-    ).toBeNull();
+    const tool = codex.records.find((record) => record.record_type === "tool");
+    expect(tool).toBeDefined();
+    expect(tool?.tool_result_ok).toBeNull();
   });
 });
 

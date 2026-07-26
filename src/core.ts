@@ -446,6 +446,7 @@ function normalizeEvent(
     role: "tool",
     tool_call_id: finalId,
     content,
+    ...(typeof event.ok === "boolean" ? { ok: event.ok } : {}),
   };
   return record;
 }

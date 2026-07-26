@@ -182,7 +182,7 @@ var claudeCodeAdapter = {
           if (!isObject(block))
             continue;
           if (block.type === "tool_result") {
-            emit(toolResultEvent(blocksText(block.content), typeof block.tool_use_id === "string" ? block.tool_use_id : undefined, line, timestamp));
+            emit(toolResultEvent(blocksText(block.content), typeof block.tool_use_id === "string" ? block.tool_use_id : undefined, typeof block.is_error === "boolean" ? !block.is_error : undefined, line, timestamp));
           } else if (block.type === "text" && typeof block.text === "string") {
             textParts.push(block.text);
           } else if (block.type === "image") {
@@ -277,10 +277,11 @@ function toolCallEvent(id, name, args, inputLine, timestamp, model) {
     ...model ? { model } : {}
   };
 }
-function toolResultEvent(content, callId, inputLine, timestamp) {
+function toolResultEvent(content, callId, ok, inputLine, timestamp) {
   return {
     type: "tool_result",
     content,
+    ...typeof ok === "boolean" ? { ok } : {},
     inputLine,
     ...callId ? { callId } : {},
     ...timestamp ? { timestamp } : {}
@@ -820,6 +821,7 @@ var lettaCodeAdapter = {
         events.push({
           type: "tool_result",
           content,
+          ...typeof row.resultOk === "boolean" ? { ok: row.resultOk } : {},
           inputLine: line,
           ...sourceFields,
           componentIndex: 1,
@@ -948,6 +950,7 @@ function decodePiSessionTranscript(transcript, options) {
       emit({
         type: "tool_result",
         content,
+        ...typeof message.isError === "boolean" ? { ok: !message.isError } : {},
         inputLine: line,
         ...typeof message.toolCallId === "string" && message.toolCallId ? { callId: message.toolCallId } : {},
         ...timestamp ? { timestamp } : {}
@@ -1054,6 +1057,7 @@ var openHandsAdapter = {
       emit({
         type: "tool_result",
         content: result,
+        ...toolResultStatus(event),
         ...callId ? { callId } : {},
         ...timestamp ? { timestamp } : {}
       });
@@ -1104,6 +1108,11 @@ function actionArgsText(event) {
     return jsonString(args);
   }
   return "{}";
+}
+function toolResultStatus(event) {
+  if (event.kind !== "ObservationEvent" || !isObject(event.observation))
+    return {};
+  return typeof event.observation.is_error === "boolean" ? { ok: !event.observation.is_error } : {};
 }
 function extractToolResultText(event) {
   if (event.kind === "ObservationEvent") {
@@ -1233,7 +1242,7 @@ var TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2
 var META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model"]);
 var CONTENT_KEYS = new Set(["role", "content", "timestamp"]);
 var ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls"]);
-var TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "timestamp"]);
+var TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "ok", "timestamp"]);
 var TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
 function validateTranscript(value, options) {
   const partial = options?.partial ?? false;
@@ -1296,6 +1305,9 @@ function validateTranscript(value, options) {
       }
       if (typeof record.content !== "string") {
         fail(`Record ${index}: tool content must be a string.`);
+      }
+      if ("ok" in record && typeof record.ok !== "boolean") {
+        fail(`Record ${index}: tool ok must be boolean when present.`);
       }
       continue;
     }
@@ -1644,7 +1656,8 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
   const record = {
     role: "tool",
     tool_call_id: finalId,
-    content
+    content,
+    ...typeof event.ok === "boolean" ? { ok: event.ok } : {}
   };
   return record;
 }

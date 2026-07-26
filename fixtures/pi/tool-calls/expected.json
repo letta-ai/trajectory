@@ -32,6 +32,7 @@
       "role": "tool",
       "tool_call_id": "toolu_pi_1",
       "content": "Successfully wrote 46 bytes to notes.txt",
+      "ok": true,
       "timestamp": "2026-07-24T06:21:03.580Z"
     },
     {
@@ -50,6 +51,7 @@
       "role": "tool",
       "tool_call_id": "toolu_pi_2",
       "content": "TODO:\n- collect pi traces\n- write the adapter\n",
+      "ok": true,
       "timestamp": "2026-07-24T06:21:03.640Z"
     },
     {

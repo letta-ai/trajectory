@@ -62,6 +62,8 @@ export interface DecodedToolResultEvent extends DecodedEventBase {
   type: "tool_result";
   callId?: string;
   content: string;
+  /** Source-native success status when the adapter exposes an authoritative field. */
+  ok?: boolean;
 }
 
 export type DecodedEvent =

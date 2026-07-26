@@ -18,6 +18,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"cwd\":\"/home/user/pi-demo\",\"model\":\"claude-sonnet-5\",\"role\":\"meta\",\"source\":\"pi\"}"
     },
     {
@@ -38,6 +39,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Create notes.txt with a short todo list, then show it with bash.\",\"role\":\"user\",\"timestamp\":\"2026-07-24T06:21:03.547Z\"}"
     },
     {
@@ -58,6 +60,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"I need to create notes.txt with the requested content, then display it.\",\"role\":\"reasoning\",\"timestamp\":\"2026-07-24T06:21:03.578Z\"}"
     },
     {
@@ -78,6 +81,7 @@
       "tool_name": "write",
       "tool_arguments_json": "{\"path\":\"notes.txt\",\"content\":\"TODO:\\n- collect pi traces\\n- write the adapter\\n\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-07-24T06:21:03.578Z\",\"tool_calls\":[{\"args\":\"{\\\"path\\\":\\\"notes.txt\\\",\\\"content\\\":\\\"TODO:\\\\n- collect pi traces\\\\n- write the adapter\\\\n\\\"}\",\"id\":\"toolu_pi_1\",\"name\":\"write\"}]}"
     },
     {
@@ -89,8 +93,8 @@
       "component_index": 0,
       "record_type": "tool",
       "record_id": "8f17fee2952ec774c1e3877967b7a80d054dde33f5adcdb445d8ab06f21040be",
-      "record_hash": "138c02b75bff466ceb190a55567b6bde99ab5084a1332d827379e814e575a00f",
-      "content_hash": "8a9fde41836e549c7d271ad10ccbc97bc6344a7ccb80759a9501481544d47bfa",
+      "record_hash": "b532d53e693260be03ac5fbe2376c915f8d4df254fd522a09660674ec1e84ab6",
+      "content_hash": "cfabb5b8a3e03b35d42dc565460e200648329eef46acdeae7d79b3577f516688",
       "source_timestamp": "2026-07-24T06:21:03.580Z",
       "record_timestamp": "2026-07-24T06:21:03.580Z",
       "content": null,
@@ -98,7 +102,8 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "Successfully wrote 46 bytes to notes.txt",
-      "record_json": "{\"content\":\"Successfully wrote 46 bytes to notes.txt\",\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.580Z\",\"tool_call_id\":\"toolu_pi_1\"}"
+      "tool_result_ok": true,
+      "record_json": "{\"content\":\"Successfully wrote 46 bytes to notes.txt\",\"ok\":true,\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.580Z\",\"tool_call_id\":\"toolu_pi_1\"}"
     },
     {
       "source_type": "pi",
@@ -118,6 +123,7 @@
       "tool_name": "bash",
       "tool_arguments_json": "{\"command\":\"cat notes.txt\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-07-24T06:21:03.585Z\",\"tool_calls\":[{\"args\":\"{\\\"command\\\":\\\"cat notes.txt\\\"}\",\"id\":\"toolu_pi_2\",\"name\":\"bash\"}]}"
     },
     {
@@ -129,8 +135,8 @@
       "component_index": 0,
       "record_type": "tool",
       "record_id": "ae62f856064616065f75f9b0413850fec9878088c7a243a94cc6eb33c5483a4c",
-      "record_hash": "cabd8be38b1a81502fa2a86290f705824187fe5a56cf52e78e943051a24ad594",
-      "content_hash": "ec62ef72aa077ffffe0453418fc4c399c614898538ea610b9a2ff07273302093",
+      "record_hash": "65357522295d448f70ca59a49b99db74576c507ecf69a4a2a925c163be2fa143",
+      "content_hash": "6d41f362736db63ffcd5ddb9c1fec8394bcaed294ee9b88611d0e0eb1219d42f",
       "source_timestamp": "2026-07-24T06:21:03.640Z",
       "record_timestamp": "2026-07-24T06:21:03.640Z",
       "content": null,
@@ -138,7 +144,8 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "TODO:\n- collect pi traces\n- write the adapter\n",
-      "record_json": "{\"content\":\"TODO:\\n- collect pi traces\\n- write the adapter\\n\",\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.640Z\",\"tool_call_id\":\"toolu_pi_2\"}"
+      "tool_result_ok": true,
+      "record_json": "{\"content\":\"TODO:\\n- collect pi traces\\n- write the adapter\\n\",\"ok\":true,\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.640Z\",\"tool_call_id\":\"toolu_pi_2\"}"
     },
     {
       "source_type": "pi",
@@ -158,12 +165,13 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Done. I created `notes.txt` with a short TODO list and displayed its contents above.\",\"role\":\"assistant\",\"timestamp\":\"2026-07-24T06:21:03.700Z\"}"
     }
   ],
   "diagnostics": [],
   "normalizer_version": "0.2.0",
-  "canonical_schema_version": 1,
+  "canonical_schema_version": 2,
   "config": {
     "bounds": {
       "toolArguments": {

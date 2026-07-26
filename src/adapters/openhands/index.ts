@@ -95,6 +95,7 @@ export const openHandsAdapter: SourceAdapter = {
       emit({
         type: "tool_result",
         content: result,
+        ...toolResultStatus(event),
         ...(callId ? { callId } : {}),
         ...(timestamp ? { timestamp } : {}),
       });
@@ -158,6 +159,13 @@ function actionArgsText(event: Record<string, unknown>): string {
     return jsonString(args);
   }
   return "{}";
+}
+
+function toolResultStatus(event: Record<string, unknown>): { ok?: boolean } {
+  if (event.kind !== "ObservationEvent" || !isObject(event.observation)) return {};
+  return typeof event.observation.is_error === "boolean"
+    ? { ok: !event.observation.is_error }
+    : {};
 }
 
 function extractToolResultText(

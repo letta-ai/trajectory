@@ -72,7 +72,7 @@ describe("source-native tool result status", () => {
     const tool = result.records.find(
       (record) => record.role === "tool" && record.tool_call_id === "toolu_pi_err",
     );
-    expect(tool?.ok).toBe(false);
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBe(false);
   });
 
   test("maps Claude Code is_error", () => {
@@ -110,7 +110,7 @@ describe("source-native tool result status", () => {
     ].join("\n");
     const result = normalizeTranscript({ source: "claude-code", transcript });
     const tool = result.records.find((record) => record.role === "tool");
-    expect(tool?.ok).toBe(true);
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBe(true);
   });
 
   test("maps Letta Code resultOk", () => {
@@ -119,7 +119,7 @@ describe("source-native tool result status", () => {
       transcript: fixtureText("letta-code/cleanup", "input.jsonl"),
     });
     const tool = result.records.find((record) => record.role === "tool");
-    expect(tool?.ok).toBe(false);
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBe(false);
   });
 
   test("does not infer Codex status from output text", () => {
@@ -128,7 +128,8 @@ describe("source-native tool result status", () => {
       transcript: codexToolTranscript("PASS"),
     });
     const tool = result.records.find((record) => record.role === "tool");
-    expect(tool?.ok).toBeUndefined();
+    expect(tool?.role).toBe("tool");
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBeUndefined();
   });
 });
 

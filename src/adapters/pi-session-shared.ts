@@ -159,6 +159,7 @@ export function decodePiSessionTranscript(
       emit({
         type: "tool_result",
         content,
+        ...(typeof message.isError === "boolean" ? { ok: !message.isError } : {}),
         inputLine: line,
         ...(typeof message.toolCallId === "string" && message.toolCallId
           ? { callId: message.toolCallId }

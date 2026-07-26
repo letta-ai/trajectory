@@ -27,6 +27,7 @@
       "role": "tool",
       "tool_call_id": "call_oc_err",
       "content": "Error: no image attachment found",
+      "ok": false,
       "timestamp": "2026-07-06T14:00:06.000Z"
     },
     {

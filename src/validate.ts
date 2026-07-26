@@ -7,7 +7,7 @@ const TIMESTAMP_PATTERN =
 const META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model"]);
 const CONTENT_KEYS = new Set(["role", "content", "timestamp"]);
 const ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls"]);
-const TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "timestamp"]);
+const TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "ok", "timestamp"]);
 const TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
 
 /**
@@ -94,6 +94,9 @@ export function validateTranscript(
       }
       if (typeof record.content !== "string") {
         fail(`Record ${index}: tool content must be a string.`);
+      }
+      if ("ok" in record && typeof record.ok !== "boolean") {
+        fail(`Record ${index}: tool ok must be boolean when present.`);
       }
       continue;
     }

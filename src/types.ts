@@ -151,6 +151,8 @@ export interface ToolResultRecord {
   role: "tool";
   tool_call_id: string;
   content: string;
+  /** Source-native success status; absent when the source has no authoritative field. */
+  ok?: boolean;
   timestamp: string;
 }
 
@@ -235,6 +237,8 @@ export interface CanonicalRecord {
   tool_name: string | null;
   tool_arguments_json: string | null;
   tool_result_json: string | null;
+  /** Source-native success status for tool results; null when unavailable. */
+  tool_result_ok: boolean | null;
   /** Lossless canonical JSON of the emitted trajectory-v1 record. */
   record_json: string;
 }

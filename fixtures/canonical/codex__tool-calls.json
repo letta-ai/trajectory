@@ -18,6 +18,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"cwd\":\"/workspace/project\",\"git_branch\":\"feature/retry\",\"model\":\"gpt-5.3-codex\",\"role\":\"meta\",\"source\":\"codex\"}"
     },
     {
@@ -38,6 +39,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"create one focused commit\",\"role\":\"user\",\"timestamp\":\"2026-03-30T05:38:34.725Z\"}"
     },
     {
@@ -58,6 +60,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Reviewing the changed files\",\"role\":\"reasoning\",\"timestamp\":\"2026-03-30T05:38:45.000Z\"}"
     },
     {
@@ -78,6 +81,7 @@
       "tool_name": "update_plan",
       "tool_arguments_json": "{\"explanation\":\"review and commit\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-03-30T05:38:50.441Z\",\"tool_calls\":[{\"args\":\"{\\\"explanation\\\":\\\"review and commit\\\"}\",\"id\":\"call_A\",\"name\":\"update_plan\"}]}"
     },
     {
@@ -98,6 +102,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "Plan updated",
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Plan updated\",\"role\":\"tool\",\"timestamp\":\"2026-03-30T05:38:50.585Z\",\"tool_call_id\":\"call_A\"}"
     },
     {
@@ -118,6 +123,7 @@
       "tool_name": "apply_patch",
       "tool_arguments_json": "{\"input\":\"*** Begin Patch\\n*** End Patch\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-03-30T05:39:00.000Z\",\"tool_calls\":[{\"args\":\"{\\\"input\\\":\\\"*** Begin Patch\\\\n*** End Patch\\\"}\",\"id\":\"call_B\",\"name\":\"apply_patch\"}]}"
     },
     {
@@ -138,6 +144,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "Done",
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Done\",\"role\":\"tool\",\"timestamp\":\"2026-03-30T05:39:00.100Z\",\"tool_call_id\":\"call_B\"}"
     },
     {
@@ -158,6 +165,7 @@
       "tool_name": "tool_search",
       "tool_arguments_json": "{\"query\":\"filesystem tools\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-03-30T05:39:30.000Z\",\"tool_calls\":[{\"args\":\"{\\\"query\\\":\\\"filesystem tools\\\"}\",\"id\":\"call_C\",\"name\":\"tool_search\"}]}"
     },
     {
@@ -178,6 +186,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "[{\"name\":\"read_file\"}]",
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"[{\\\"name\\\":\\\"read_file\\\"}]\",\"role\":\"tool\",\"timestamp\":\"2026-03-30T05:39:30.100Z\",\"tool_call_id\":\"call_C\"}"
     },
     {
@@ -198,6 +207,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Created one focused commit.\",\"role\":\"assistant\",\"timestamp\":\"2026-03-30T05:40:43.000Z\"}"
     }
   ],
@@ -208,12 +218,9 @@
       "inputLine": 3
     }
   ],
-  "normalizer_version": "0.1.0",
-  "canonical_schema_version": 1,
+  "normalizer_version": "0.2.0",
+  "canonical_schema_version": 2,
   "config": {
-    "filters": {
-      "toolResults": "include"
-    },
     "bounds": {
       "toolArguments": {
         "maxCharacters": 20000
@@ -222,6 +229,9 @@
         "maxCharacters": 2500,
         "strategy": "head-tail"
       }
+    },
+    "filters": {
+      "toolResults": "include"
     }
   }
 }

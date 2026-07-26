@@ -135,6 +135,7 @@ export const lettaCodeAdapter: SourceAdapter = {
         events.push({
           type: "tool_result",
           content,
+          ...(typeof row.resultOk === "boolean" ? { ok: row.resultOk } : {}),
           inputLine: line,
           ...sourceFields,
           componentIndex: 1,

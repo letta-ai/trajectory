@@ -175,7 +175,11 @@ class AssistantToolCallRecord(TypedDict):
     timestamp: str
 
 
-class ToolResultRecord(TypedDict):
+class _ToolResultOptional(TypedDict, total=False):
+    ok: bool
+
+
+class ToolResultRecord(_ToolResultOptional):
     role: Literal["tool"]
     tool_call_id: str
     content: str

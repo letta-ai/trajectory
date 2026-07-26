@@ -99,6 +99,27 @@ describe("canonical invariants", () => {
   }
 });
 
+describe("canonical tool result status", () => {
+  test("projects source-native status without inferring missing outcomes", () => {
+    const pi = normalizeToCanonical({
+      source: "pi",
+      transcript: fixtureText("pi/cleanup", "input.jsonl"),
+    });
+    const failed = pi.records.find(
+      (record) => record.record_type === "tool" && record.tool_call_id === "toolu_pi_err",
+    );
+    expect(failed?.tool_result_ok).toBe(false);
+
+    const codex = normalizeToCanonical({
+      source: "codex",
+      transcript: fixtureText("codex/tool-calls", "input.jsonl"),
+    });
+    expect(
+      codex.records.find((record) => record.record_type === "tool")?.tool_result_ok,
+    ).toBeNull();
+  });
+});
+
 describe("canonical filtering", () => {
   test("omits tool results and reports the resolved filter", () => {
     const result = normalizeToCanonical({

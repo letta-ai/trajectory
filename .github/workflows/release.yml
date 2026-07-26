@@ -19,9 +19,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
-      # Kept for when provenance / OIDC trusted publishing is enabled; unused
-      # while publishing with NPM_TOKEN (npm rejects --provenance for private
-      # source repos with a 422).
+      # Required for npm provenance attestations (OIDC).
       id-token: write
 
     steps:
@@ -146,10 +144,7 @@ jobs:
             Changes from ${{ steps.version.outputs.old_version }} to ${{ steps.version.outputs.new_version }}
           generate_release_notes: true
 
-      # NOTE: no --provenance while the source repo is private (npm rejects it
-      # with a 422). Once the repo is public, re-add --provenance (or switch to
-      # OIDC trusted publishing like letta-agent-sdk); no other change needed.
       - name: Publish to npm
-        run: npm publish --access public --tag ${{ steps.version.outputs.npm_tag }}
+        run: npm publish --access public --provenance --tag ${{ steps.version.outputs.npm_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

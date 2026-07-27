@@ -1,0 +1,51 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "omp",
+      "cwd": "/home/user/omp-notes",
+      "model": "claude-sonnet-5"
+    },
+    {
+      "role": "user",
+      "content": "Summarize the screenshot I attached.\n[image]",
+      "timestamp": "2026-07-24T07:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "toolu_omp_err",
+          "name": "read",
+          "args": "{\"path\":\"screenshot.png\"}"
+        }
+      ],
+      "timestamp": "2026-07-24T07:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "toolu_omp_err",
+      "content": "Error: File not found: screenshot.png",
+      "timestamp": "2026-07-24T07:00:04.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I could not find the screenshot; could you re-attach it?",
+      "timestamp": "2026-07-24T07:00:06.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 5.",
+      "inputLine": 5
+    },
+    {
+      "code": "orphan_tool_result",
+      "message": "Dropped a tool result without a preceding call for \"toolu_omp_gone\".",
+      "recordIndex": 5,
+      "inputLine": 11
+    }
+  ]
+}

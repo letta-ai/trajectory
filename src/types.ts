@@ -6,6 +6,7 @@ export type TrajectorySource =
   | "codex"
   | "hermes"
   | "letta-code"
+  | "omp"
   | "openclaw"
   | "openhands"
   | "pi";

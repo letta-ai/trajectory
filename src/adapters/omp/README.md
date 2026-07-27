@@ -33,9 +33,11 @@ OMP headers carry only `cwd` (no `git_branch`), so the `meta` record exposes
 ## Listing
 
 `listTrajectories({ source: "omp" })` scans `<agentDir>/sessions/*/` for
-`.jsonl` transcripts, resolving the agent directory like OMP does
-(`$OMP_CODING_AGENT_DIR`, then the pi-compat `$PI_CODING_AGENT_DIR`, then
-~/.omp/agent`). Only primary session transcripts (one directory level under
-each escaped-cwd project directory) are enumerated. OMP's per-session
-subagent transcripts, nested one level deeper under `<timestamp>_<uuid>/`,
-are not listed by default.
+`.jsonl` transcripts. Default discovery mirrors OMP's current directory inputs:
+named profiles (`OMP_PROFILE`, with `PI_PROFILE` as the compatibility fallback),
+the default profile's `PI_CODING_AGENT_DIR` override, `PI_CONFIG_DIR`, and a
+migrated `XDG_DATA_HOME/omp` data root when present. A caller-supplied `root`
+continues to mean the agent directory itself. Only primary session transcripts
+(one directory level under each escaped-cwd project directory) are enumerated.
+OMP's per-session subagent transcripts, nested one level deeper under
+`<timestamp>_<uuid>/`, are not listed by default.

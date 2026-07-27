@@ -2517,12 +2517,17 @@ function defaultAgentDir() {
 }
 
 // src/adapters/omp/list.ts
+import { existsSync as existsSync2 } from "node:fs";
 import { homedir as homedir10 } from "node:os";
 import { basename as basename5, join as join11 } from "node:path";
 async function listOmpTrajectories(root) {
-  const base = root ?? defaultAgentDir2();
   const items = [];
-  const sessionsPath = join11(base, "sessions");
+  const sessionsPath = root ? join11(root, "sessions") : resolveOmpSessionsPath({
+    home: homedir10(),
+    platform: process.platform,
+    env: process.env,
+    exists: existsSync2
+  });
   for (const project of safeReadDir(sessionsPath)) {
     if (!project.isDirectory)
       continue;
@@ -2538,11 +2543,29 @@ async function listOmpTrajectories(root) {
   }
   return sortListings(items);
 }
-function defaultAgentDir2() {
-  const override = process.env.OMP_CODING_AGENT_DIR?.trim() || process.env.PI_CODING_AGENT_DIR?.trim();
-  if (override)
-    return override;
-  return join11(homedir10(), ".omp", "agent");
+function resolveOmpSessionsPath(options) {
+  const profile = resolveProfile(options.env.OMP_PROFILE, options.env.PI_PROFILE);
+  const configRoot = join11(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
+  const agentOverride = profile ? undefined : options.env.PI_CODING_AGENT_DIR?.trim() || undefined;
+  const agentDir = agentOverride ?? join11(configRoot, "agent");
+  if (agentOverride === undefined && (options.platform === "linux" || options.platform === "darwin")) {
+    const xdgData = options.env.XDG_DATA_HOME?.trim();
+    if (xdgData) {
+      const xdgRoot = join11(xdgData, "omp", ...profile ? ["profiles", profile] : []);
+      if (options.exists(xdgRoot))
+        return join11(xdgRoot, "sessions");
+    }
+  }
+  return join11(agentDir, "sessions");
+}
+function resolveProfile(ompProfile, piProfile) {
+  const value = (ompProfile !== undefined ? ompProfile : piProfile)?.trim();
+  if (!value || value === "default")
+    return;
+  if (value === "." || value === ".." || value.endsWith(".") || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(value) || /^(?:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\..*)?$/i.test(value)) {
+    return;
+  }
+  return value;
 }
 
 // src/listing.ts

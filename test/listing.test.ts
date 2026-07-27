@@ -4,6 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveOmpSessionsPath } from "../src/adapters/omp/list.js";
 import { listTrajectories } from "../src/index.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -248,5 +249,59 @@ describe("listTrajectories", () => {
       limit: 10,
     });
     expect(resumed.items.map((item) => item.id)).toEqual(["rollout-a"]);
+  });
+});
+
+describe("OMP default store resolution", () => {
+  const resolve = (
+    env: NodeJS.ProcessEnv,
+    existing: string[] = [],
+    platform: NodeJS.Platform = "linux",
+  ) =>
+    resolveOmpSessionsPath({
+      home: "/home/tester",
+      platform,
+      env,
+      exists: (path) => existing.includes(path),
+    });
+
+  test("uses the supported default-profile overrides", () => {
+    expect(resolve({ PI_CODING_AGENT_DIR: "/custom/agent" })).toBe(
+      "/custom/agent/sessions",
+    );
+    expect(resolve({ PI_CONFIG_DIR: ".config/omp" })).toBe(
+      "/home/tester/.config/omp/agent/sessions",
+    );
+  });
+
+  test("resolves named profiles and OMP_PROFILE precedence", () => {
+    expect(resolve({ PI_PROFILE: "legacy" })).toBe(
+      "/home/tester/.omp/profiles/legacy/agent/sessions",
+    );
+    expect(
+      resolve({
+        OMP_PROFILE: "work",
+        PI_PROFILE: "legacy",
+        PI_CODING_AGENT_DIR: "/ignored/for/profiles",
+      }),
+    ).toBe("/home/tester/.omp/profiles/work/agent/sessions");
+  });
+
+  test("uses an initialized XDG data root and otherwise stays home-based", () => {
+    expect(
+      resolve(
+        { XDG_DATA_HOME: "/xdg/data" },
+        ["/xdg/data/omp"],
+      ),
+    ).toBe("/xdg/data/omp/sessions");
+    expect(resolve({ XDG_DATA_HOME: "/xdg/data" })).toBe(
+      "/home/tester/.omp/agent/sessions",
+    );
+    expect(
+      resolve(
+        { OMP_PROFILE: "work", XDG_DATA_HOME: "/xdg/data" },
+        ["/xdg/data/omp/profiles/work"],
+      ),
+    ).toBe("/xdg/data/omp/profiles/work/sessions");
   });
 });

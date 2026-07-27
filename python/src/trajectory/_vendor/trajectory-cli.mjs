@@ -1222,6 +1222,17 @@ function extractToolResultText(event) {
   return;
 }
 
+// src/adapters/omp/index.ts
+var ompAdapter = {
+  source: "omp",
+  decode(transcript) {
+    return decodePiSessionTranscript(transcript, {
+      source: "omp",
+      sourceLabel: "omp"
+    });
+  }
+};
+
 // src/adapters/pi/index.ts
 var piAdapter = {
   source: "pi",
@@ -2660,6 +2671,58 @@ function defaultAgentDir() {
   return join11(homedir10(), ".pi", "agent");
 }
 
+// src/adapters/omp/list.ts
+import { existsSync as existsSync2 } from "node:fs";
+import { homedir as homedir10 } from "node:os";
+import { basename as basename5, join as join11 } from "node:path";
+async function listOmpTrajectories(root) {
+  const items = [];
+  const sessionsPath = root ? join11(root, "sessions") : resolveOmpSessionsPath({
+    home: homedir10(),
+    platform: process.platform,
+    env: process.env,
+    exists: existsSync2
+  });
+  for (const project of safeReadDir(sessionsPath)) {
+    if (!project.isDirectory)
+      continue;
+    const projectPath = join11(sessionsPath, project.name);
+    for (const entry of safeReadDir(projectPath)) {
+      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+        continue;
+      const path = join11(projectPath, entry.name);
+      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
+      if (listing)
+        items.push(listing);
+    }
+  }
+  return sortListings(items);
+}
+function resolveOmpSessionsPath(options) {
+  const profile = resolveProfile(options.env.OMP_PROFILE, options.env.PI_PROFILE);
+  const configRoot = join11(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
+  const agentOverride = profile ? undefined : options.env.PI_CODING_AGENT_DIR?.trim() || undefined;
+  const agentDir = agentOverride ?? join11(configRoot, "agent");
+  if (agentOverride === undefined && (options.platform === "linux" || options.platform === "darwin")) {
+    const xdgData = options.env.XDG_DATA_HOME?.trim();
+    if (xdgData) {
+      const xdgRoot = join11(xdgData, "omp", ...profile ? ["profiles", profile] : []);
+      if (options.exists(xdgRoot))
+        return join11(xdgRoot, "sessions");
+    }
+  }
+  return join11(agentDir, "sessions");
+}
+function resolveProfile(ompProfile, piProfile) {
+  const value = (ompProfile !== undefined ? ompProfile : piProfile)?.trim();
+  if (!value || value === "default")
+    return;
+  if (value === "." || value === ".." || value.endsWith(".") || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(value) || /^(?:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\..*)?$/i.test(value)) {
+    return;
+  }
+  return value;
+}
+
 // src/listing.ts
 var DEFAULT_LIMIT = 50;
 var MAX_LIMIT = 1000;
@@ -2672,7 +2735,8 @@ var LISTERS = {
   "letta-code": listLettaCodeTrajectories,
   openclaw: listOpenClawTrajectories,
   openhands: listOpenHandsTrajectories,
-  pi: listPiTrajectories
+  pi: listPiTrajectories,
+  omp: listOmpTrajectories
 };
 async function listTrajectories(input) {
   if (!input || typeof input !== "object") {
@@ -2743,7 +2807,8 @@ var ADAPTERS = {
   "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,
   openhands: openHandsAdapter,
-  pi: piAdapter
+  pi: piAdapter,
+  omp: ompAdapter
 };
 function decodeTranscript(input) {
   if (!input || typeof input !== "object") {

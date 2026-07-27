@@ -7,6 +7,7 @@ export type TrajectorySource =
   | "droid"
   | "hermes"
   | "letta-code"
+  | "omp"
   | "openclaw"
   | "openhands"
   | "pi";

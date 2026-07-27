@@ -77,6 +77,7 @@ and is empty when the transcript required no recoverable cleanup.
 | [`droid`](src/adapters/droid/) | Native Droid session JSONL | `droid` |
 | [`hermes`](src/adapters/hermes/) | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
 | [`letta-code`](src/adapters/letta-code/) | Letta Code client `transcript.jsonl` | `letta-code` |
+| [`omp`](src/adapters/omp/) | Native OMP (Oh My Pi) coding-agent session JSONL (pi-agent session format) | `omp` |
 | [`openclaw`](src/adapters/openclaw/) | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |
 | [`openhands`](src/adapters/openhands/) | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | [`pi`](src/adapters/pi/) | Native pi-coding-agent session JSONL | `pi` |

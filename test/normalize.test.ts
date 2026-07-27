@@ -21,6 +21,8 @@ const fixtures = [
   { source: "hermes", name: "hermes/cleanup" },
   { source: "letta-code", name: "letta-code/tool-calls" },
   { source: "letta-code", name: "letta-code/cleanup" },
+  { source: "omp", name: "omp/tool-calls" },
+  { source: "omp", name: "omp/cleanup" },
   { source: "openclaw", name: "openclaw/tool-calls" },
   { source: "openclaw", name: "openclaw/cleanup" },
   { source: "openhands", name: "openhands/tool-calls" },

@@ -114,7 +114,7 @@ describe("public API", () => {
         expect.objectContaining({
           role: "tool",
           tool_call_id: "call_only",
-          content: "permission denied",
+          content: "Error: permission denied",
         }),
       ]),
     );
@@ -122,6 +122,77 @@ describe("public API", () => {
     expect(result.diagnostics).toEqual(
       expect.not.arrayContaining([
         expect.objectContaining({ code: "noise_record_dropped" }),
+      ]),
+    );
+  });
+
+  test("decodes Droid text-block tool results and prefixes failed results once", () => {
+    const transcript = [
+      JSON.stringify({ type: "session_start", id: "droid-session", cwd: "/tmp/droid" }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "user",
+          content: [{ type: "text", text: "Run both commands." }],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call_ok", name: "Bash", input: { cmd: "pwd" } },
+            { type: "tool_use", id: "call_error", name: "Bash", input: { cmd: "false" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "call_ok",
+              is_error: false,
+              content: [
+                { type: "text", text: "first" },
+                { type: "text", text: "second" },
+              ],
+            },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "message",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "call_error",
+              is_error: true,
+              content: [{ type: "text", text: "Error: permission denied" }],
+            },
+          ],
+        },
+      }),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "droid", transcript });
+
+    expect(result.records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: "tool",
+          tool_call_id: "call_ok",
+          content: "first\nsecond",
+        }),
+        expect.objectContaining({
+          role: "tool",
+          tool_call_id: "call_error",
+          content: "Error: permission denied",
+        }),
       ]),
     );
   });

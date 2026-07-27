@@ -537,7 +537,7 @@ var droidAdapter = {
         } else if (block.type === "tool_result" && role === "user") {
           emit({
             type: "tool_result",
-            content: typeof block.content === "string" ? block.content : String(block.content),
+            content: toolResultContent(block.content, block.is_error === true),
             inputLine: line,
             ...typeof block.tool_use_id === "string" && block.tool_use_id ? { callId: block.tool_use_id } : {}
           });
@@ -555,6 +555,10 @@ var droidAdapter = {
     };
   }
 };
+function toolResultContent(content, isError) {
+  const text = typeof content === "string" ? content : blocksText(content);
+  return isError && !/^error/i.test(text) ? `Error: ${text}` : text;
+}
 
 // src/adapters/hermes/index.ts
 var CONTENT_JSON_PREFIX = "\x00json:";

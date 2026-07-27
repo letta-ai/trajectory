@@ -4,7 +4,7 @@ import type {
   SourceAdapter,
 } from "../../internal.js";
 import type { Diagnostic } from "../../types.js";
-import { isObject, jsonString, parseJsonLines } from "../shared.js";
+import { blocksText, isObject, jsonString, parseJsonLines } from "../shared.js";
 
 const TRANSPORT_TYPES = new Set([
   "todo_state",
@@ -86,8 +86,7 @@ export const droidAdapter: SourceAdapter = {
         } else if (block.type === "tool_result" && role === "user") {
           emit({
             type: "tool_result",
-            content:
-              typeof block.content === "string" ? block.content : String(block.content),
+            content: toolResultContent(block.content, block.is_error === true),
             inputLine: line,
             ...(typeof block.tool_use_id === "string" && block.tool_use_id
               ? { callId: block.tool_use_id }
@@ -108,3 +107,8 @@ export const droidAdapter: SourceAdapter = {
     };
   },
 };
+
+function toolResultContent(content: unknown, isError: boolean): string {
+  const text = typeof content === "string" ? content : blocksText(content);
+  return isError && !/^error/i.test(text) ? `Error: ${text}` : text;
+}

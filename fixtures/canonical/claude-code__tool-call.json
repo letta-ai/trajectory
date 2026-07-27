@@ -18,6 +18,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"cwd\":\"/workspace/project\",\"git_branch\":\"main\",\"model\":\"claude-opus-4-6\",\"role\":\"meta\",\"source\":\"claude-code\"}"
     },
     {
@@ -38,6 +39,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"fix the flaky retry test\",\"role\":\"user\",\"timestamp\":\"2026-03-06T14:15:22.394Z\"}"
     },
     {
@@ -58,6 +60,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"check the retry module\",\"role\":\"reasoning\",\"timestamp\":\"2026-03-06T14:15:30.000Z\"}"
     },
     {
@@ -78,6 +81,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Looking at retry.py now.\",\"role\":\"assistant\",\"timestamp\":\"2026-03-06T14:15:30.000Z\"}"
     },
     {
@@ -98,6 +102,7 @@
       "tool_name": "Read",
       "tool_arguments_json": "{\"file_path\":\"retry.py\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-03-06T14:15:30.000Z\",\"tool_calls\":[{\"args\":\"{\\\"file_path\\\":\\\"retry.py\\\"}\",\"id\":\"toolu_01A\",\"name\":\"Read\"}]}"
     },
     {
@@ -109,8 +114,8 @@
       "component_index": 0,
       "record_type": "tool",
       "record_id": "3c660c57b62dfb1b8e1afb3cbbf61bded34a99a6ede918cc4bac6b8b2605edf0",
-      "record_hash": "2af8eb886c40ba853b9c5412e1cd47590750da2b538fd2520fb74eb9d14d1cb7",
-      "content_hash": "bd3f23233825598e5849604171e58e9b37c493c17b4e55a74664f9b28222568e",
+      "record_hash": "c6e05ac6a12cc0f02cc3c7cf1fba845cfebbf6b81c443b3cc6b465163652e76d",
+      "content_hash": "e6d1daed2435781633b89ec8c15dad6af070aac064f3ec89fbe37cc4e348e031",
       "source_timestamp": "2026-03-06T14:15:31.000Z",
       "record_timestamp": "2026-03-06T14:15:31.000Z",
       "content": null,
@@ -118,7 +123,8 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "1\tdef retry():",
-      "record_json": "{\"content\":\"1\\tdef retry():\",\"role\":\"tool\",\"timestamp\":\"2026-03-06T14:15:31.000Z\",\"tool_call_id\":\"toolu_01A\"}"
+      "tool_result_ok": false,
+      "record_json": "{\"content\":\"1\\tdef retry():\",\"ok\":false,\"role\":\"tool\",\"timestamp\":\"2026-03-06T14:15:31.000Z\",\"tool_call_id\":\"toolu_01A\"}"
     },
     {
       "source_type": "claude-code",
@@ -138,16 +144,14 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Patched the backoff.\",\"role\":\"assistant\",\"timestamp\":\"2026-03-06T14:15:33.000Z\"}"
     }
   ],
   "diagnostics": [],
-  "normalizer_version": "0.1.0",
-  "canonical_schema_version": 1,
+  "normalizer_version": "0.2.0",
+  "canonical_schema_version": 2,
   "config": {
-    "filters": {
-      "toolResults": "include"
-    },
     "bounds": {
       "toolArguments": {
         "maxCharacters": 20000
@@ -156,6 +160,9 @@
         "maxCharacters": 2500,
         "strategy": "head-tail"
       }
+    },
+    "filters": {
+      "toolResults": "include"
     }
   }
 }

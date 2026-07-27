@@ -18,6 +18,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"role\":\"meta\",\"source\":\"openhands\"}"
     },
     {
@@ -38,6 +39,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Inspect and update the entry point.\",\"role\":\"user\",\"timestamp\":\"2026-07-03T10:00:00.000Z\"}"
     },
     {
@@ -58,6 +60,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"I'll inspect the workspace first.\",\"role\":\"reasoning\",\"timestamp\":\"2026-07-03T10:00:01.000Z\"}"
     },
     {
@@ -78,6 +81,7 @@
       "tool_name": "terminal",
       "tool_arguments_json": "{\"command\":\"pwd\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-07-03T10:00:01.000Z\",\"tool_calls\":[{\"args\":\"{\\\"command\\\":\\\"pwd\\\"}\",\"id\":\"call_oh_1\",\"name\":\"terminal\"}]}"
     },
     {
@@ -89,8 +93,8 @@
       "component_index": 0,
       "record_type": "tool",
       "record_id": "a6b6e7de4eba2a340ab448bb74524405afa9c7ed84cff74c7a9aacc64e9b2fd7",
-      "record_hash": "e15a47f49265498187eaaaa5208ecdc33be64ddce55d629cd234042967498c84",
-      "content_hash": "47bd2e2adc81b0332e9e02c914cafe27c8446fb883a44f22d6821acca53c58c4",
+      "record_hash": "8730ee8cd7311df60ade508be48b48d2327033a54b9f92a209969ebe8d8925af",
+      "content_hash": "a3246ba169dc4ed8ed3b48f3fd3e4879645c57195381e5a8afb35971bc07922d",
       "source_timestamp": "2026-07-03T10:00:02.000Z",
       "record_timestamp": "2026-07-03T10:00:02.000Z",
       "content": null,
@@ -98,7 +102,8 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "/workspace\nready",
-      "record_json": "{\"content\":\"/workspace\\nready\",\"role\":\"tool\",\"timestamp\":\"2026-07-03T10:00:02.000Z\",\"tool_call_id\":\"call_oh_1\"}"
+      "tool_result_ok": true,
+      "record_json": "{\"content\":\"/workspace\\nready\",\"ok\":true,\"role\":\"tool\",\"timestamp\":\"2026-07-03T10:00:02.000Z\",\"tool_call_id\":\"call_oh_1\"}"
     },
     {
       "source_type": "openhands",
@@ -118,6 +123,7 @@
       "tool_name": "file_editor",
       "tool_arguments_json": "{\"path\":\"src/app.ts\",\"content\":\"updated\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-07-03T10:00:03.000Z\",\"tool_calls\":[{\"args\":\"{\\\"path\\\":\\\"src/app.ts\\\",\\\"content\\\":\\\"updated\\\"}\",\"id\":\"oh_action-2\",\"name\":\"file_editor\"}]}"
     },
     {
@@ -138,6 +144,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "Edit was not approved.",
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Edit was not approved.\",\"role\":\"tool\",\"timestamp\":\"2026-07-03T10:00:04.000Z\",\"tool_call_id\":\"oh_action-2\"}"
     },
     {
@@ -158,16 +165,14 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"I inspected the workspace; the edit was rejected.\",\"role\":\"assistant\",\"timestamp\":\"2026-07-03T10:00:05.000Z\"}"
     }
   ],
   "diagnostics": [],
-  "normalizer_version": "0.1.0",
-  "canonical_schema_version": 1,
+  "normalizer_version": "0.2.0",
+  "canonical_schema_version": 2,
   "config": {
-    "filters": {
-      "toolResults": "include"
-    },
     "bounds": {
       "toolArguments": {
         "maxCharacters": 20000
@@ -176,6 +181,9 @@
         "maxCharacters": 2500,
         "strategy": "head-tail"
       }
+    },
+    "filters": {
+      "toolResults": "include"
     }
   }
 }

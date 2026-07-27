@@ -9,8 +9,9 @@ The adapter decodes `MessageEvent` (user/agent prose), `ActionEvent` (thought
 `oh_<eventId>` fallback), and result events (`ObservationEvent`,
 `AgentErrorEvent`, `UserRejectObservation`). A pre-pass maps action ids to
 call ids so an observation arriving before its action still links instead of
-being dropped as an orphan. OpenHands event `id`s provide native record
-identity.
+being dropped as an orphan. `ObservationEvent.observation.is_error` maps to the
+normalized tool result's `ok` field; other result event kinds remain unknown.
+OpenHands event `id`s provide native record identity.
 
 ## Listing
 

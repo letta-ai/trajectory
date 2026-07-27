@@ -25,6 +25,7 @@
       "role": "tool",
       "tool_call_id": "letta-code-tool-line-5",
       "content": "Error: command failed",
+      "ok": false,
       "timestamp": "2026-07-22T13:00:02.000Z"
     },
     {

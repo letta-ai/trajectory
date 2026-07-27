@@ -27,6 +27,7 @@
       "role": "tool",
       "tool_call_id": "toolu_pi_err",
       "content": "Error: File not found: screenshot.png",
+      "ok": false,
       "timestamp": "2026-07-24T07:00:04.000Z"
     },
     {

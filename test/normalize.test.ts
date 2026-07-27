@@ -63,6 +63,76 @@ describe("golden fixtures", () => {
   }
 });
 
+describe("source-native tool result status", () => {
+  test("maps Pi isError", () => {
+    const result = normalizeTranscript({
+      source: "pi",
+      transcript: fixtureText("pi/cleanup", "input.jsonl"),
+    });
+    const tool = result.records.find(
+      (record) => record.role === "tool" && record.tool_call_id === "toolu_pi_err",
+    );
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBe(false);
+  });
+
+  test("maps Claude Code is_error", () => {
+    const transcript = [
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        message: { role: "user", content: "run tests" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "call-1", name: "Bash", input: { command: "bun test" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u2",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "call-1",
+              content: "passed",
+              is_error: false,
+            },
+          ],
+        },
+      }),
+    ].join("\n");
+    const result = normalizeTranscript({ source: "claude-code", transcript });
+    const tool = result.records.find((record) => record.role === "tool");
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBe(true);
+  });
+
+  test("maps Letta Code resultOk", () => {
+    const result = normalizeTranscript({
+      source: "letta-code",
+      transcript: fixtureText("letta-code/cleanup", "input.jsonl"),
+    });
+    const tool = result.records.find((record) => record.role === "tool");
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBe(false);
+  });
+
+  test("does not infer Codex status from output text", () => {
+    const result = normalizeTranscript({
+      source: "codex",
+      transcript: codexToolTranscript("PASS"),
+    });
+    const tool = result.records.find((record) => record.role === "tool");
+    expect(tool?.role).toBe("tool");
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBeUndefined();
+  });
+});
+
 describe("public API", () => {
   test("always returns diagnostics", () => {
     const result = normalizeTranscript({

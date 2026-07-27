@@ -99,6 +99,7 @@ export function buildCanonicalRecords(
       tool_name: flat.toolName,
       tool_arguments_json: flat.toolArgumentsJson,
       tool_result_json: flat.toolResultJson,
+      tool_result_ok: flat.toolResultOk,
       record_json: recordJson,
     };
   });
@@ -244,7 +245,9 @@ function semanticContent(
       return { name: call?.name ?? "", args: call?.args ?? "" };
     }
     case "tool":
-      return { content: record.role === "tool" ? record.content : null };
+      return record.role === "tool"
+        ? { content: record.content, ...(typeof record.ok === "boolean" ? { ok: record.ok } : {}) }
+        : { content: null };
   }
 }
 
@@ -254,6 +257,7 @@ interface FlatFields {
   toolName: string | null;
   toolArgumentsJson: string | null;
   toolResultJson: string | null;
+  toolResultOk: boolean | null;
 }
 
 function flattenFields(
@@ -266,6 +270,7 @@ function flattenFields(
     toolName: null,
     toolArgumentsJson: null,
     toolResultJson: null,
+    toolResultOk: null,
   };
   switch (type) {
     case "user":
@@ -284,7 +289,12 @@ function flattenFields(
     }
     case "tool":
       return record.role === "tool"
-        ? { ...empty, toolCallId: record.tool_call_id, toolResultJson: record.content }
+        ? {
+            ...empty,
+            toolCallId: record.tool_call_id,
+            toolResultJson: record.content,
+            toolResultOk: record.ok ?? null,
+          }
         : empty;
     case "meta":
       return empty;

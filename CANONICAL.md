@@ -44,7 +44,7 @@ fields it must compute from stored cross-upload state.
 | `record_hash` | library | sha256 of `record_json` (64-hex) |
 | `content_hash` | library | sha256 of canonical semantic content, excluding transport metadata/timestamps (64-hex) |
 | `source_timestamp`, `record_timestamp` | library | descriptive only, never a cursor; nullable |
-| `content`, `tool_call_id`, `tool_name`, `tool_arguments_json`, `tool_result_json` | library | nullable flattened fields |
+| `content`, `tool_call_id`, `tool_name`, `tool_arguments_json`, `tool_result_json`, `tool_result_ok` | library | nullable flattened fields; `tool_result_ok` is `true`/`false` only for source-native structured outcomes and otherwise `null` |
 | `record_json` | library | lossless canonical JSON of the emitted trajectory-v1 record |
 | `organization_id`, `workspace_id`, `user_id`, `source_id`, `source_upload_id` | worker | tenancy + raw-upload lineage |
 | `ingestion_id`, `ingested_at` | worker | opaque monotonic ingestion identity — the Dream cursor key |

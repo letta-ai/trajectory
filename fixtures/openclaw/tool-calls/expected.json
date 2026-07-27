@@ -32,6 +32,7 @@
       "role": "tool",
       "tool_call_id": "call_oc_1",
       "content": "README.md\nsrc\n",
+      "ok": true,
       "timestamp": "2026-07-05T09:00:05.500Z"
     },
     {

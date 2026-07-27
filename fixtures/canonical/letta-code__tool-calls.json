@@ -18,6 +18,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"role\":\"meta\",\"source\":\"letta-code\"}"
     },
     {
@@ -38,6 +39,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Inspect the entry point.\",\"role\":\"user\",\"timestamp\":\"2026-07-22T12:00:00.000Z\"}"
     },
     {
@@ -58,6 +60,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"I should read the file first.\",\"role\":\"reasoning\",\"timestamp\":\"2026-07-22T12:00:01.000Z\"}"
     },
     {
@@ -78,6 +81,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"I will inspect it now.\",\"role\":\"assistant\",\"timestamp\":\"2026-07-22T12:00:01.000Z\"}"
     },
     {
@@ -98,6 +102,7 @@
       "tool_name": "Read",
       "tool_arguments_json": "{\"file_path\":\"src/app.ts\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-07-22T12:00:02.000Z\",\"tool_calls\":[{\"args\":\"{\\\"file_path\\\":\\\"src/app.ts\\\"}\",\"id\":\"call-read-1\",\"name\":\"Read\"}]}"
     },
     {
@@ -109,8 +114,8 @@
       "component_index": 1,
       "record_type": "tool",
       "record_id": "53d517a48a8be36793baf70ece96089cde53c3957026dcefecbb96df927db225",
-      "record_hash": "31b58727422ed18a3507df67dba1de934fb2204c06bc5483aca3c5db49af9891",
-      "content_hash": "0462d6b714053e5ce7e58b8d0c40fa3fc41b99e2bdc8e5b2c48773b715b1744f",
+      "record_hash": "05d59e2405ecfdcebf664402c40cc29fe9dfb0dde4c75c541f2662ca5bd2418e",
+      "content_hash": "cd065815738be662b3ecddfce68bb1bf226719a46a12c4112e04fe3e862795ce",
       "source_timestamp": "2026-07-22T12:00:02.000Z",
       "record_timestamp": "2026-07-22T12:00:02.000Z",
       "content": null,
@@ -118,7 +123,8 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "export const value = 1;",
-      "record_json": "{\"content\":\"export const value = 1;\",\"role\":\"tool\",\"timestamp\":\"2026-07-22T12:00:02.000Z\",\"tool_call_id\":\"call-read-1\"}"
+      "tool_result_ok": true,
+      "record_json": "{\"content\":\"export const value = 1;\",\"ok\":true,\"role\":\"tool\",\"timestamp\":\"2026-07-22T12:00:02.000Z\",\"tool_call_id\":\"call-read-1\"}"
     },
     {
       "source_type": "letta-code",
@@ -138,16 +144,14 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"The entry point exports value 1.\",\"role\":\"assistant\",\"timestamp\":\"2026-07-22T12:00:03.000Z\"}"
     }
   ],
   "diagnostics": [],
-  "normalizer_version": "0.1.1",
-  "canonical_schema_version": 1,
+  "normalizer_version": "0.2.0",
+  "canonical_schema_version": 2,
   "config": {
-    "filters": {
-      "toolResults": "include"
-    },
     "bounds": {
       "toolArguments": {
         "maxCharacters": 20000
@@ -156,6 +160,9 @@
         "maxCharacters": 2500,
         "strategy": "head-tail"
       }
+    },
+    "filters": {
+      "toolResults": "include"
     }
   }
 }

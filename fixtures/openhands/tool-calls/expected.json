@@ -30,6 +30,7 @@
       "role": "tool",
       "tool_call_id": "call_oh_1",
       "content": "/workspace\nready",
+      "ok": true,
       "timestamp": "2026-07-03T10:00:02.000Z"
     },
     {

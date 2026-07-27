@@ -131,6 +131,7 @@ export const claudeCodeAdapter: SourceAdapter = {
               toolResultEvent(
                 blocksText(block.content),
                 typeof block.tool_use_id === "string" ? block.tool_use_id : undefined,
+                typeof block.is_error === "boolean" ? !block.is_error : undefined,
                 line,
                 timestamp,
               ),
@@ -315,12 +316,14 @@ function toolCallEvent(
 function toolResultEvent(
   content: string,
   callId: string | undefined,
+  ok: boolean | undefined,
   inputLine: number,
   timestamp?: Date,
 ): DecodedEvent {
   return {
     type: "tool_result",
     content,
+    ...(typeof ok === "boolean" ? { ok } : {}),
     inputLine,
     ...(callId ? { callId } : {}),
     ...(timestamp ? { timestamp } : {}),

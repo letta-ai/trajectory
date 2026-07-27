@@ -81,6 +81,12 @@ and is empty when the transcript required no recoverable cleanup.
 | [`pi`](src/adapters/pi/) | Native pi-coding-agent session JSONL | `pi` |
 | [`deepagents`](src/adapters/deepagents/) | Deep Agents CLI LangGraph SQLite store plus `threadId` | `deepagents` |
 
+Tool result records may include `ok: boolean` when the source exposes an
+authoritative structured outcome, such as Pi/OpenClaw `isError`, Claude Code
+`is_error`, Letta Code `resultOk`, or OpenHands observation `is_error`. The
+field is omitted when the source does not expose a reliable status; result text
+is never interpreted as success or failure.
+
 Each adapter lives in its own folder under [`src/adapters/`](src/adapters/)
 with a README documenting the exact input contract, decoding behavior, and
 what the adapter drops.

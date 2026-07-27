@@ -467,6 +467,100 @@ function outputText(output) {
   return output == null ? "" : String(output);
 }
 
+// src/adapters/droid/index.ts
+var TRANSPORT_TYPES2 = new Set([
+  "todo_state",
+  "session_end",
+  "compaction_state"
+]);
+var droidAdapter = {
+  source: "droid",
+  decode(transcript) {
+    const diagnostics = [];
+    const events = [];
+    let cwd;
+    let sourceGroupId;
+    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
+      const recordType = record.type;
+      if (recordType === "session_start") {
+        if (sourceGroupId === undefined && typeof record.id === "string" && record.id) {
+          sourceGroupId = record.id;
+        }
+        if (cwd === undefined && typeof record.cwd === "string" && record.cwd) {
+          cwd = record.cwd;
+        }
+        continue;
+      }
+      if (typeof recordType === "string" && TRANSPORT_TYPES2.has(recordType)) {
+        continue;
+      }
+      if (recordType !== "message" || !isObject(record.message))
+        continue;
+      const role = record.message.role;
+      if (role !== "user" && role !== "assistant")
+        continue;
+      const blocks = record.message.content;
+      if (!Array.isArray(blocks))
+        continue;
+      let componentIndex = 0;
+      const emit = (event) => {
+        events.push({
+          ...event,
+          sourceOffset: byteOffset,
+          sourceAnchorKind: "byte",
+          componentIndex: componentIndex++
+        });
+      };
+      for (const block of blocks) {
+        if (!isObject(block))
+          continue;
+        if (block.type === "thinking") {
+          emit({
+            type: "reasoning",
+            content: typeof block.thinking === "string" ? block.thinking : "",
+            inputLine: line
+          });
+        } else if (block.type === "text") {
+          emit({
+            type: "message",
+            role,
+            content: typeof block.text === "string" ? block.text : "",
+            inputLine: line
+          });
+        } else if (block.type === "tool_use" && role === "assistant") {
+          emit({
+            type: "tool_call",
+            args: jsonString(block.input),
+            inputLine: line,
+            ...typeof block.id === "string" && block.id ? { id: block.id } : {},
+            ...typeof block.name === "string" && block.name ? { name: block.name } : {}
+          });
+        } else if (block.type === "tool_result" && role === "user") {
+          emit({
+            type: "tool_result",
+            content: toolResultContent(block.content, block.is_error === true),
+            inputLine: line,
+            ...typeof block.tool_use_id === "string" && block.tool_use_id ? { callId: block.tool_use_id } : {}
+          });
+        }
+      }
+    }
+    return {
+      events,
+      context: {
+        source: "droid",
+        ...cwd ? { cwd } : {},
+        ...sourceGroupId ? { sourceGroupId } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function toolResultContent(content, isError) {
+  const text = typeof content === "string" ? content : blocksText(content);
+  return isError && !/^error/i.test(text) ? `Error: ${text}` : text;
+}
+
 // src/adapters/hermes/index.ts
 var CONTENT_JSON_PREFIX = "\x00json:";
 var hermesAdapter = {
@@ -2385,9 +2479,23 @@ async function listCodexTrajectories(root) {
   return sortListings(items);
 }
 
-// src/adapters/deepagents/list.ts
+// src/adapters/droid/list.ts
 import { homedir as homedir4 } from "node:os";
-import { join as join5 } from "node:path";
+import { basename as basename3, join as join5 } from "node:path";
+async function listDroidTrajectories(root) {
+  const base = root ?? join5(homedir4(), ".factory", "sessions");
+  const items = [];
+  for (const path of collectFiles(base, ".jsonl", 12)) {
+    const listing = listingFromFile(basename3(path, ".jsonl"), path);
+    if (listing)
+      items.push(listing);
+  }
+  return sortListings(items);
+}
+
+// src/adapters/deepagents/list.ts
+import { homedir as homedir5 } from "node:os";
+import { join as join6 } from "node:path";
 async function listDeepAgentsTrajectories(root) {
   const path = resolveStorePath(root);
   if (!safeStat(path))
@@ -2408,13 +2516,13 @@ async function listDeepAgentsTrajectories(root) {
 }
 function resolveStorePath(root) {
   if (root === undefined)
-    return join5(homedir4(), ".deepagents", "sessions.db");
-  return root.endsWith(".db") ? root : join5(root, "sessions.db");
+    return join6(homedir5(), ".deepagents", "sessions.db");
+  return root.endsWith(".db") ? root : join6(root, "sessions.db");
 }
 
 // src/adapters/hermes/list.ts
-import { homedir as homedir5 } from "node:os";
-import { join as join6 } from "node:path";
+import { homedir as homedir6 } from "node:os";
+import { join as join7 } from "node:path";
 async function listHermesTrajectories(root) {
   const path = resolveStorePath2(root);
   if (!safeStat(path))
@@ -2441,27 +2549,27 @@ async function listHermesTrajectories(root) {
 }
 function resolveStorePath2(root) {
   if (root === undefined)
-    return join6(homedir5(), ".hermes", "state.db");
-  return root.endsWith(".db") ? root : join6(root, "state.db");
+    return join7(homedir6(), ".hermes", "state.db");
+  return root.endsWith(".db") ? root : join7(root, "state.db");
 }
 function numeric(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 // src/adapters/letta-code/list.ts
-import { homedir as homedir6 } from "node:os";
-import { join as join7 } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { join as join8 } from "node:path";
 async function listLettaCodeTrajectories(root) {
-  const base = root ?? join7(homedir6(), ".letta", "transcripts");
+  const base = root ?? join8(homedir7(), ".letta", "transcripts");
   const items = [];
   for (const agent of safeReadDir(base)) {
     if (!agent.isDirectory)
       continue;
-    const agentPath = join7(base, agent.name);
+    const agentPath = join8(base, agent.name);
     for (const conversation of safeReadDir(agentPath)) {
       if (!conversation.isDirectory)
         continue;
-      const path = join7(agentPath, conversation.name, "transcript.jsonl");
+      const path = join8(agentPath, conversation.name, "transcript.jsonl");
       const listing = listingFromFile(`${agent.name}/${conversation.name}`, path);
       if (listing && (listing.sizeBytes ?? 0) > 0)
         items.push(listing);
@@ -2472,21 +2580,21 @@ async function listLettaCodeTrajectories(root) {
 
 // src/adapters/openclaw/list.ts
 import { existsSync } from "node:fs";
-import { homedir as homedir7 } from "node:os";
-import { basename as basename3, join as join8 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { basename as basename4, join as join9 } from "node:path";
 async function listOpenClawTrajectories(root) {
   const base = root ?? defaultStateDir();
   const items = [];
-  const agentsPath = join8(base, "agents");
+  const agentsPath = join9(base, "agents");
   for (const agent of safeReadDir(agentsPath)) {
     if (!agent.isDirectory)
       continue;
-    const sessionsPath = join8(agentsPath, agent.name, "sessions");
+    const sessionsPath = join9(agentsPath, agent.name, "sessions");
     for (const entry of safeReadDir(sessionsPath)) {
       if (!entry.isFile || !entry.name.endsWith(".jsonl"))
         continue;
-      const path = join8(sessionsPath, entry.name);
-      const listing = listingFromFile(basename3(entry.name, ".jsonl"), path);
+      const path = join9(sessionsPath, entry.name);
+      const listing = listingFromFile(basename4(entry.name, ".jsonl"), path);
       if (listing)
         items.push(listing);
     }
@@ -2497,22 +2605,22 @@ function defaultStateDir() {
   const override = process.env.OPENCLAW_STATE_DIR?.trim() || process.env.CLAWDBOT_STATE_DIR?.trim();
   if (override)
     return override;
-  const current = join8(homedir7(), ".openclaw");
+  const current = join9(homedir8(), ".openclaw");
   if (existsSync(current))
     return current;
-  return join8(homedir7(), ".clawdbot");
+  return join9(homedir8(), ".clawdbot");
 }
 
 // src/adapters/openhands/list.ts
-import { homedir as homedir8 } from "node:os";
-import { join as join9 } from "node:path";
+import { homedir as homedir9 } from "node:os";
+import { join as join10 } from "node:path";
 async function listOpenHandsTrajectories(root) {
-  const base = root ?? join9(homedir8(), ".openhands", "sessions");
+  const base = root ?? join10(homedir9(), ".openhands", "sessions");
   const items = [];
   for (const entry of safeReadDir(base)) {
     if (!entry.isDirectory)
       continue;
-    const path = join9(base, entry.name);
+    const path = join10(base, entry.name);
     const facts = safeStat(path);
     items.push({
       id: entry.name,
@@ -2524,21 +2632,21 @@ async function listOpenHandsTrajectories(root) {
 }
 
 // src/adapters/pi/list.ts
-import { homedir as homedir9 } from "node:os";
-import { basename as basename4, join as join10 } from "node:path";
+import { homedir as homedir10 } from "node:os";
+import { basename as basename5, join as join11 } from "node:path";
 async function listPiTrajectories(root) {
   const base = root ?? defaultAgentDir();
   const items = [];
-  const sessionsPath = join10(base, "sessions");
+  const sessionsPath = join11(base, "sessions");
   for (const project of safeReadDir(sessionsPath)) {
     if (!project.isDirectory)
       continue;
-    const projectPath = join10(sessionsPath, project.name);
+    const projectPath = join11(sessionsPath, project.name);
     for (const entry of safeReadDir(projectPath)) {
       if (!entry.isFile || !entry.name.endsWith(".jsonl"))
         continue;
-      const path = join10(projectPath, entry.name);
-      const listing = listingFromFile(basename4(entry.name, ".jsonl"), path);
+      const path = join11(projectPath, entry.name);
+      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
       if (listing)
         items.push(listing);
     }
@@ -2549,7 +2657,7 @@ function defaultAgentDir() {
   const override = process.env.PI_CODING_AGENT_DIR?.trim();
   if (override)
     return override;
-  return join10(homedir9(), ".pi", "agent");
+  return join11(homedir10(), ".pi", "agent");
 }
 
 // src/listing.ts
@@ -2558,6 +2666,7 @@ var MAX_LIMIT = 1000;
 var LISTERS = {
   "claude-code": listClaudeCodeTrajectories,
   codex: listCodexTrajectories,
+  droid: listDroidTrajectories,
   deepagents: listDeepAgentsTrajectories,
   hermes: listHermesTrajectories,
   "letta-code": listLettaCodeTrajectories,
@@ -2629,6 +2738,7 @@ function invalidCursor() {
 var ADAPTERS = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  droid: droidAdapter,
   hermes: hermesAdapter,
   "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,

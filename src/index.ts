@@ -1,5 +1,6 @@
 import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
 import { codexAdapter } from "./adapters/codex/index.js";
+import { cursorAdapter } from "./adapters/cursor/index.js";
 import { droidAdapter } from "./adapters/droid/index.js";
 import { geminiCliAdapter } from "./adapters/gemini-cli/index.js";
 import { hermesAdapter } from "./adapters/hermes/index.js";
@@ -30,6 +31,7 @@ import { NormalizationError } from "./types.js";
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  cursor: cursorAdapter,
   droid: droidAdapter,
   "gemini-cli": geminiCliAdapter,
   hermes: hermesAdapter,
@@ -122,8 +124,8 @@ function isPartialTranscript(input: NormalizeInput): boolean {
  * Resolve the authoritative source group. Caller context fills a missing
  * adapter-detected group but must not silently override a detected one: a
  * disagreement fails so the upload can be quarantined. Location-anchored sources
- * (Codex) require a resolved group rather than falling back to a sentinel, which
- * would turn missing context into durable bad identity.
+ * (Codex and Cursor) require a resolved group rather than falling back to a
+ * sentinel, which would turn missing context into durable bad identity.
  */
 function resolveGroupId(
   source: TranscriptTrajectorySource,
@@ -137,10 +139,13 @@ function resolveGroupId(
     );
   }
   const resolved = detected || provided;
-  if (source === "codex" && !resolved) {
+  if ((source === "codex" || source === "cursor") && !resolved) {
+    const sourceLabel = source === "codex" ? "Codex" : "Cursor";
+    const discoveryHint = source === "codex" ? "include session_meta or " : "";
     throw new NormalizationError(
       "source_group_required",
-      "Canonical Codex normalization requires a source group: include session_meta or pass sourceContext.groupId.",
+      `Canonical ${sourceLabel} normalization requires a source group: ` +
+        `${discoveryHint}pass sourceContext.groupId.`,
     );
   }
   return resolved || GROUP_SENTINEL;

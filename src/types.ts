@@ -4,6 +4,7 @@ import type { ResolvedNormalizationFilters } from "./filters.js";
 export type TrajectorySource =
   | "claude-code"
   | "codex"
+  | "cursor"
   | "droid"
   | "gemini-cli"
   | "hermes"

@@ -16,6 +16,8 @@ const fixtures = [
   { source: "claude-code", name: "claude-code/subagent" },
   { source: "codex", name: "codex/tool-calls" },
   { source: "codex", name: "codex/cleanup" },
+  { source: "cursor", name: "cursor/tool-calls" },
+  { source: "cursor", name: "cursor/cleanup" },
   { source: "droid", name: "droid/happy-path" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/cleanup" },
@@ -368,6 +370,47 @@ describe("public API", () => {
         transcript: "{}",
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects an invalid cursor document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "cursor",
+        transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("synthesizes Cursor tool-call ids when the capture omits them", () => {
+    const transcript = [
+      JSON.stringify({
+        role: "user",
+        message: { content: [{ type: "text", text: "Create the file." }] },
+      }),
+      JSON.stringify({
+        role: "assistant",
+        message: {
+          content: [
+            {
+              type: "tool_use",
+              name: "write",
+              input: { path: "note.txt" },
+            },
+          ],
+        },
+      }),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "cursor", transcript });
+    const call = result.records.find(
+      (record) => record.role === "assistant" && record.content === null,
+    );
+    expect(call?.role === "assistant" && call.content === null
+      ? call.tool_calls[0]?.id
+      : undefined).toBe("call_2");
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "tool_call_id_synthesized",
+    );
   });
 
   test("rejects Letta API message arrays", () => {

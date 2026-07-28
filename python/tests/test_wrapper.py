@@ -27,6 +27,8 @@ FIXTURES = (
     ("claude-code", "claude-code/cleanup", "input.jsonl"),
     ("codex", "codex/tool-calls", "input.jsonl"),
     ("codex", "codex/cleanup", "input.jsonl"),
+    ("cursor", "cursor/tool-calls", "input.jsonl"),
+    ("cursor", "cursor/cleanup", "input.jsonl"),
     ("droid", "droid/happy-path", "input.jsonl"),
     ("gemini-cli", "gemini-cli/tool-calls", "input.json"),
     ("gemini-cli", "gemini-cli/cleanup", "input.json"),

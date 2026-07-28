@@ -192,3 +192,22 @@ Sanitized happy-path and cleanup fixtures cover thoughts, prose, linked inline
 tool responses, structured status, unsupported message diagnostics, metadata,
 and canonical native identity. The audit retained no transcript content,
 arguments, results, paths, or identifiers.
+
+## Cursor SWE-chat capture
+
+The Cursor adapter targets the role/message JSONL capture present in the
+public `SALT-NLP/SWE-chat` raw transcripts. A privacy-safe audit covered all 19
+Cursor exports and inspected only aggregate keys, field types, block types,
+and file sizes.
+
+Every observed capture used `text` and `tool_use` content blocks. The corpus
+contained no timestamps, native record IDs, tool-call IDs, or tool results, so
+deterministic synthesized timestamps/call IDs and byte-offset canonical
+identity are expected for this source. All 19 captures normalized successfully
+(1,331 records) when canonical calls were supplied the corpus session ID.
+
+Sanitized fixtures additionally exercise the compatible `thinking` and
+`tool_result` blocks, including native IDs and structured error status when
+present. Cleanup coverage includes malformed lines, unsupported rows/blocks,
+and the required caller-owned canonical group. No source transcript content
+was retained.

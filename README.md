@@ -74,6 +74,7 @@ and is empty when the transcript required no recoverable cleanup.
 | --- | --- | --- |
 | [`claude-code`](src/adapters/claude-code/) | Native Claude Code JSONL | `claude-code` |
 | [`codex`](src/adapters/codex/) | Native Codex rollout JSONL | `codex` |
+| [`cursor`](src/adapters/cursor/) | Cursor role/message content-block JSONL capture | `cursor` |
 | [`droid`](src/adapters/droid/) | Native Droid session JSONL | `droid` |
 | [`gemini-cli`](src/adapters/gemini-cli/) | Native Gemini CLI whole-session JSON | `gemini-cli` |
 | [`hermes`](src/adapters/hermes/) | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
@@ -87,7 +88,7 @@ and is empty when the transcript required no recoverable cleanup.
 
 Tool result records may include `ok: boolean` when the source exposes an
 authoritative structured outcome, such as Pi/OpenClaw `isError`, Claude Code
-`is_error`, Letta Code `resultOk`, OpenHands observation `is_error`, or
+`is_error`, Letta Code `resultOk`, OpenHands/Cursor `is_error`, or
 OpenCode/Gemini terminal state. The field is omitted when the source does not
 expose a reliable status; result text is never interpreted as success or
 failure.
@@ -101,8 +102,9 @@ what the adapter drops.
 `listTrajectories()` enumerates the sessions in a source's standard local
 store, newest first, with cursor pagination. It is a discovery layer beside
 normalization — `normalizeTranscript()` itself never touches the filesystem.
-Gemini CLI and OpenCode are export-only input contracts and intentionally
-return `listing_unavailable`; callers locate and read the exports themselves.
+Cursor, Gemini CLI, and OpenCode are export-only input contracts and
+intentionally return `listing_unavailable`; callers locate and read the
+exports themselves.
 
 ```ts
 import { listTrajectories } from "@letta-ai/trajectory";

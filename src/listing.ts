@@ -110,7 +110,11 @@ export async function listTrajectories(
 }
 
 function isKnownNormalizationOnlySource(source: AnyTrajectorySource): boolean {
-  return source === "gemini-cli" || source === "opencode";
+  return (
+    source === "cursor" ||
+    source === "gemini-cli" ||
+    source === "opencode"
+  );
 }
 
 function resolveLimit(limit: number | undefined): number {

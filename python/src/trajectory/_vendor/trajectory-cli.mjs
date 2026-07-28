@@ -2673,12 +2673,12 @@ function defaultAgentDir() {
 
 // src/adapters/omp/list.ts
 import { existsSync as existsSync2 } from "node:fs";
-import { homedir as homedir10 } from "node:os";
-import { basename as basename5, join as join11 } from "node:path";
+import { homedir as homedir11 } from "node:os";
+import { basename as basename6, join as join12 } from "node:path";
 async function listOmpTrajectories(root) {
   const items = [];
-  const sessionsPath = root ? join11(root, "sessions") : resolveOmpSessionsPath({
-    home: homedir10(),
+  const sessionsPath = root ? join12(root, "sessions") : resolveOmpSessionsPath({
+    home: homedir11(),
     platform: process.platform,
     env: process.env,
     exists: existsSync2
@@ -2686,12 +2686,12 @@ async function listOmpTrajectories(root) {
   for (const project of safeReadDir(sessionsPath)) {
     if (!project.isDirectory)
       continue;
-    const projectPath = join11(sessionsPath, project.name);
+    const projectPath = join12(sessionsPath, project.name);
     for (const entry of safeReadDir(projectPath)) {
       if (!entry.isFile || !entry.name.endsWith(".jsonl"))
         continue;
-      const path = join11(projectPath, entry.name);
-      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
+      const path = join12(projectPath, entry.name);
+      const listing = listingFromFile(basename6(entry.name, ".jsonl"), path);
       if (listing)
         items.push(listing);
     }
@@ -2700,18 +2700,18 @@ async function listOmpTrajectories(root) {
 }
 function resolveOmpSessionsPath(options) {
   const profile = resolveProfile(options.env.OMP_PROFILE, options.env.PI_PROFILE);
-  const configRoot = join11(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
+  const configRoot = join12(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
   const agentOverride = profile ? undefined : options.env.PI_CODING_AGENT_DIR?.trim() || undefined;
-  const agentDir = agentOverride ?? join11(configRoot, "agent");
+  const agentDir = agentOverride ?? join12(configRoot, "agent");
   if (agentOverride === undefined && (options.platform === "linux" || options.platform === "darwin")) {
     const xdgData = options.env.XDG_DATA_HOME?.trim();
     if (xdgData) {
-      const xdgRoot = join11(xdgData, "omp", ...profile ? ["profiles", profile] : []);
+      const xdgRoot = join12(xdgData, "omp", ...profile ? ["profiles", profile] : []);
       if (options.exists(xdgRoot))
-        return join11(xdgRoot, "sessions");
+        return join12(xdgRoot, "sessions");
     }
   }
-  return join11(agentDir, "sessions");
+  return join12(agentDir, "sessions");
 }
 function resolveProfile(ompProfile, piProfile) {
   const value = (ompProfile !== undefined ? ompProfile : piProfile)?.trim();

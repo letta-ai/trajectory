@@ -27,7 +27,8 @@
       "role": "tool",
       "tool_call_id": "toolu_omp_err",
       "content": "Error: File not found: screenshot.png",
-      "timestamp": "2026-07-24T07:00:04.000Z"
+      "timestamp": "2026-07-24T07:00:04.000Z",
+      "ok": false
     },
     {
       "role": "assistant",

@@ -18,6 +18,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"cwd\":\"/home/user/omp-demo\",\"model\":\"claude-sonnet-5\",\"role\":\"meta\",\"source\":\"omp\"}"
     },
     {
@@ -38,6 +39,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Create notes.txt with a short todo list, then show it with bash.\",\"role\":\"user\",\"timestamp\":\"2026-07-24T06:21:03.547Z\"}"
     },
     {
@@ -58,6 +60,7 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"I need to create notes.txt with the requested content, then display it.\",\"role\":\"reasoning\",\"timestamp\":\"2026-07-24T06:21:03.578Z\"}"
     },
     {
@@ -78,6 +81,7 @@
       "tool_name": "write",
       "tool_arguments_json": "{\"path\":\"notes.txt\",\"content\":\"TODO:\\n- collect omp traces\\n- write the adapter\\n\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-07-24T06:21:03.578Z\",\"tool_calls\":[{\"args\":\"{\\\"path\\\":\\\"notes.txt\\\",\\\"content\\\":\\\"TODO:\\\\n- collect omp traces\\\\n- write the adapter\\\\n\\\"}\",\"id\":\"toolu_omp_1\",\"name\":\"write\"}]}"
     },
     {
@@ -89,8 +93,8 @@
       "component_index": 0,
       "record_type": "tool",
       "record_id": "e49c76c1a65b857830e811d054190320a972b4448615eb7b72fe075cf5ffcddb",
-      "record_hash": "1e5a9103848be75a03efea2c8590ae60611c0bb197c7dbdab36d4a61b7cd748c",
-      "content_hash": "8a9fde41836e549c7d271ad10ccbc97bc6344a7ccb80759a9501481544d47bfa",
+      "record_hash": "60d5fa2dc1af4f5d57bd132e645bfcbc7ea5be268ff1e074fab7632f12e4e4ec",
+      "content_hash": "cfabb5b8a3e03b35d42dc565460e200648329eef46acdeae7d79b3577f516688",
       "source_timestamp": "2026-07-24T06:21:03.580Z",
       "record_timestamp": "2026-07-24T06:21:03.580Z",
       "content": null,
@@ -98,7 +102,8 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "Successfully wrote 46 bytes to notes.txt",
-      "record_json": "{\"content\":\"Successfully wrote 46 bytes to notes.txt\",\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.580Z\",\"tool_call_id\":\"toolu_omp_1\"}"
+      "tool_result_ok": true,
+      "record_json": "{\"content\":\"Successfully wrote 46 bytes to notes.txt\",\"ok\":true,\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.580Z\",\"tool_call_id\":\"toolu_omp_1\"}"
     },
     {
       "source_type": "omp",
@@ -118,6 +123,7 @@
       "tool_name": "bash",
       "tool_arguments_json": "{\"command\":\"cat notes.txt\"}",
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-07-24T06:21:03.585Z\",\"tool_calls\":[{\"args\":\"{\\\"command\\\":\\\"cat notes.txt\\\"}\",\"id\":\"toolu_omp_2\",\"name\":\"bash\"}]}"
     },
     {
@@ -129,8 +135,8 @@
       "component_index": 0,
       "record_type": "tool",
       "record_id": "5eed31f706f7da6c188af6ca8468ba116a61c69565d348b15d6b28c975fb3089",
-      "record_hash": "e558621c2415cf75273c661cb11495e923b8f06bc8b8b6207907532b29ece116",
-      "content_hash": "fa8b7fa84b87d3e9949cb6b7e061d5129e3e763dbe7944792a286a007d008113",
+      "record_hash": "e6ba48c72ec6539aa31cc5f0d139676105820f08942fdb06cec953668fc3a3ae",
+      "content_hash": "161e2425f3aa029a9fcdaa6c749d2488c8f39437a57842250bf91122c42f1cfb",
       "source_timestamp": "2026-07-24T06:21:03.640Z",
       "record_timestamp": "2026-07-24T06:21:03.640Z",
       "content": null,
@@ -138,7 +144,8 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": "TODO:\n- collect omp traces\n- write the adapter\n",
-      "record_json": "{\"content\":\"TODO:\\n- collect omp traces\\n- write the adapter\\n\",\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.640Z\",\"tool_call_id\":\"toolu_omp_2\"}"
+      "tool_result_ok": true,
+      "record_json": "{\"content\":\"TODO:\\n- collect omp traces\\n- write the adapter\\n\",\"ok\":true,\"role\":\"tool\",\"timestamp\":\"2026-07-24T06:21:03.640Z\",\"tool_call_id\":\"toolu_omp_2\"}"
     },
     {
       "source_type": "omp",
@@ -158,12 +165,13 @@
       "tool_name": null,
       "tool_arguments_json": null,
       "tool_result_json": null,
+      "tool_result_ok": null,
       "record_json": "{\"content\":\"Done. I created `notes.txt` with a short TODO list and displayed its contents above.\",\"role\":\"assistant\",\"timestamp\":\"2026-07-24T06:21:03.700Z\"}"
     }
   ],
   "diagnostics": [],
   "normalizer_version": "0.2.0",
-  "canonical_schema_version": 1,
+  "canonical_schema_version": 2,
   "config": {
     "bounds": {
       "toolArguments": {

@@ -36,6 +36,8 @@ FIXTURES = (
     ("omp", "omp/cleanup", "input.jsonl"),
     ("openclaw", "openclaw/tool-calls", "input.jsonl"),
     ("openclaw", "openclaw/cleanup", "input.jsonl"),
+    ("opencode", "opencode/tool-calls", "input.json"),
+    ("opencode", "opencode/cleanup", "input.json"),
     ("openhands", "openhands/tool-calls", "input.json"),
     ("openhands", "openhands/cleanup", "input.json"),
     ("pi", "pi/tool-calls", "input.jsonl"),

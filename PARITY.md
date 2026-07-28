@@ -154,3 +154,23 @@ A Python-generated fixture was also opened with the official JavaScript
 JavaScript saver rejected Python's `msgpack` serializer type. The production
 adapter therefore delegates to the official Python saver and message reducer
 instead of decoding SQLite blobs or assuming cross-language wire compatibility.
+
+## OpenCode native export
+
+The OpenCode adapter was implemented against the native-format parser in
+`letta-train` and a privacy-safe structural audit of public
+`SALT-NLP/SWE-chat` raw transcripts. The corpus contained 623 `OpenCode` rows
+plus one lowercase `opencode` row. The audit inspected aggregate keys, field
+types, part/status values, and file sizes without retaining transcript content,
+arguments, results, paths, or identifiers.
+
+Native documents consistently used `{info, messages[].parts[]}`. Sampled tool
+states included `completed`, `error`, and one unfinished `running` call. Part
+IDs, call IDs, millisecond times, model, cwd, output, and string errors are
+preserved. Of 17 native documents in the matched sample, 16 normalized
+successfully (5,380 records); one valid but incomplete user-only session
+correctly failed with `missing_assistant_records`.
+
+Sanitized happy-path and cleanup fixtures cover reasoning, linked calls and
+results, terminal status, metadata, unknown semantic records, and canonical
+native identity. No source transcript content was copied into this repository.

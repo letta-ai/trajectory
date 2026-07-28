@@ -1,0 +1,69 @@
+{
+  "info": {
+    "id": "oc-session-cleanup",
+    "directory": "/workspace/opencode-cleanup",
+    "time": {
+      "created": 1767312000000
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "id": "oc-cleanup-user",
+        "role": "user",
+        "time": {
+          "created": 1767312001000
+        }
+      },
+      "parts": [
+        {
+          "type": "text",
+          "text": "Read the protected file."
+        }
+      ]
+    },
+    {
+      "info": {
+        "id": "oc-cleanup-assistant",
+        "role": "assistant",
+        "modelID": "gpt-test",
+        "time": {
+          "created": 1767312002000
+        }
+      },
+      "parts": [
+        {
+          "type": "step-start"
+        },
+        {
+          "type": "future-semantic-part",
+          "value": "ignored"
+        },
+        {
+          "id": "oc-cleanup-tool",
+          "type": "tool",
+          "callID": "oc-call-error",
+          "tool": "read",
+          "state": {
+            "status": "error",
+            "input": {
+              "path": "protected.txt"
+            },
+            "error": "permission denied",
+            "time": {
+              "start": 1767312003000,
+              "end": 1767312003500
+            }
+          }
+        },
+        {
+          "type": "text",
+          "text": "The file could not be read."
+        },
+        {
+          "type": "step-finish"
+        }
+      ]
+    }
+  ]
+}

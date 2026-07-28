@@ -9,6 +9,7 @@ export type TrajectorySource =
   | "letta-code"
   | "omp"
   | "openclaw"
+  | "opencode"
   | "openhands"
   | "pi";
 

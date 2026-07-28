@@ -1,0 +1,45 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "opencode",
+      "cwd": "/workspace/opencode-cleanup",
+      "model": "gpt-test"
+    },
+    {
+      "role": "user",
+      "content": "Read the protected file.",
+      "timestamp": "2026-01-02T00:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "oc-call-error",
+          "name": "read",
+          "args": "{\"path\":\"protected.txt\"}"
+        }
+      ],
+      "timestamp": "2026-01-02T00:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "oc-call-error",
+      "content": "permission denied",
+      "ok": false,
+      "timestamp": "2026-01-02T00:00:03.500Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The file could not be read.",
+      "timestamp": "2026-01-02T00:00:03.500Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "noise_record_dropped",
+      "message": "Skipped unsupported OpenCode part type \"future-semantic-part\" in message 2."
+    }
+  ]
+}

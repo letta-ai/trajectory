@@ -40,6 +40,13 @@ const goldenFixtures = [
   golden: string;
 }>;
 
+const additionalInvariantFixtures = [
+  { source: "opencode", name: "opencode/tool-calls" },
+] as const satisfies ReadonlyArray<{
+  source: TrajectorySource;
+  name: string;
+}>;
+
 describe("canonical golden fixtures", () => {
   for (const fixture of goldenFixtures) {
     test(fixture.name, () => {
@@ -66,10 +73,12 @@ describe("canonical golden fixtures", () => {
 });
 
 describe("canonical invariants", () => {
-  for (const fixture of goldenFixtures) {
+  for (const fixture of [...goldenFixtures, ...additionalInvariantFixtures]) {
     test(fixture.name, () => {
       const inputFile =
-        fixture.source === "openhands" || fixture.source === "hermes"
+        fixture.source === "openhands" ||
+        fixture.source === "hermes" ||
+        fixture.source === "opencode"
           ? "input.json"
           : "input.jsonl";
       const result = normalizeToCanonical({
@@ -98,6 +107,20 @@ describe("canonical invariants", () => {
       expect([...orderKeys]).toEqual([...orderKeys].sort());
     });
   }
+});
+
+describe("OpenCode source-native identity", () => {
+  test("uses native part and message ids", () => {
+    const result = normalizeToCanonical({
+      source: "opencode",
+      transcript: fixtureText("opencode/tool-calls", "input.json"),
+    });
+    const body = result.records.filter((record) => record.record_type !== "meta");
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.every((record) => record.source_identity_kind === "native")).toBe(
+      true,
+    );
+  });
 });
 
 describe("canonical tool result status", () => {

@@ -79,15 +79,16 @@ and is empty when the transcript required no recoverable cleanup.
 | [`letta-code`](src/adapters/letta-code/) | Letta Code client `transcript.jsonl` | `letta-code` |
 | [`omp`](src/adapters/omp/) | Native OMP (Oh My Pi) coding-agent session JSONL (pi-agent session format) | `omp` |
 | [`openclaw`](src/adapters/openclaw/) | Native OpenClaw session JSONL (pi-agent session format) | `openclaw` |
+| [`opencode`](src/adapters/opencode/) | Native OpenCode `{ "info": ..., "messages": [...] }` session JSON | `opencode` |
 | [`openhands`](src/adapters/openhands/) | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | [`pi`](src/adapters/pi/) | Native pi-coding-agent session JSONL | `pi` |
 | [`deepagents`](src/adapters/deepagents/) | Deep Agents CLI LangGraph SQLite store plus `threadId` | `deepagents` |
 
 Tool result records may include `ok: boolean` when the source exposes an
 authoritative structured outcome, such as Pi/OpenClaw `isError`, Claude Code
-`is_error`, Letta Code `resultOk`, or OpenHands observation `is_error`. The
-field is omitted when the source does not expose a reliable status; result text
-is never interpreted as success or failure.
+`is_error`, Letta Code `resultOk`, OpenHands observation `is_error`, or
+OpenCode terminal state. The field is omitted when the source does not expose
+a reliable status; result text is never interpreted as success or failure.
 
 Each adapter lives in its own folder under [`src/adapters/`](src/adapters/)
 with a README documenting the exact input contract, decoding behavior, and
@@ -98,6 +99,8 @@ what the adapter drops.
 `listTrajectories()` enumerates the sessions in a source's standard local
 store, newest first, with cursor pagination. It is a discovery layer beside
 normalization — `normalizeTranscript()` itself never touches the filesystem.
+OpenCode is an export-only input contract and intentionally returns
+`listing_unavailable`; callers locate and read the export themselves.
 
 ```ts
 import { listTrajectories } from "@letta-ai/trajectory";

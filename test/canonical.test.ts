@@ -664,13 +664,22 @@ describe("meta determinism", () => {
     expect(reversedMeta?.record_hash).toBe(forwardMeta?.record_hash ?? "");
   });
 
-  test("multiple Claude Code session ids are rejected", () => {
+  test("multiple Claude Code session ids require an explicit canonical group", () => {
     const lines = [
       JSON.stringify({ type: "user", uuid: "u-1", sessionId: "s-1", timestamp: "2026-05-01T10:00:00.000Z", message: { role: "user", content: "hi" } }),
       JSON.stringify({ type: "assistant", uuid: "a-1", sessionId: "s-2", timestamp: "2026-05-01T10:00:01.000Z", message: { role: "assistant", content: [{ type: "text", text: "yo" }] } }),
     ];
     expect(() => canonical(lines)).toThrow(
-      expect.objectContaining({ code: "source_group_conflict" }),
+      expect.objectContaining({ code: "source_group_required" }),
+    );
+
+    const result = normalizeToCanonical({
+      source: "claude-code",
+      transcript: lines.join("\n"),
+      sourceContext: { groupId: "resumed-export" },
+    });
+    expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
+      new Set(["resumed-export"]),
     );
   });
 

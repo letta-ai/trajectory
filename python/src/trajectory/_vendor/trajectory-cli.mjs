@@ -216,11 +216,10 @@ var claudeCodeAdapter = {
     if (agentIds.size > 1) {
       throw new NormalizationError("source_group_conflict", `Claude Code subagent transcript contains multiple agent ids: ${[...agentIds].map((id) => JSON.stringify(id)).sort().join(", ")}.`);
     }
-    if (sessionIds.size > 1 && (!standaloneSidechain || agentIds.size === 0)) {
-      throw new NormalizationError("source_group_conflict", `Claude Code transcript contains multiple session ids: ${[...sessionIds].map((id) => JSON.stringify(id)).sort().join(", ")}.`);
-    }
-    const [sessionId] = sessionIds;
+    const sessionId = sessionIds.size === 1 ? sessionIds.values().next().value : undefined;
     const [agentId] = agentIds;
+    const sourceGroupId = agentId ?? sessionId;
+    const sourceGroupAmbiguous = sessionIds.size > 1 && !agentId;
     const cwd = cwdCandidate?.value;
     const gitBranch = branchCandidate?.value;
     return {
@@ -229,7 +228,8 @@ var claudeCodeAdapter = {
         source: "claude-code",
         ...cwd ? { cwd } : {},
         ...gitBranch ? { gitBranch } : {},
-        ...agentId || sessionId ? { sourceGroupId: agentId || sessionId } : {}
+        ...sourceGroupId ? { sourceGroupId } : {},
+        ...sourceGroupAmbiguous ? { sourceGroupAmbiguous: true } : {}
       },
       diagnostics
     };

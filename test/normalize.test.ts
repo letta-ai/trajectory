@@ -127,6 +127,34 @@ describe("source-native tool result status", () => {
     expect(tool?.role === "tool" ? tool.ok : undefined).toBe(true);
   });
 
+  test("normalizes a resumed Claude Code export with multiple session ids", () => {
+    const transcript = [
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        sessionId: "parent-session",
+        message: { role: "user", content: "continue the task" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        sessionId: "resumed-session",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Continuing." }],
+        },
+      }),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "claude-code", transcript });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+  });
+
   test("maps Letta Code resultOk", () => {
     const result = normalizeTranscript({
       source: "letta-code",

@@ -105,6 +105,7 @@ export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
     input.source,
     internal.context.sourceGroupId,
     input.sourceContext?.groupId,
+    internal.context.sourceGroupAmbiguous ?? false,
   );
   return finalizeCanonical(internal, bounds, {
     groupId,
@@ -133,7 +134,14 @@ function resolveGroupId(
   source: TranscriptTrajectorySource,
   detected: string | undefined,
   provided: string | undefined,
+  ambiguous: boolean,
 ): string {
+  if (ambiguous && !provided) {
+    throw new NormalizationError(
+      "source_group_required",
+      `Canonical ${source} normalization found multiple source groups; pass sourceContext.groupId.`,
+    );
+  }
   if (detected && provided && detected !== provided) {
     throw new NormalizationError(
       "source_group_conflict",
@@ -141,7 +149,9 @@ function resolveGroupId(
     );
   }
   const resolved = detected || provided;
-  if ((source === "codex" || source === "cursor") && !resolved) {
+  if (
+    (source === "codex" || source === "cursor") && !resolved
+  ) {
     const sourceLabel = source === "codex" ? "Codex" : "Cursor";
     const discoveryHint = source === "codex" ? "include session_meta or " : "";
     throw new NormalizationError(

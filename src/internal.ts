@@ -85,6 +85,11 @@ export interface SessionContext {
    * source-local sentinel downstream when a source has one implicit group.
    */
   sourceGroupId?: string;
+  /**
+   * The input contains more than one plausible source group. Canonical callers
+   * must provide the authoritative group instead of using a sentinel.
+   */
+  sourceGroupAmbiguous?: boolean;
 }
 
 export interface DecodedSession {

@@ -16,6 +16,11 @@ conversation rows are present, the adapter treats the sidechain as the primary
 conversation and uses its `agentId` as the source group rather than the parent
 `sessionId`.
 
+Resumed or concatenated exports may contain records carrying multiple parent
+`sessionId` values. They remain valid trajectory-v1 input. Canonical callers
+must supply the authoritative export identity through
+`sourceContext.groupId`; the adapter does not guess among the embedded ids.
+
 Dropped input:
 
 - Sidechain records embedded alongside an ordinary parent conversation,

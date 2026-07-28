@@ -200,23 +200,15 @@ export const claudeCodeAdapter: SourceAdapter = {
           .join(", ")}.`,
       );
     }
-    // A standalone subagent is grouped by its own agent id, so parent session-id
-    // drift does not make its identity ambiguous. Ordinary transcripts, and
-    // older subagent transcripts without agentId, still require one session id.
-    if (
-      sessionIds.size > 1 &&
-      (!standaloneSidechain || agentIds.size === 0)
-    ) {
-      throw new NormalizationError(
-        "source_group_conflict",
-        `Claude Code transcript contains multiple session ids: ${[...sessionIds]
-          .map((id) => JSON.stringify(id))
-          .sort()
-          .join(", ")}.`,
-      );
-    }
-    const [sessionId] = sessionIds;
+    // Resumed and concatenated exports can contain records from more than one
+    // parent session. That does not make trajectory-v1 normalization
+    // ambiguous, but canonical identity needs the caller to provide the
+    // authoritative file/session group instead of guessing among them.
+    const sessionId =
+      sessionIds.size === 1 ? sessionIds.values().next().value : undefined;
     const [agentId] = agentIds;
+    const sourceGroupId = agentId ?? sessionId;
+    const sourceGroupAmbiguous = sessionIds.size > 1 && !agentId;
     const cwd = cwdCandidate?.value;
     const gitBranch = branchCandidate?.value;
 
@@ -226,9 +218,8 @@ export const claudeCodeAdapter: SourceAdapter = {
         source: "claude-code",
         ...(cwd ? { cwd } : {}),
         ...(gitBranch ? { gitBranch } : {}),
-        ...(agentId || sessionId
-          ? { sourceGroupId: agentId || sessionId }
-          : {}),
+        ...(sourceGroupId ? { sourceGroupId } : {}),
+        ...(sourceGroupAmbiguous ? { sourceGroupAmbiguous: true } : {}),
       },
       diagnostics,
     };

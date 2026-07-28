@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-trajectory"
-version = "0.2.3"
+version = "0.2.4"
 description = "Normalize native agent transcripts into a shared trajectory format."
 readme = "README.md"
 requires-python = ">=3.10"

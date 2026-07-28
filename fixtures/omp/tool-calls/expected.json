@@ -32,7 +32,8 @@
       "role": "tool",
       "tool_call_id": "toolu_omp_1",
       "content": "Successfully wrote 46 bytes to notes.txt",
-      "timestamp": "2026-07-24T06:21:03.580Z"
+      "timestamp": "2026-07-24T06:21:03.580Z",
+      "ok": true
     },
     {
       "role": "assistant",
@@ -50,7 +51,8 @@
       "role": "tool",
       "tool_call_id": "toolu_omp_2",
       "content": "TODO:\n- collect omp traces\n- write the adapter\n",
-      "timestamp": "2026-07-24T06:21:03.640Z"
+      "timestamp": "2026-07-24T06:21:03.640Z",
+      "ok": true
     },
     {
       "role": "assistant",

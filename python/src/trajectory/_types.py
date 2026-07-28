@@ -3,11 +3,11 @@
 from typing import Literal, TypedDict, Union
 
 TrajectorySource = Literal[
-    "claude-code", "codex", "droid", "hermes", "letta-code", "openclaw", "openhands", "pi"
+    "claude-code", "codex", "droid", "hermes", "letta-code", "omp", "openclaw", "openhands", "pi"
 ]
 CheckpointTrajectorySource = Literal["deepagents"]
 AnyTrajectorySource = Literal[
-    "claude-code", "codex", "droid", "hermes", "letta-code", "openclaw", "openhands", "pi", "deepagents"
+    "claude-code", "codex", "droid", "hermes", "letta-code", "omp", "openclaw", "openhands", "pi", "deepagents"
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 ToolResultPolicy = Literal["include", "omit"]
@@ -43,6 +43,8 @@ NormalizationErrorCode = Literal[
     "missing_user_records",
     "missing_assistant_records",
     "invalid_normalized_transcript",
+    "source_group_required",
+    "source_group_conflict",
 ]
 
 

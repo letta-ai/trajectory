@@ -31,7 +31,7 @@ except (ImportError, ModuleNotFoundError) as error:
         "python_dependency_missing",
         "Reading Deep Agents checkpoints requires Python packages "
         "langgraph and langgraph-checkpoint-sqlite; install the "
-        "letta-trajectory[deepagents] extra in this Python environment "
+        "agent-trajectory[deepagents] extra in this Python environment "
         f"(import error: {error}).",
     )
 

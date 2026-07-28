@@ -22,6 +22,14 @@ The TypeScript package is published as
 npm install @letta-ai/trajectory
 ```
 
+The Python wrapper is published as
+[`agent-trajectory`](https://pypi.org/project/agent-trajectory/) and imports as
+`trajectory`:
+
+```sh
+pip install agent-trajectory
+```
+
 ## Quick start
 
 ```ts

@@ -1,0 +1,45 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "opencode",
+      "cwd": "/workspace/opencode-demo",
+      "model": "gpt-test"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the project notes.",
+      "timestamp": "2026-01-01T00:00:01.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I should list the note files first.",
+      "timestamp": "2026-01-01T00:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "oc-call-1",
+          "name": "glob",
+          "args": "{\"pattern\":\"notes/*.md\"}"
+        }
+      ],
+      "timestamp": "2026-01-01T00:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "oc-call-1",
+      "content": "notes/plan.md",
+      "ok": true,
+      "timestamp": "2026-01-01T00:00:04.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I found the project plan.",
+      "timestamp": "2026-01-01T00:00:04.000Z"
+    }
+  ],
+  "diagnostics": []
+}

@@ -60,7 +60,7 @@ export interface ListTrajectoriesResult {
 
 type SourceLister = (root: string | undefined) => Promise<TrajectoryListing[]>;
 
-const LISTERS: Record<AnyTrajectorySource, SourceLister> = {
+const LISTERS: Partial<Record<AnyTrajectorySource, SourceLister>> = {
   "claude-code": listClaudeCodeTrajectories,
   codex: listCodexTrajectories,
   droid: listDroidTrajectories,
@@ -87,8 +87,10 @@ export async function listTrajectories(
   const lister = LISTERS[input.source];
   if (!lister) {
     throw new NormalizationError(
-      "unknown_source",
-      `Unknown trajectory source ${JSON.stringify(input.source)}. Supported sources: ${Object.keys(LISTERS).join(", ")}.`,
+      input.source === "opencode" ? "listing_unavailable" : "unknown_source",
+      input.source === "opencode"
+        ? `Local trajectory listing is not available for ${JSON.stringify(input.source)}; supply an exported transcript directly to normalizeTranscript().`
+        : `Unknown trajectory source ${JSON.stringify(input.source)}. Supported listing sources: ${Object.keys(LISTERS).join(", ")}.`,
     );
   }
   if (

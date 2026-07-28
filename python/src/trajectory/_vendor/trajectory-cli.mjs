@@ -1222,6 +1222,168 @@ function extractToolResultText(event) {
   return;
 }
 
+// src/adapters/opencode/index.ts
+var TRANSPORT_PART_TYPES = new Set([
+  "file",
+  "patch",
+  "snapshot",
+  "step-finish",
+  "step-start",
+  "subtask"
+]);
+var openCodeAdapter = {
+  source: "opencode",
+  decode(transcript) {
+    const document = parseOpenCodeDocument(transcript);
+    const diagnostics = [];
+    const events = [];
+    const sessionInfo = isObject(document.info) ? document.info : {};
+    let partOrdinal = 0;
+    for (let messageIndex = 0;messageIndex < document.messages.length; messageIndex += 1) {
+      const message = document.messages[messageIndex];
+      if (!isObject(message))
+        continue;
+      const info = isObject(message.info) ? message.info : {};
+      const role = info.role;
+      const messageId = nonemptyString2(info.id);
+      const timestamp = parseTimestamp(isObject(info.time) ? info.time.created : undefined);
+      const model = nonemptyString2(info.modelID);
+      const parts = Array.isArray(message.parts) ? message.parts : [];
+      let messageComponentIndex = 0;
+      let latestTimestamp;
+      const orderedTimestamp = (candidate) => {
+        if (!candidate)
+          return latestTimestamp;
+        if (latestTimestamp && candidate.getTime() < latestTimestamp.getTime()) {
+          return latestTimestamp;
+        }
+        latestTimestamp = candidate;
+        return candidate;
+      };
+      for (const part of parts) {
+        const ordinal = partOrdinal++;
+        if (!isObject(part))
+          continue;
+        const partId = nonemptyString2(part.id);
+        const sourceRecordId = partId ?? messageId;
+        let partComponentIndex = 0;
+        const emit = (event) => {
+          const componentIndex = partId ? partComponentIndex++ : messageId ? messageComponentIndex++ : partComponentIndex++;
+          events.push({
+            ...event,
+            ...sourceRecordId ? { sourceRecordId } : { sourceOffset: ordinal, sourceAnchorKind: "ordinal" },
+            sourceSequence: ordinal,
+            componentIndex
+          });
+        };
+        if (part.type === "text") {
+          if (role !== "user" && role !== "assistant")
+            continue;
+          const partTime = isObject(part.time) ? part.time : {};
+          const eventTimestamp = orderedTimestamp(parseTimestamp(partTime.start) ?? timestamp);
+          emit({
+            type: "message",
+            role,
+            content: stringContent(part.text),
+            ...eventTimestamp ? { timestamp: eventTimestamp } : {},
+            ...model ? { model } : {}
+          });
+          continue;
+        }
+        if (part.type === "reasoning") {
+          const partTime = isObject(part.time) ? part.time : {};
+          const eventTimestamp = orderedTimestamp(parseTimestamp(partTime.start) ?? timestamp);
+          emit({
+            type: "reasoning",
+            content: stringContent(part.text),
+            ...eventTimestamp ? { timestamp: eventTimestamp } : {},
+            ...model ? { model } : {}
+          });
+          continue;
+        }
+        if (part.type === "tool") {
+          const state = isObject(part.state) ? part.state : {};
+          const stateTime = isObject(state.time) ? state.time : {};
+          const callTimestamp = orderedTimestamp(parseTimestamp(stateTime.start) ?? timestamp);
+          const resultTimestamp = orderedTimestamp(parseTimestamp(stateTime.end) ?? callTimestamp);
+          const callId = nonemptyString2(part.callID);
+          const name = nonemptyString2(part.tool);
+          emit({
+            type: "tool_call",
+            args: jsonString(state.input),
+            ...callId ? { id: callId } : {},
+            ...name ? { name } : {},
+            ...callTimestamp ? { timestamp: callTimestamp } : {},
+            ...model ? { model } : {}
+          });
+          const status = nonemptyString2(state.status);
+          const output = state.output !== undefined ? stringContent(state.output) : status === "error" ? errorContent(state.error) : undefined;
+          if (output !== undefined) {
+            emit({
+              type: "tool_result",
+              content: output,
+              ...callId ? { callId } : {},
+              ...status === "completed" ? { ok: true } : status === "error" ? { ok: false } : {},
+              ...resultTimestamp ? { timestamp: resultTimestamp } : {},
+              ...model ? { model } : {}
+            });
+          }
+          continue;
+        }
+        if (typeof part.type === "string" && !TRANSPORT_PART_TYPES.has(part.type)) {
+          diagnostics.push({
+            code: "noise_record_dropped",
+            message: `Skipped unsupported OpenCode part type ${JSON.stringify(part.type)} ` + `in message ${messageIndex + 1}.`
+          });
+        }
+      }
+    }
+    const cwd = nonemptyString2(sessionInfo.directory);
+    const sourceGroupId = nonemptyString2(sessionInfo.id);
+    const createdAt = parseTimestamp(isObject(sessionInfo.time) ? sessionInfo.time.created : undefined);
+    return {
+      events,
+      context: {
+        source: "opencode",
+        ...cwd ? { cwd } : {},
+        ...sourceGroupId ? { sourceGroupId } : {},
+        ...createdAt ? { createdAt } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function parseOpenCodeDocument(transcript) {
+  let parsed;
+  try {
+    parsed = JSON.parse(transcript);
+  } catch {
+    throw invalidOpenCodeTranscript();
+  }
+  if (!isObject(parsed) || !isObject(parsed.info) || !Array.isArray(parsed.messages)) {
+    throw invalidOpenCodeTranscript();
+  }
+  return parsed;
+}
+function nonemptyString2(value) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+function stringContent(value) {
+  if (typeof value === "string")
+    return value;
+  if (value === null || value === undefined)
+    return "";
+  return isObject(value) || Array.isArray(value) ? jsonString(value) : String(value);
+}
+function errorContent(value) {
+  if (isObject(value) && typeof value.message === "string")
+    return value.message;
+  return stringContent(value);
+}
+function invalidOpenCodeTranscript() {
+  return new NormalizationError("invalid_input", "OpenCode transcript must be one JSON document with info and messages arrays of message parts.");
+}
+
 // src/adapters/omp/index.ts
 var ompAdapter = {
   source: "omp",
@@ -2744,7 +2906,7 @@ async function listTrajectories(input) {
   }
   const lister = LISTERS[input.source];
   if (!lister) {
-    throw new NormalizationError("unknown_source", `Unknown trajectory source ${JSON.stringify(input.source)}. Supported sources: ${Object.keys(LISTERS).join(", ")}.`);
+    throw new NormalizationError(input.source === "opencode" ? "listing_unavailable" : "unknown_source", input.source === "opencode" ? `Local trajectory listing is not available for ${JSON.stringify(input.source)}; supply an exported transcript directly to normalizeTranscript().` : `Unknown trajectory source ${JSON.stringify(input.source)}. Supported listing sources: ${Object.keys(LISTERS).join(", ")}.`);
   }
   if (input.root !== undefined && (typeof input.root !== "string" || !input.root)) {
     throw new NormalizationError("invalid_input", "root must be a non-empty string when provided.");
@@ -2806,6 +2968,7 @@ var ADAPTERS = {
   hermes: hermesAdapter,
   "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,
+  opencode: openCodeAdapter,
   openhands: openHandsAdapter,
   pi: piAdapter,
   omp: ompAdapter

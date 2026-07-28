@@ -25,6 +25,8 @@ const fixtures = [
   { source: "omp", name: "omp/cleanup" },
   { source: "openclaw", name: "openclaw/tool-calls" },
   { source: "openclaw", name: "openclaw/cleanup" },
+  { source: "opencode", name: "opencode/tool-calls" },
+  { source: "opencode", name: "opencode/cleanup" },
   { source: "openhands", name: "openhands/tool-calls" },
   { source: "openhands", name: "openhands/cleanup" },
   { source: "pi", name: "pi/tool-calls" },
@@ -48,7 +50,9 @@ describe("golden fixtures", () => {
     test(fixture.name, () => {
       const input = fixtureText(
         fixture.name,
-        fixture.source === "openhands" || fixture.source === "hermes"
+        fixture.source === "openhands" ||
+          fixture.source === "hermes" ||
+          fixture.source === "opencode"
           ? "input.json"
           : "input.jsonl",
       );
@@ -345,6 +349,15 @@ describe("public API", () => {
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });
 
+  test("rejects an invalid opencode document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "opencode",
+        transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
   test("rejects Letta API message arrays", () => {
     expect(() =>
       normalizeTranscript({
@@ -393,7 +406,9 @@ describe("public API", () => {
     test(`omits tool results while retaining calls for ${fixture.source}`, () => {
       const input = fixtureText(
         fixture.name,
-        fixture.source === "openhands" || fixture.source === "hermes"
+        fixture.source === "openhands" ||
+          fixture.source === "hermes" ||
+          fixture.source === "opencode"
           ? "input.json"
           : "input.jsonl",
       );

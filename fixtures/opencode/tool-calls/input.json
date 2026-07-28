@@ -1,0 +1,77 @@
+{
+  "info": {
+    "id": "oc-session-1",
+    "directory": "/workspace/opencode-demo",
+    "version": "1.2.21",
+    "time": {
+      "created": 1767225600000
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "id": "oc-message-user",
+        "role": "user",
+        "sessionID": "oc-session-1",
+        "time": {
+          "created": 1767225601000
+        }
+      },
+      "parts": [
+        {
+          "id": "oc-part-user",
+          "messageID": "oc-message-user",
+          "sessionID": "oc-session-1",
+          "type": "text",
+          "text": "Inspect the project notes."
+        }
+      ]
+    },
+    {
+      "info": {
+        "id": "oc-message-assistant",
+        "role": "assistant",
+        "sessionID": "oc-session-1",
+        "modelID": "gpt-test",
+        "time": {
+          "created": 1767225602000
+        }
+      },
+      "parts": [
+        {
+          "id": "oc-part-reasoning",
+          "messageID": "oc-message-assistant",
+          "sessionID": "oc-session-1",
+          "type": "reasoning",
+          "text": "I should list the note files first."
+        },
+        {
+          "id": "oc-part-tool",
+          "messageID": "oc-message-assistant",
+          "sessionID": "oc-session-1",
+          "type": "tool",
+          "callID": "oc-call-1",
+          "tool": "glob",
+          "state": {
+            "status": "completed",
+            "input": {
+              "pattern": "notes/*.md"
+            },
+            "output": "notes/plan.md",
+            "time": {
+              "start": 1767225603000,
+              "end": 1767225604000
+            }
+          }
+        },
+        {
+          "id": "oc-part-answer",
+          "messageID": "oc-message-assistant",
+          "sessionID": "oc-session-1",
+          "type": "text",
+          "text": "I found the project plan."
+        }
+      ]
+    }
+  ]
+}

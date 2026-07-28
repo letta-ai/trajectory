@@ -90,6 +90,11 @@ export interface SessionContext {
    * must provide the authoritative group instead of using a sentinel.
    */
   sourceGroupAmbiguous?: boolean;
+  /**
+   * The source shape is valid but carries no native grouping metadata.
+   * Canonical callers must provide the authoritative group.
+   */
+  sourceGroupRequired?: boolean;
 }
 
 export interface DecodedSession {

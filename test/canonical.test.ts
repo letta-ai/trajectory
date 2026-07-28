@@ -158,6 +158,45 @@ describe("new source-native identity", () => {
       }),
     ).toThrow(expect.objectContaining({ code: "source_group_required" }));
   });
+
+  test("Gemini CLI messages-only exports require an explicit canonical group", () => {
+    const transcript = JSON.stringify({
+      messages: [
+        { type: "user", content: "Inspect the failure." },
+        { type: "gemini", content: "I will inspect it." },
+      ],
+    });
+
+    expect(() =>
+      normalizeToCanonical({ source: "gemini-cli", transcript }),
+    ).toThrow(expect.objectContaining({ code: "source_group_required" }));
+
+    const result = normalizeToCanonical({
+      source: "gemini-cli",
+      transcript,
+      sourceContext: { groupId: "messages-only-export" },
+    });
+    expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
+      new Set(["messages-only-export"]),
+    );
+  });
+
+  test("Gemini CLI projectHash-only exports retain the default canonical group", () => {
+    const result = normalizeToCanonical({
+      source: "gemini-cli",
+      transcript: JSON.stringify({
+        projectHash: "project-hash",
+        messages: [
+          { type: "user", content: "Inspect the failure." },
+          { type: "gemini", content: "I will inspect it." },
+        ],
+      }),
+    });
+
+    expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
+      new Set(["default"]),
+    );
+  });
 });
 
 describe("canonical tool result status", () => {

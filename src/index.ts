@@ -106,6 +106,7 @@ export function normalizeToCanonical(input: NormalizeInput): CanonicalResult {
     internal.context.sourceGroupId,
     input.sourceContext?.groupId,
     internal.context.sourceGroupAmbiguous ?? false,
+    internal.context.sourceGroupRequired ?? false,
   );
   return finalizeCanonical(internal, bounds, {
     groupId,
@@ -126,8 +127,9 @@ function isPartialTranscript(input: NormalizeInput): boolean {
 /**
  * Resolve the authoritative source group. Caller context fills a missing
  * adapter-detected group but must not silently override a detected one: a
- * disagreement fails so the upload can be quarantined. Location-anchored sources
- * (Codex and Cursor) require a resolved group rather than falling back to a
+ * disagreement fails so the upload can be quarantined. Location-anchored
+ * sources (Codex and Cursor), ambiguous inputs, and native shapes with no
+ * grouping metadata require a resolved group rather than falling back to a
  * sentinel, which would turn missing context into durable bad identity.
  */
 function resolveGroupId(
@@ -135,11 +137,18 @@ function resolveGroupId(
   detected: string | undefined,
   provided: string | undefined,
   ambiguous: boolean,
+  required: boolean,
 ): string {
   if (ambiguous && !provided) {
     throw new NormalizationError(
       "source_group_required",
       `Canonical ${source} normalization found multiple source groups; pass sourceContext.groupId.`,
+    );
+  }
+  if (required && !provided) {
+    throw new NormalizationError(
+      "source_group_required",
+      `Canonical ${source} normalization has no source group; pass sourceContext.groupId.`,
     );
   }
   if (detected && provided && detected !== provided) {
@@ -149,9 +158,7 @@ function resolveGroupId(
     );
   }
   const resolved = detected || provided;
-  if (
-    (source === "codex" || source === "cursor") && !resolved
-  ) {
+  if ((source === "codex" || source === "cursor") && !resolved) {
     const sourceLabel = source === "codex" ? "Codex" : "Cursor";
     const discoveryHint = source === "codex" ? "include session_meta or " : "";
     throw new NormalizationError(

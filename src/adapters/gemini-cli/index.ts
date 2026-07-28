@@ -124,12 +124,15 @@ export const geminiCliAdapter: SourceAdapter = {
     }
 
     const sourceGroupId = nonemptyString(document.sessionId);
+    const sourceGroupRequired =
+      !sourceGroupId && !nonemptyString(document.projectHash);
     const createdAt = parseTimestamp(document.startTime);
     return {
       events,
       context: {
         source: "gemini-cli",
         ...(sourceGroupId ? { sourceGroupId } : {}),
+        ...(sourceGroupRequired ? { sourceGroupRequired: true } : {}),
         ...(createdAt ? { createdAt } : {}),
       },
       diagnostics,
@@ -150,9 +153,7 @@ function parseGeminiDocument(transcript: string): GeminiDocument {
   }
   if (
     !isObject(parsed) ||
-    !Array.isArray(parsed.messages) ||
-    (typeof parsed.sessionId !== "string" &&
-      typeof parsed.projectHash !== "string")
+    !Array.isArray(parsed.messages)
   ) {
     throw invalidGeminiTranscript();
   }
@@ -197,7 +198,6 @@ function stringContent(value: unknown): string {
 function invalidGeminiTranscript(): NormalizationError {
   return new NormalizationError(
     "invalid_input",
-    "Gemini CLI transcript must be one native session JSON document with " +
-      "session metadata and a messages array.",
+    "Gemini CLI transcript must be one native session JSON document with a messages array.",
   );
 }

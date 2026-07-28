@@ -393,6 +393,24 @@ describe("public API", () => {
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });
 
+  test("normalizes a Gemini CLI messages-only export", () => {
+    const result = normalizeTranscript({
+      source: "gemini-cli",
+      transcript: JSON.stringify({
+        messages: [
+          { type: "user", content: "Inspect the failure." },
+          { type: "gemini", content: "I will inspect it." },
+        ],
+      }),
+    });
+
+    expect(result.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+  });
+
   test("rejects an invalid opencode document shape", () => {
     expect(() =>
       normalizeTranscript({

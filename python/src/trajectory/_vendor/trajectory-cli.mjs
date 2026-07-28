@@ -942,12 +942,14 @@ var geminiCliAdapter = {
       }
     }
     const sourceGroupId = nonemptyString2(document.sessionId);
+    const sourceGroupRequired = !sourceGroupId && !nonemptyString2(document.projectHash);
     const createdAt = parseTimestamp(document.startTime);
     return {
       events,
       context: {
         source: "gemini-cli",
         ...sourceGroupId ? { sourceGroupId } : {},
+        ...sourceGroupRequired ? { sourceGroupRequired: true } : {},
         ...createdAt ? { createdAt } : {}
       },
       diagnostics
@@ -961,7 +963,7 @@ function parseGeminiDocument(transcript) {
   } catch {
     throw invalidGeminiTranscript();
   }
-  if (!isObject(parsed) || !Array.isArray(parsed.messages) || typeof parsed.sessionId !== "string" && typeof parsed.projectHash !== "string") {
+  if (!isObject(parsed) || !Array.isArray(parsed.messages)) {
     throw invalidGeminiTranscript();
   }
   return parsed;
@@ -1000,7 +1002,7 @@ function stringContent(value) {
   return isObject(value) || Array.isArray(value) ? jsonString(value) : String(value);
 }
 function invalidGeminiTranscript() {
-  return new NormalizationError("invalid_input", "Gemini CLI transcript must be one native session JSON document with " + "session metadata and a messages array.");
+  return new NormalizationError("invalid_input", "Gemini CLI transcript must be one native session JSON document with a messages array.");
 }
 
 // src/adapters/hermes/index.ts

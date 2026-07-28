@@ -17,6 +17,8 @@ const fixtures = [
   { source: "codex", name: "codex/tool-calls" },
   { source: "codex", name: "codex/cleanup" },
   { source: "droid", name: "droid/happy-path" },
+  { source: "gemini-cli", name: "gemini-cli/tool-calls" },
+  { source: "gemini-cli", name: "gemini-cli/cleanup" },
   { source: "hermes", name: "hermes/tool-calls" },
   { source: "hermes", name: "hermes/cleanup" },
   { source: "letta-code", name: "letta-code/tool-calls" },
@@ -52,6 +54,7 @@ describe("golden fixtures", () => {
         fixture.name,
         fixture.source === "openhands" ||
           fixture.source === "hermes" ||
+          fixture.source === "gemini-cli" ||
           fixture.source === "opencode"
           ? "input.json"
           : "input.jsonl",
@@ -349,6 +352,15 @@ describe("public API", () => {
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
   });
 
+  test("rejects an invalid gemini-cli document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "gemini-cli",
+        transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
   test("rejects an invalid opencode document shape", () => {
     expect(() =>
       normalizeTranscript({
@@ -408,6 +420,7 @@ describe("public API", () => {
         fixture.name,
         fixture.source === "openhands" ||
           fixture.source === "hermes" ||
+          fixture.source === "gemini-cli" ||
           fixture.source === "opencode"
           ? "input.json"
           : "input.jsonl",

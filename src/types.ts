@@ -5,6 +5,7 @@ export type TrajectorySource =
   | "claude-code"
   | "codex"
   | "droid"
+  | "gemini-cli"
   | "hermes"
   | "letta-code"
   | "omp"

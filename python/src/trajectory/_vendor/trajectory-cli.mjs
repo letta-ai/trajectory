@@ -561,6 +561,166 @@ function toolResultContent(content, isError) {
   return isError && !/^error/i.test(text) ? `Error: ${text}` : text;
 }
 
+// src/adapters/gemini-cli/index.ts
+var TERMINAL_TOOL_STATUSES = new Set(["cancelled", "error", "success"]);
+var geminiCliAdapter = {
+  source: "gemini-cli",
+  decode(transcript) {
+    const document = parseGeminiDocument(transcript);
+    const diagnostics = [];
+    const events = [];
+    for (let messageIndex = 0;messageIndex < document.messages.length; messageIndex += 1) {
+      const message = document.messages[messageIndex];
+      if (!isObject(message))
+        continue;
+      const messageType = message.type;
+      if (messageType === "info")
+        continue;
+      const timestamp = parseTimestamp(message.timestamp);
+      const model = nonemptyString(message.model);
+      const sourceRecordId = nonemptyString(message.id);
+      let componentIndex = 0;
+      const emit = (event) => {
+        events.push({
+          ...event,
+          ...sourceRecordId ? { sourceRecordId } : { sourceOffset: messageIndex, sourceAnchorKind: "ordinal" },
+          sourceSequence: messageIndex,
+          componentIndex: componentIndex++
+        });
+      };
+      if (messageType === "user") {
+        emit({
+          type: "message",
+          role: "user",
+          content: blocksText(message.content),
+          ...timestamp ? { timestamp } : {}
+        });
+        continue;
+      }
+      if (messageType !== "gemini") {
+        diagnostics.push({
+          code: "noise_record_dropped",
+          message: `Skipped unsupported Gemini CLI message type ${JSON.stringify(messageType)} ` + `at position ${messageIndex + 1}.`
+        });
+        continue;
+      }
+      if (Array.isArray(message.thoughts)) {
+        for (const thought of message.thoughts) {
+          const content2 = thoughtContent(thought);
+          if (!content2.trim())
+            continue;
+          emit({
+            type: "reasoning",
+            content: content2,
+            ...timestamp ? { timestamp } : {},
+            ...model ? { model } : {}
+          });
+        }
+      }
+      const content = blocksText(message.content);
+      if (content.trim()) {
+        emit({
+          type: "message",
+          role: "assistant",
+          content,
+          ...timestamp ? { timestamp } : {},
+          ...model ? { model } : {}
+        });
+      }
+      if (!Array.isArray(message.toolCalls))
+        continue;
+      for (const rawCall of message.toolCalls) {
+        if (!isObject(rawCall))
+          continue;
+        const callId = nonemptyString(rawCall.id);
+        const name = nonemptyString(rawCall.name);
+        const callTimestamp = parseTimestamp(rawCall.timestamp) ?? timestamp;
+        emit({
+          type: "tool_call",
+          args: jsonString(rawCall.args),
+          ...callId ? { id: callId } : {},
+          ...name ? { name } : {},
+          ...callTimestamp ? { timestamp: callTimestamp } : {},
+          ...model ? { model } : {}
+        });
+        const status = nonemptyString(rawCall.status);
+        const outputs = toolOutputs(rawCall.result);
+        if (outputs.length === 0 && (!status || !TERMINAL_TOOL_STATUSES.has(status))) {
+          continue;
+        }
+        emit({
+          type: "tool_result",
+          content: outputs.join(`
+`),
+          ...callId ? { callId } : {},
+          ...status === "success" ? { ok: true } : status === "error" || status === "cancelled" ? { ok: false } : {},
+          ...callTimestamp ? { timestamp: callTimestamp } : {},
+          ...model ? { model } : {}
+        });
+      }
+    }
+    const sourceGroupId = nonemptyString(document.sessionId);
+    const createdAt = parseTimestamp(document.startTime);
+    return {
+      events,
+      context: {
+        source: "gemini-cli",
+        ...sourceGroupId ? { sourceGroupId } : {},
+        ...createdAt ? { createdAt } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function parseGeminiDocument(transcript) {
+  let parsed;
+  try {
+    parsed = JSON.parse(transcript);
+  } catch {
+    throw invalidGeminiTranscript();
+  }
+  if (!isObject(parsed) || !Array.isArray(parsed.messages) || typeof parsed.sessionId !== "string" && typeof parsed.projectHash !== "string") {
+    throw invalidGeminiTranscript();
+  }
+  return parsed;
+}
+function nonemptyString(value) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+function thoughtContent(value) {
+  if (!isObject(value))
+    return String(value ?? "");
+  return ["subject", "description"].flatMap((key) => typeof value[key] === "string" && value[key] ? [value[key]] : []).join(" — ");
+}
+function toolOutputs(value) {
+  if (!Array.isArray(value))
+    return [];
+  const outputs = [];
+  for (const item of value) {
+    if (!isObject(item) || !isObject(item.functionResponse))
+      continue;
+    const response = item.functionResponse.response;
+    if (!isObject(response))
+      continue;
+    if (response.output !== undefined) {
+      outputs.push(stringContent(response.output));
+    } else if (Object.keys(response).length > 0) {
+      outputs.push(jsonString(response));
+    }
+  }
+  return outputs;
+}
+function stringContent(value) {
+  if (typeof value === "string")
+    return value;
+  if (value === null || value === undefined)
+    return "";
+  return isObject(value) || Array.isArray(value) ? jsonString(value) : String(value);
+}
+function invalidGeminiTranscript() {
+  return new NormalizationError("invalid_input", "Gemini CLI transcript must be one native session JSON document with " + "session metadata and a messages array.");
+}
+
 // src/adapters/hermes/index.ts
 var CONTENT_JSON_PREFIX = "\x00json:";
 var hermesAdapter = {
@@ -833,7 +993,7 @@ var lettaCodeAdapter = {
     for (const { value: row } of rows) {
       if (row.kind !== "reasoning")
         continue;
-      const sourceRecordId = nonemptyString(row.source_message_id) ?? nonemptyString(row.source_line_id);
+      const sourceRecordId = nonemptyString2(row.source_message_id) ?? nonemptyString2(row.source_line_id);
       if (sourceRecordId)
         reasoningRecordIds.add(sourceRecordId);
     }
@@ -856,8 +1016,8 @@ var lettaCodeAdapter = {
         continue;
       }
       const timestamp = parseTimestamp(row.captured_at);
-      const sourceMessageId = nonemptyString(row.source_message_id);
-      const sourceLineId = nonemptyString(row.source_line_id);
+      const sourceMessageId = nonemptyString2(row.source_message_id);
+      const sourceLineId = nonemptyString2(row.source_line_id);
       const sourceRecordId = sourceMessageId ?? sourceLineId;
       const sourceFields = sourceRecordId ? { sourceRecordId } : {
         sourceOffset: line - 1,
@@ -896,10 +1056,10 @@ var lettaCodeAdapter = {
         continue;
       }
       const callId = sourceLineId ?? sourceMessageId ?? `letta-code-tool-line-${line}`;
-      const name = nonemptyString(row.name);
+      const name = nonemptyString2(row.name);
       events.push({
         type: "tool_call",
-        args: nonemptyString(row.argsText) ?? "{}",
+        args: nonemptyString2(row.argsText) ?? "{}",
         inputLine: line,
         ...sourceFields,
         componentIndex: 0,
@@ -934,7 +1094,7 @@ var lettaCodeAdapter = {
     };
   }
 };
-function nonemptyString(value) {
+function nonemptyString2(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function invalidLettaCodeTranscript() {
@@ -1245,9 +1405,9 @@ var openCodeAdapter = {
         continue;
       const info = isObject(message.info) ? message.info : {};
       const role = info.role;
-      const messageId = nonemptyString2(info.id);
+      const messageId = nonemptyString3(info.id);
       const timestamp = parseTimestamp(isObject(info.time) ? info.time.created : undefined);
-      const model = nonemptyString2(info.modelID);
+      const model = nonemptyString3(info.modelID);
       const parts = Array.isArray(message.parts) ? message.parts : [];
       let messageComponentIndex = 0;
       let latestTimestamp;
@@ -1264,7 +1424,7 @@ var openCodeAdapter = {
         const ordinal = partOrdinal++;
         if (!isObject(part))
           continue;
-        const partId = nonemptyString2(part.id);
+        const partId = nonemptyString3(part.id);
         const sourceRecordId = partId ?? messageId;
         let partComponentIndex = 0;
         const emit = (event) => {
@@ -1284,7 +1444,7 @@ var openCodeAdapter = {
           emit({
             type: "message",
             role,
-            content: stringContent(part.text),
+            content: stringContent2(part.text),
             ...eventTimestamp ? { timestamp: eventTimestamp } : {},
             ...model ? { model } : {}
           });
@@ -1295,7 +1455,7 @@ var openCodeAdapter = {
           const eventTimestamp = orderedTimestamp(parseTimestamp(partTime.start) ?? timestamp);
           emit({
             type: "reasoning",
-            content: stringContent(part.text),
+            content: stringContent2(part.text),
             ...eventTimestamp ? { timestamp: eventTimestamp } : {},
             ...model ? { model } : {}
           });
@@ -1306,8 +1466,8 @@ var openCodeAdapter = {
           const stateTime = isObject(state.time) ? state.time : {};
           const callTimestamp = orderedTimestamp(parseTimestamp(stateTime.start) ?? timestamp);
           const resultTimestamp = orderedTimestamp(parseTimestamp(stateTime.end) ?? callTimestamp);
-          const callId = nonemptyString2(part.callID);
-          const name = nonemptyString2(part.tool);
+          const callId = nonemptyString3(part.callID);
+          const name = nonemptyString3(part.tool);
           emit({
             type: "tool_call",
             args: jsonString(state.input),
@@ -1316,8 +1476,8 @@ var openCodeAdapter = {
             ...callTimestamp ? { timestamp: callTimestamp } : {},
             ...model ? { model } : {}
           });
-          const status = nonemptyString2(state.status);
-          const output = state.output !== undefined ? stringContent(state.output) : status === "error" ? errorContent(state.error) : undefined;
+          const status = nonemptyString3(state.status);
+          const output = state.output !== undefined ? stringContent2(state.output) : status === "error" ? errorContent(state.error) : undefined;
           if (output !== undefined) {
             emit({
               type: "tool_result",
@@ -1338,8 +1498,8 @@ var openCodeAdapter = {
         }
       }
     }
-    const cwd = nonemptyString2(sessionInfo.directory);
-    const sourceGroupId = nonemptyString2(sessionInfo.id);
+    const cwd = nonemptyString3(sessionInfo.directory);
+    const sourceGroupId = nonemptyString3(sessionInfo.id);
     const createdAt = parseTimestamp(isObject(sessionInfo.time) ? sessionInfo.time.created : undefined);
     return {
       events,
@@ -1365,10 +1525,10 @@ function parseOpenCodeDocument(transcript) {
   }
   return parsed;
 }
-function nonemptyString2(value) {
+function nonemptyString3(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
-function stringContent(value) {
+function stringContent2(value) {
   if (typeof value === "string")
     return value;
   if (value === null || value === undefined)
@@ -1378,7 +1538,7 @@ function stringContent(value) {
 function errorContent(value) {
   if (isObject(value) && typeof value.message === "string")
     return value.message;
-  return stringContent(value);
+  return stringContent2(value);
 }
 function invalidOpenCodeTranscript() {
   return new NormalizationError("invalid_input", "OpenCode transcript must be one JSON document with info and messages arrays of message parts.");
@@ -2906,7 +3066,7 @@ async function listTrajectories(input) {
   }
   const lister = LISTERS[input.source];
   if (!lister) {
-    throw new NormalizationError(input.source === "opencode" ? "listing_unavailable" : "unknown_source", input.source === "opencode" ? `Local trajectory listing is not available for ${JSON.stringify(input.source)}; supply an exported transcript directly to normalizeTranscript().` : `Unknown trajectory source ${JSON.stringify(input.source)}. Supported listing sources: ${Object.keys(LISTERS).join(", ")}.`);
+    throw new NormalizationError(isKnownNormalizationOnlySource(input.source) ? "listing_unavailable" : "unknown_source", isKnownNormalizationOnlySource(input.source) ? `Local trajectory listing is not available for ${JSON.stringify(input.source)}; supply an exported transcript directly to normalizeTranscript().` : `Unknown trajectory source ${JSON.stringify(input.source)}. Supported listing sources: ${Object.keys(LISTERS).join(", ")}.`);
   }
   if (input.root !== undefined && (typeof input.root !== "string" || !input.root)) {
     throw new NormalizationError("invalid_input", "root must be a non-empty string when provided.");
@@ -2914,6 +3074,9 @@ async function listTrajectories(input) {
   const limit = resolveLimit2(input.limit);
   const items = await lister(input.root);
   return paginate(items, input.cursor, limit);
+}
+function isKnownNormalizationOnlySource(source) {
+  return source === "gemini-cli" || source === "opencode";
 }
 function resolveLimit2(limit) {
   if (limit === undefined)
@@ -2965,6 +3128,7 @@ var ADAPTERS = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
   droid: droidAdapter,
+  "gemini-cli": geminiCliAdapter,
   hermes: hermesAdapter,
   "letta-code": lettaCodeAdapter,
   openclaw: openClawAdapter,

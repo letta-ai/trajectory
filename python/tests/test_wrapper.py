@@ -28,6 +28,8 @@ FIXTURES = (
     ("codex", "codex/tool-calls", "input.jsonl"),
     ("codex", "codex/cleanup", "input.jsonl"),
     ("droid", "droid/happy-path", "input.jsonl"),
+    ("gemini-cli", "gemini-cli/tool-calls", "input.json"),
+    ("gemini-cli", "gemini-cli/cleanup", "input.json"),
     ("hermes", "hermes/tool-calls", "input.json"),
     ("hermes", "hermes/cleanup", "input.json"),
     ("letta-code", "letta-code/tool-calls", "input.jsonl"),

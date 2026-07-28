@@ -1,0 +1,59 @@
+{
+  "sessionId": "gemini-session-1",
+  "projectHash": "project-hash",
+  "startTime": "2026-01-03T00:00:00.000Z",
+  "lastUpdated": "2026-01-03T00:00:04.000Z",
+  "messages": [
+    {
+      "id": "gemini-info",
+      "type": "info",
+      "timestamp": "2026-01-03T00:00:00.000Z",
+      "content": "Harness notice"
+    },
+    {
+      "id": "gemini-user",
+      "type": "user",
+      "timestamp": "2026-01-03T00:00:01.000Z",
+      "content": [
+        {
+          "text": "Read the project overview."
+        }
+      ]
+    },
+    {
+      "id": "gemini-assistant",
+      "type": "gemini",
+      "timestamp": "2026-01-03T00:00:02.000Z",
+      "model": "gemini-test",
+      "thoughts": [
+        {
+          "subject": "Planning",
+          "description": "read the overview first"
+        }
+      ],
+      "content": "I will inspect the overview.",
+      "toolCalls": [
+        {
+          "id": "gemini-call-1",
+          "name": "read_file",
+          "args": {
+            "file_path": "OVERVIEW.md"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "gemini-call-1",
+                "name": "read_file",
+                "response": {
+                  "output": "Project overview"
+                }
+              }
+            }
+          ],
+          "status": "success",
+          "timestamp": "2026-01-03T00:00:03.000Z"
+        }
+      ]
+    }
+  ]
+}

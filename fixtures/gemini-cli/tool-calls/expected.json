@@ -1,0 +1,44 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "gemini-cli",
+      "model": "gemini-test"
+    },
+    {
+      "role": "user",
+      "content": "Read the project overview.",
+      "timestamp": "2026-01-03T00:00:01.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "Planning — read the overview first",
+      "timestamp": "2026-01-03T00:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I will inspect the overview.",
+      "timestamp": "2026-01-03T00:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "gemini-call-1",
+          "name": "read_file",
+          "args": "{\"file_path\":\"OVERVIEW.md\"}"
+        }
+      ],
+      "timestamp": "2026-01-03T00:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "gemini-call-1",
+      "content": "Project overview",
+      "ok": true,
+      "timestamp": "2026-01-03T00:00:03.000Z"
+    }
+  ],
+  "diagnostics": []
+}

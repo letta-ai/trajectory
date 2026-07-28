@@ -1,0 +1,54 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "cursor"
+    },
+    {
+      "role": "user",
+      "content": "Run the failing command.",
+      "timestamp": "2026-01-01T00:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "cursor-call-error",
+          "name": "shell",
+          "args": "{\"command\":\"false\"}"
+        }
+      ],
+      "timestamp": "2026-01-01T00:00:15.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "cursor-call-error",
+      "content": "command failed",
+      "ok": false,
+      "timestamp": "2026-01-01T00:00:30.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 1.",
+      "inputLine": 1
+    },
+    {
+      "code": "noise_record_dropped",
+      "message": "Skipped unsupported Cursor row on line 2.",
+      "inputLine": 2
+    },
+    {
+      "code": "noise_record_dropped",
+      "message": "Skipped unsupported Cursor content block \"future-block\" on line 4.",
+      "inputLine": 4
+    },
+    {
+      "code": "timestamps_synthesized",
+      "message": "Synthesized timestamps for 3 normalized records.",
+      "count": 3
+    }
+  ]
+}

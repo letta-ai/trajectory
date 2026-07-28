@@ -1,0 +1,2 @@
+{"id":"cursor-user","role":"user","message":{"content":[{"type":"text","text":"Build the backend."}]}}
+{"id":"cursor-assistant","role":"assistant","message":{"model":"cursor-test","content":[{"type":"thinking","thinking":"I should start with the API."},{"type":"text","text":"Starting with the API."},{"type":"tool_use","id":"cursor-call-1","name":"write","input":{"path":"api.ts"}}]}}

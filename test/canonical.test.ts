@@ -41,6 +41,7 @@ const goldenFixtures = [
 }>;
 
 const additionalInvariantFixtures = [
+  { source: "cursor", name: "cursor/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "opencode", name: "opencode/tool-calls" },
 ] as const satisfies ReadonlyArray<{
@@ -86,6 +87,9 @@ describe("canonical invariants", () => {
       const result = normalizeToCanonical({
         source: fixture.source,
         transcript: fixtureText(fixture.name, inputFile),
+        ...(fixture.source === "cursor"
+          ? { sourceContext: { groupId: "cursor-session" } }
+          : {}),
       });
 
       const first = result.records[0];
@@ -112,7 +116,9 @@ describe("canonical invariants", () => {
 });
 
 describe("new source-native identity", () => {
-  for (const fixture of additionalInvariantFixtures) {
+  for (const fixture of additionalInvariantFixtures.filter(
+    ({ source }) => source !== "cursor",
+  )) {
     test(fixture.source, () => {
       const result = normalizeToCanonical({
         source: fixture.source,
@@ -125,6 +131,28 @@ describe("new source-native identity", () => {
       );
     });
   }
+
+  test("Cursor falls back to stable JSONL byte offsets when row ids are absent", () => {
+    const result = normalizeToCanonical({
+      source: "cursor",
+      transcript: fixtureText("cursor/cleanup", "input.jsonl"),
+      sourceContext: { groupId: "cursor-cleanup-session" },
+    });
+    const body = result.records.filter((record) => record.record_type !== "meta");
+    expect(body.length).toBeGreaterThan(0);
+    expect(body.every((record) => record.source_identity_kind === "location")).toBe(
+      true,
+    );
+  });
+
+  test("Cursor canonical normalization requires the caller's session id", () => {
+    expect(() =>
+      normalizeToCanonical({
+        source: "cursor",
+        transcript: fixtureText("cursor/tool-calls", "input.jsonl"),
+      }),
+    ).toThrow(expect.objectContaining({ code: "source_group_required" }));
+  });
 });
 
 describe("canonical tool result status", () => {

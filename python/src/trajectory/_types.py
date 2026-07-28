@@ -3,11 +3,11 @@
 from typing import Literal, TypedDict, Union
 
 TrajectorySource = Literal[
-    "claude-code", "codex", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi"
+    "claude-code", "codex", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi"
 ]
 CheckpointTrajectorySource = Literal["deepagents"]
 AnyTrajectorySource = Literal[
-    "claude-code", "codex", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi", "deepagents"
+    "claude-code", "codex", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi", "deepagents"
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 ToolResultPolicy = Literal["include", "omit"]

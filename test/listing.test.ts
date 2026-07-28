@@ -127,7 +127,7 @@ afterAll(() => {
 
 describe("listTrajectories", () => {
   test("reports normalization-only sources without pretending to discover a store", async () => {
-    for (const source of ["gemini-cli", "opencode"] as const) {
+    for (const source of ["cursor", "gemini-cli", "opencode"] as const) {
       await expect(listTrajectories({ source })).rejects.toEqual(
         expect.objectContaining({ code: "listing_unavailable" }),
       );

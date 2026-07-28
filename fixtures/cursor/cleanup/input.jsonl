@@ -1,0 +1,5 @@
+{not-json
+{"role":"system","message":{"content":"transport"}}
+{"role":"user","message":{"content":"Run the failing command."}}
+{"role":"assistant","message":{"content":[{"type":"tool_use","id":"cursor-call-error","name":"shell","input":{"command":"false"}},{"type":"future-block","value":"ignored"}]}}
+{"role":"user","message":{"content":[{"type":"tool_result","tool_use_id":"cursor-call-error","content":[{"type":"text","text":"command failed"}],"is_error":true}]}}

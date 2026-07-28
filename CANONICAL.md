@@ -69,16 +69,17 @@ normalizeToCanonical({ source, transcript, sourceContext: { groupId, baseByteOff
   can be quarantined.
 - `baseByteOffset` — the absolute UTF-8 byte offset of this transcript within its
   source generation. It is added only to **byte-anchored** location identities
-  (Codex and id-less Claude Code/OpenClaw rows), making them stable regardless
-  of chunk boundaries. Ordinal anchors (Deep Agents) ignore it, and the
+  (Codex, Cursor, and id-less Claude Code/OpenClaw rows), making them stable
+  regardless of chunk boundaries. Ordinal anchors (Deep Agents) ignore it, and the
   anchor unit is part of the identity so byte and ordinal anchors never collide.
 
-Codex is `location`-anchored and therefore **requires** a resolved group
-(detected `session_meta` or `sourceContext.groupId`); it fails with
-`source_group_required` rather than falling back to the `default` sentinel, which
-would turn missing context into durable bad identity. Absolute byte offsets are
-only stable within one append-only generation; a truncation/replacement is a new
-generation upstream (worker-owned).
+Codex and Cursor are `location`-anchored and therefore **require** a resolved
+group. Codex may detect it from `session_meta`; Cursor's capture has no session
+field, so its caller passes `sourceContext.groupId`. Both fail with
+`source_group_required` rather than falling back to the `default` sentinel,
+which would turn missing context into durable bad identity. Absolute byte
+offsets are only stable within one append-only generation; a
+truncation/replacement is a new generation upstream (worker-owned).
 
 Both `normalizeTranscript()` and `normalizeToCanonical()` support
 **partial-transcript semantics** for a fragment of a larger conversation.
@@ -122,8 +123,9 @@ confidently it can interpret conflicts:
   `source_message_id`/`source_line_id`, OpenHands event `id`). Supports
   exact-duplicate dedup **and** conflicting-version detection.
 - `location` — a stable source-native location anchor when no native id exists:
-  an absolute UTF-8 byte offset for Codex and id-less Claude Code/OpenClaw rows
-  (chunkable via `baseByteOffset`), a whole-decode ordinal for Deep Agents, or
+  an absolute UTF-8 byte offset for Codex, Cursor, and id-less Claude
+  Code/OpenClaw rows (chunkable via `baseByteOffset`), a whole-decode ordinal for
+  Deep Agents, or
   the JSONL row position for id-less Letta Code rows.
   The anchor unit is part of the identity, so byte and ordinal anchors never
   collide. Supports dedup and conflict detection for append-only assembly.

@@ -14,7 +14,7 @@ on:
 
 jobs:
   publish:
-    name: Bump, release, and publish to npm
+    name: Bump, release, and publish to npm and PyPI
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -44,6 +44,11 @@ jobs:
         with:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.10"
 
       - name: Bump version
         id: version
@@ -105,19 +110,41 @@ jobs:
             echo "is_prerelease=false" >> $GITHUB_OUTPUT
           fi
 
+          # npm prerelease versions ("0.3.0-next.1") are not valid PEP 440, so
+          # the Python distribution carries the normalized equivalent
+          # ("0.3.0rc1"). Stable releases are identical on both sides.
+          PY_VERSION=$(python3 - "$NEW_VERSION" <<'PY'
+          import re
+          import sys
+
+          version = sys.argv[1]
+          match = re.fullmatch(r"(\d+\.\d+\.\d+)(?:-([0-9A-Za-z-]+)\.(\d+))?", version)
+          if match is None:
+              sys.exit(f"Cannot derive a PEP 440 version from {version!r}.")
+
+          base, tag, number = match.groups()
+          if tag is None:
+              print(base)
+          else:
+              labels = {"a": "a", "alpha": "a", "b": "b", "beta": "b"}
+              print(f"{base}{labels.get(tag.lower(), 'rc')}{number}")
+          PY
+          )
+
           # The version is pinned in four places that version.test.ts (and the
           # Python parity tests) keep in lockstep; bump all of them together.
           jq --arg version "$NEW_VERSION" '.version = $version' package.json > package.json.tmp
           mv package.json.tmp package.json
           sed -i "s/^export const NORMALIZER_VERSION = \".*\";$/export const NORMALIZER_VERSION = \"$NEW_VERSION\";/" src/version.ts
-          sed -i "s/^version = \".*\"$/version = \"$NEW_VERSION\"/" pyproject.toml
-          sed -i "s/^__version__ = \".*\"$/__version__ = \"$NEW_VERSION\"/" python/src/trajectory/__init__.py
+          sed -i "s/^version = \".*\"$/version = \"$PY_VERSION\"/" pyproject.toml
+          sed -i "s/^__version__ = \".*\"$/__version__ = \"$PY_VERSION\"/" python/src/trajectory/__init__.py
           grep -q "NORMALIZER_VERSION = \"$NEW_VERSION\"" src/version.ts
-          grep -q "version = \"$NEW_VERSION\"" pyproject.toml
-          grep -q "__version__ = \"$NEW_VERSION\"" python/src/trajectory/__init__.py
+          grep -q "version = \"$PY_VERSION\"" pyproject.toml
+          grep -q "__version__ = \"$PY_VERSION\"" python/src/trajectory/__init__.py
 
           echo "old_version=$OLD_VERSION" >> $GITHUB_OUTPUT
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "py_version=$PY_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 
       - name: Install dependencies
@@ -125,6 +152,17 @@ jobs:
 
       - name: Verify (typecheck, test, build)
         run: bun run check
+
+      - name: Verify Python parity
+        run: PYTHONPATH=python/src python -m unittest discover -s python/tests -v
+
+      # Built before anything is published so a packaging failure cannot leave
+      # npm and PyPI out of sync. `--outdir` avoids clobbering the tsc `dist/`.
+      - name: Build Python distributions
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build --outdir dist-python
+          python -m twine check --strict dist-python/*
 
       - name: Commit and push version bump
         run: |
@@ -148,3 +186,9 @@ jobs:
         run: npm publish --access public --provenance --tag ${{ steps.version.outputs.npm_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish to PyPI
+        run: python -m twine upload --non-interactive dist-python/*
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}

@@ -31,7 +31,7 @@ wrapper reuses its own interpreter automatically, and its optional extra
 installs the LangGraph dependencies:
 
 ```sh
-pip install "letta-trajectory[deepagents] @ git+ssh://git@github.com/letta-ai/trajectory.git"
+pip install "agent-trajectory[deepagents]"
 ```
 
 ```python

@@ -3,7 +3,7 @@ requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "letta-trajectory"
+name = "agent-trajectory"
 version = "0.2.2"
 description = "Normalize native agent transcripts into a shared trajectory format."
 readme = "README.md"

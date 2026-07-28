@@ -211,3 +211,20 @@ Sanitized fixtures additionally exercise the compatible `thinking` and
 present. Cleanup coverage includes malformed lines, unsupported rows/blocks,
 and the required caller-owned canonical group. No source transcript content
 was retained.
+
+## GitHub Copilot CLI event export
+
+The Copilot CLI adapter was checked against both event streams in the public
+`SALT-NLP/SWE-chat` raw transcripts and the native-format parser in
+`letta-train`. The privacy-safe audit inspected event/data keys, value types,
+status values, and file sizes without retaining transcript prose, arguments,
+results, paths, or identifiers.
+
+Both captures exercised user-prompt hooks, plaintext `reasoningText`, tool
+requests, successful results, and structured failed executions
+(`success: false` with `{code, message}` errors). Both normalized successfully
+(717 records).
+
+Sanitized happy-path and cleanup fixtures cover session metadata, native event
+identity, reasoning, linked calls/results, success/failure status, duplicated
+transport events, malformed lines, and unsupported-event diagnostics.

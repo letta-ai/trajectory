@@ -1,0 +1,6 @@
+{not-json
+{"id":"copilot-cleanup-start","type":"session.start","timestamp":"2026-01-06T00:00:00.000Z","data":{"sessionId":"copilot-session-cleanup","startTime":"2026-01-06T00:00:00.000Z","context":{"cwd":"/workspace/copilot-cleanup","branch":"cleanup"}}}
+{"id":"copilot-cleanup-user","type":"hook.start","timestamp":"2026-01-06T00:00:01.000Z","data":{"hookType":"userPromptSubmitted","input":{"sessionId":"copilot-session-cleanup","prompt":"Run the command.","cwd":"/workspace/copilot-cleanup","timestamp":1767657601000}}}
+{"id":"copilot-cleanup-assistant","type":"assistant.message","timestamp":"2026-01-06T00:00:02.000Z","data":{"content":"","toolRequests":[{"toolCallId":"copilot-call-error","name":"shell","arguments":"not-json"}]}}
+{"id":"copilot-cleanup-result","type":"tool.execution_complete","timestamp":"2026-01-06T00:00:03.000Z","data":{"toolCallId":"copilot-call-error","model":"copilot-test","success":false,"error":{"code":"failed","message":"command failed"}}}
+{"id":"copilot-future","type":"future.event","timestamp":"2026-01-06T00:00:04.000Z","data":{"value":"ignored"}}

@@ -16,6 +16,8 @@ const fixtures = [
   { source: "claude-code", name: "claude-code/subagent" },
   { source: "codex", name: "codex/tool-calls" },
   { source: "codex", name: "codex/cleanup" },
+  { source: "copilot-cli", name: "copilot-cli/tool-calls" },
+  { source: "copilot-cli", name: "copilot-cli/cleanup" },
   { source: "cursor", name: "cursor/tool-calls" },
   { source: "cursor", name: "cursor/cleanup" },
   { source: "droid", name: "droid/happy-path" },
@@ -367,6 +369,15 @@ describe("public API", () => {
     expect(() =>
       normalizeTranscript({
         source: "opencode",
+        transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects an invalid copilot-cli document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "copilot-cli",
         transcript: "{}",
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));

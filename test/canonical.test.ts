@@ -41,6 +41,7 @@ const goldenFixtures = [
 }>;
 
 const additionalInvariantFixtures = [
+  { source: "copilot-cli", name: "copilot-cli/tool-calls" },
   { source: "cursor", name: "cursor/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "opencode", name: "opencode/tool-calls" },
@@ -120,9 +121,13 @@ describe("new source-native identity", () => {
     ({ source }) => source !== "cursor",
   )) {
     test(fixture.source, () => {
+      const inputFile =
+        fixture.source === "gemini-cli" || fixture.source === "opencode"
+          ? "input.json"
+          : "input.jsonl";
       const result = normalizeToCanonical({
         source: fixture.source,
-        transcript: fixtureText(fixture.name, "input.json"),
+        transcript: fixtureText(fixture.name, inputFile),
       });
       const body = result.records.filter((record) => record.record_type !== "meta");
       expect(body.length).toBeGreaterThan(0);

@@ -1,0 +1,53 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "copilot-cli",
+      "cwd": "/workspace/copilot-cleanup",
+      "git_branch": "cleanup",
+      "model": "copilot-test"
+    },
+    {
+      "role": "user",
+      "content": "Run the command.",
+      "timestamp": "2026-01-06T00:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "copilot-call-error",
+          "name": "shell",
+          "args": "{\"_raw\":\"not-json\"}"
+        }
+      ],
+      "timestamp": "2026-01-06T00:00:02.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "copilot-call-error",
+      "content": "command failed",
+      "ok": false,
+      "timestamp": "2026-01-06T00:00:03.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 1.",
+      "inputLine": 1
+    },
+    {
+      "code": "noise_record_dropped",
+      "message": "Skipped unsupported Copilot CLI event on line 6.",
+      "inputLine": 6
+    },
+    {
+      "code": "tool_arguments_reshaped",
+      "message": "Reshaped arguments for tool call \"copilot-call-error\" into a JSON object.",
+      "recordIndex": 2,
+      "inputLine": 4
+    }
+  ]
+}

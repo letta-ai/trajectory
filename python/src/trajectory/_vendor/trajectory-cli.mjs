@@ -467,6 +467,193 @@ function outputText(output) {
   return output == null ? "" : String(output);
 }
 
+// src/adapters/copilot-cli/index.ts
+var KNOWN_EVENT_TYPES = new Set([
+  "abort",
+  "assistant.message",
+  "assistant.turn_end",
+  "assistant.turn_start",
+  "hook.end",
+  "hook.start",
+  "session.compaction_complete",
+  "session.compaction_start",
+  "session.info",
+  "session.mode_changed",
+  "session.model_change",
+  "session.plan_changed",
+  "session.resume",
+  "session.shutdown",
+  "session.start",
+  "session.task_complete",
+  "system.notification",
+  "tool.execution_complete",
+  "tool.execution_start",
+  "user.message"
+]);
+var copilotCliAdapter = {
+  source: "copilot-cli",
+  decode(transcript) {
+    const diagnostics = [];
+    const rows = parseJsonLines(transcript, diagnostics);
+    const events = [];
+    let recognizedRows = 0;
+    let cwd;
+    let gitBranch;
+    let model;
+    let sourceGroupId;
+    let createdAt;
+    for (const { value: row } of rows) {
+      if (typeof row.type !== "string" || !KNOWN_EVENT_TYPES.has(row.type))
+        continue;
+      const data = isObject(row.data) ? row.data : {};
+      if (row.type === "session.start") {
+        sourceGroupId ??= nonemptyString(data.sessionId);
+        createdAt ??= parseTimestamp(data.startTime);
+        const context = isObject(data.context) ? data.context : {};
+        cwd ??= nonemptyString(context.cwd);
+        gitBranch ??= nonemptyString(context.branch);
+      } else if (row.type === "hook.start" && data.hookType === "userPromptSubmitted") {
+        const input = isObject(data.input) ? data.input : {};
+        sourceGroupId ??= nonemptyString(input.sessionId);
+        cwd ??= nonemptyString(input.cwd);
+      } else if (row.type === "tool.execution_complete") {
+        model ??= nonemptyString(data.model);
+      } else if (row.type === "session.model_change") {
+        model ??= nonemptyString(data.newModel);
+      } else if (row.type === "session.shutdown") {
+        model ??= nonemptyString(data.currentModel);
+      }
+    }
+    for (const { value: row, line, byteOffset } of rows) {
+      const rowType = row.type;
+      if (typeof rowType !== "string" || !KNOWN_EVENT_TYPES.has(rowType)) {
+        diagnostics.push({
+          code: "noise_record_dropped",
+          message: `Skipped unsupported Copilot CLI event on line ${line}.`,
+          inputLine: line
+        });
+        continue;
+      }
+      recognizedRows += 1;
+      const data = isObject(row.data) ? row.data : {};
+      const timestamp = parseTimestamp(row.timestamp);
+      const sourceRecordId = nonemptyString(row.id);
+      let componentIndex = 0;
+      const emit = (event) => {
+        events.push({
+          ...event,
+          ...sourceRecordId ? { sourceRecordId } : { sourceOffset: byteOffset, sourceAnchorKind: "byte" },
+          sourceSequence: line - 1,
+          componentIndex: componentIndex++,
+          inputLine: line
+        });
+      };
+      if (rowType === "hook.start" && data.hookType === "userPromptSubmitted") {
+        const input = isObject(data.input) ? data.input : {};
+        const promptTimestamp = parseTimestamp(input.timestamp) ?? timestamp;
+        emit({
+          type: "message",
+          role: "user",
+          content: typeof input.prompt === "string" ? input.prompt : "",
+          ...promptTimestamp ? { timestamp: promptTimestamp } : {}
+        });
+        continue;
+      }
+      if (rowType === "assistant.message") {
+        const eventModel = nonemptyString(data.model);
+        if (typeof data.reasoningText === "string" && data.reasoningText.trim()) {
+          emit({
+            type: "reasoning",
+            content: data.reasoningText,
+            ...timestamp ? { timestamp } : {},
+            ...eventModel ? { model: eventModel } : {}
+          });
+        }
+        if (typeof data.content === "string" && data.content.trim()) {
+          emit({
+            type: "message",
+            role: "assistant",
+            content: data.content,
+            ...timestamp ? { timestamp } : {},
+            ...eventModel ? { model: eventModel } : {}
+          });
+        }
+        if (Array.isArray(data.toolRequests)) {
+          for (const request of data.toolRequests) {
+            if (!isObject(request))
+              continue;
+            const callId = nonemptyString(request.toolCallId);
+            const name = nonemptyString(request.name);
+            emit({
+              type: "tool_call",
+              args: typeof request.arguments === "string" ? request.arguments : jsonString(request.arguments),
+              ...callId ? { id: callId } : {},
+              ...name ? { name } : {},
+              ...timestamp ? { timestamp } : {},
+              ...eventModel ? { model: eventModel } : {}
+            });
+          }
+        }
+        continue;
+      }
+      if (rowType === "tool.execution_complete") {
+        const callId = nonemptyString(data.toolCallId);
+        const eventModel = nonemptyString(data.model);
+        emit({
+          type: "tool_result",
+          content: copilotResultContent(data),
+          ...callId ? { callId } : {},
+          ...typeof data.success === "boolean" ? { ok: data.success } : {},
+          ...timestamp ? { timestamp } : {},
+          ...eventModel ? { model: eventModel } : {}
+        });
+      }
+    }
+    if (recognizedRows === 0)
+      throw invalidCopilotTranscript();
+    return {
+      events,
+      context: {
+        source: "copilot-cli",
+        ...cwd ? { cwd } : {},
+        ...gitBranch ? { gitBranch } : {},
+        ...model ? { model } : {},
+        ...sourceGroupId ? { sourceGroupId } : {},
+        ...createdAt ? { createdAt } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function nonemptyString(value) {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+function copilotResultContent(data) {
+  if (isObject(data.result)) {
+    const content = data.result.content;
+    if (typeof content === "string")
+      return content;
+    if (content !== undefined)
+      return stringifyContent(content);
+  }
+  if (isObject(data.error) && typeof data.error.message === "string") {
+    return data.error.message;
+  }
+  if (data.error !== undefined)
+    return stringifyContent(data.error);
+  return "";
+}
+function stringifyContent(value) {
+  if (typeof value === "string")
+    return value;
+  if (value === null || value === undefined)
+    return "";
+  return isObject(value) || Array.isArray(value) ? jsonString(value) : String(value);
+}
+function invalidCopilotTranscript() {
+  return new NormalizationError("invalid_input", "Copilot CLI transcript must be native event JSONL with recognized type and data records.");
+}
+
 // src/adapters/cursor/index.ts
 var cursorAdapter = {
   source: "cursor",
@@ -672,8 +859,8 @@ var geminiCliAdapter = {
       if (messageType === "info")
         continue;
       const timestamp = parseTimestamp(message.timestamp);
-      const model = nonemptyString(message.model);
-      const sourceRecordId = nonemptyString(message.id);
+      const model = nonemptyString2(message.model);
+      const sourceRecordId = nonemptyString2(message.id);
       let componentIndex = 0;
       const emit = (event) => {
         events.push({
@@ -727,8 +914,8 @@ var geminiCliAdapter = {
       for (const rawCall of message.toolCalls) {
         if (!isObject(rawCall))
           continue;
-        const callId = nonemptyString(rawCall.id);
-        const name = nonemptyString(rawCall.name);
+        const callId = nonemptyString2(rawCall.id);
+        const name = nonemptyString2(rawCall.name);
         const callTimestamp = parseTimestamp(rawCall.timestamp) ?? timestamp;
         emit({
           type: "tool_call",
@@ -738,7 +925,7 @@ var geminiCliAdapter = {
           ...callTimestamp ? { timestamp: callTimestamp } : {},
           ...model ? { model } : {}
         });
-        const status = nonemptyString(rawCall.status);
+        const status = nonemptyString2(rawCall.status);
         const outputs = toolOutputs(rawCall.result);
         if (outputs.length === 0 && (!status || !TERMINAL_TOOL_STATUSES.has(status))) {
           continue;
@@ -754,7 +941,7 @@ var geminiCliAdapter = {
         });
       }
     }
-    const sourceGroupId = nonemptyString(document.sessionId);
+    const sourceGroupId = nonemptyString2(document.sessionId);
     const createdAt = parseTimestamp(document.startTime);
     return {
       events,
@@ -779,7 +966,7 @@ function parseGeminiDocument(transcript) {
   }
   return parsed;
 }
-function nonemptyString(value) {
+function nonemptyString2(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function thoughtContent(value) {
@@ -1088,7 +1275,7 @@ var lettaCodeAdapter = {
     for (const { value: row } of rows) {
       if (row.kind !== "reasoning")
         continue;
-      const sourceRecordId = nonemptyString2(row.source_message_id) ?? nonemptyString2(row.source_line_id);
+      const sourceRecordId = nonemptyString3(row.source_message_id) ?? nonemptyString3(row.source_line_id);
       if (sourceRecordId)
         reasoningRecordIds.add(sourceRecordId);
     }
@@ -1111,8 +1298,8 @@ var lettaCodeAdapter = {
         continue;
       }
       const timestamp = parseTimestamp(row.captured_at);
-      const sourceMessageId = nonemptyString2(row.source_message_id);
-      const sourceLineId = nonemptyString2(row.source_line_id);
+      const sourceMessageId = nonemptyString3(row.source_message_id);
+      const sourceLineId = nonemptyString3(row.source_line_id);
       const sourceRecordId = sourceMessageId ?? sourceLineId;
       const sourceFields = sourceRecordId ? { sourceRecordId } : {
         sourceOffset: line - 1,
@@ -1151,10 +1338,10 @@ var lettaCodeAdapter = {
         continue;
       }
       const callId = sourceLineId ?? sourceMessageId ?? `letta-code-tool-line-${line}`;
-      const name = nonemptyString2(row.name);
+      const name = nonemptyString3(row.name);
       events.push({
         type: "tool_call",
-        args: nonemptyString2(row.argsText) ?? "{}",
+        args: nonemptyString3(row.argsText) ?? "{}",
         inputLine: line,
         ...sourceFields,
         componentIndex: 0,
@@ -1189,7 +1376,7 @@ var lettaCodeAdapter = {
     };
   }
 };
-function nonemptyString2(value) {
+function nonemptyString3(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function invalidLettaCodeTranscript() {
@@ -1500,9 +1687,9 @@ var openCodeAdapter = {
         continue;
       const info = isObject(message.info) ? message.info : {};
       const role = info.role;
-      const messageId = nonemptyString3(info.id);
+      const messageId = nonemptyString4(info.id);
       const timestamp = parseTimestamp(isObject(info.time) ? info.time.created : undefined);
-      const model = nonemptyString3(info.modelID);
+      const model = nonemptyString4(info.modelID);
       const parts = Array.isArray(message.parts) ? message.parts : [];
       let messageComponentIndex = 0;
       let latestTimestamp;
@@ -1519,7 +1706,7 @@ var openCodeAdapter = {
         const ordinal = partOrdinal++;
         if (!isObject(part))
           continue;
-        const partId = nonemptyString3(part.id);
+        const partId = nonemptyString4(part.id);
         const sourceRecordId = partId ?? messageId;
         let partComponentIndex = 0;
         const emit = (event) => {
@@ -1561,8 +1748,8 @@ var openCodeAdapter = {
           const stateTime = isObject(state.time) ? state.time : {};
           const callTimestamp = orderedTimestamp(parseTimestamp(stateTime.start) ?? timestamp);
           const resultTimestamp = orderedTimestamp(parseTimestamp(stateTime.end) ?? callTimestamp);
-          const callId = nonemptyString3(part.callID);
-          const name = nonemptyString3(part.tool);
+          const callId = nonemptyString4(part.callID);
+          const name = nonemptyString4(part.tool);
           emit({
             type: "tool_call",
             args: jsonString(state.input),
@@ -1571,7 +1758,7 @@ var openCodeAdapter = {
             ...callTimestamp ? { timestamp: callTimestamp } : {},
             ...model ? { model } : {}
           });
-          const status = nonemptyString3(state.status);
+          const status = nonemptyString4(state.status);
           const output = state.output !== undefined ? stringContent2(state.output) : status === "error" ? errorContent(state.error) : undefined;
           if (output !== undefined) {
             emit({
@@ -1593,8 +1780,8 @@ var openCodeAdapter = {
         }
       }
     }
-    const cwd = nonemptyString3(sessionInfo.directory);
-    const sourceGroupId = nonemptyString3(sessionInfo.id);
+    const cwd = nonemptyString4(sessionInfo.directory);
+    const sourceGroupId = nonemptyString4(sessionInfo.id);
     const createdAt = parseTimestamp(isObject(sessionInfo.time) ? sessionInfo.time.created : undefined);
     return {
       events,
@@ -1620,7 +1807,7 @@ function parseOpenCodeDocument(transcript) {
   }
   return parsed;
 }
-function nonemptyString3(value) {
+function nonemptyString4(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function stringContent2(value) {
@@ -3171,7 +3358,7 @@ async function listTrajectories(input) {
   return paginate(items, input.cursor, limit);
 }
 function isKnownNormalizationOnlySource(source) {
-  return source === "cursor" || source === "gemini-cli" || source === "opencode";
+  return source === "copilot-cli" || source === "cursor" || source === "gemini-cli" || source === "opencode";
 }
 function resolveLimit2(limit) {
   if (limit === undefined)
@@ -3222,6 +3409,7 @@ function invalidCursor() {
 var ADAPTERS = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  "copilot-cli": copilotCliAdapter,
   cursor: cursorAdapter,
   droid: droidAdapter,
   "gemini-cli": geminiCliAdapter,

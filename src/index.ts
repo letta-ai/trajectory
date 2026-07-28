@@ -1,5 +1,6 @@
 import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
 import { codexAdapter } from "./adapters/codex/index.js";
+import { copilotCliAdapter } from "./adapters/copilot-cli/index.js";
 import { cursorAdapter } from "./adapters/cursor/index.js";
 import { droidAdapter } from "./adapters/droid/index.js";
 import { geminiCliAdapter } from "./adapters/gemini-cli/index.js";
@@ -31,6 +32,7 @@ import { NormalizationError } from "./types.js";
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
+  "copilot-cli": copilotCliAdapter,
   cursor: cursorAdapter,
   droid: droidAdapter,
   "gemini-cli": geminiCliAdapter,

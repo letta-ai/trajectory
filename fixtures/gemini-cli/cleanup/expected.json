@@ -1,0 +1,39 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "gemini-cli",
+      "model": "gemini-test"
+    },
+    {
+      "role": "user",
+      "content": "Read the missing file.",
+      "timestamp": "2026-01-04T00:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "gemini-call-error",
+          "name": "read_file",
+          "args": "{\"file_path\":\"missing.txt\"}"
+        }
+      ],
+      "timestamp": "2026-01-04T00:00:03.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "gemini-call-error",
+      "content": "{\"error\":\"file missing\"}",
+      "ok": false,
+      "timestamp": "2026-01-04T00:00:03.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "noise_record_dropped",
+      "message": "Skipped unsupported Gemini CLI message type \"telemetry\" at position 1."
+    }
+  ]
+}

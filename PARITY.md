@@ -174,3 +174,21 @@ correctly failed with `missing_assistant_records`.
 Sanitized happy-path and cleanup fixtures cover reasoning, linked calls and
 results, terminal status, metadata, unknown semantic records, and canonical
 native identity. No source transcript content was copied into this repository.
+
+## Gemini CLI native export
+
+The Gemini CLI adapter was checked against a privacy-safe structural audit of
+the public `SALT-NLP/SWE-chat` raw transcripts and the native-format parser in
+`letta-train`. The corpus contained 59 `Gemini CLI` rows, although agent labels
+were not reliable wire-format identifiers: some labelled files used another
+supported capture shape and must be routed by content.
+
+Native documents used `{sessionId, projectHash, messages[]}`. Sampled terminal
+tool statuses were `success`, `error`, and `cancelled`; results used inline
+`functionResponse.response` objects. All 15 native documents in the matched
+sample normalized successfully (4,932 records).
+
+Sanitized happy-path and cleanup fixtures cover thoughts, prose, linked inline
+tool responses, structured status, unsupported message diagnostics, metadata,
+and canonical native identity. The audit retained no transcript content,
+arguments, results, paths, or identifiers.

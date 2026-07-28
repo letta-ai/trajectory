@@ -127,9 +127,11 @@ afterAll(() => {
 
 describe("listTrajectories", () => {
   test("reports normalization-only sources without pretending to discover a store", async () => {
-    await expect(listTrajectories({ source: "opencode" })).rejects.toEqual(
-      expect.objectContaining({ code: "listing_unavailable" }),
-    );
+    for (const source of ["gemini-cli", "opencode"] as const) {
+      await expect(listTrajectories({ source })).rejects.toEqual(
+        expect.objectContaining({ code: "listing_unavailable" }),
+      );
+    }
   });
 
   test("lists claude-code parent and subagent sessions newest first", async () => {

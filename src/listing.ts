@@ -87,8 +87,10 @@ export async function listTrajectories(
   const lister = LISTERS[input.source];
   if (!lister) {
     throw new NormalizationError(
-      input.source === "opencode" ? "listing_unavailable" : "unknown_source",
-      input.source === "opencode"
+      isKnownNormalizationOnlySource(input.source)
+        ? "listing_unavailable"
+        : "unknown_source",
+      isKnownNormalizationOnlySource(input.source)
         ? `Local trajectory listing is not available for ${JSON.stringify(input.source)}; supply an exported transcript directly to normalizeTranscript().`
         : `Unknown trajectory source ${JSON.stringify(input.source)}. Supported listing sources: ${Object.keys(LISTERS).join(", ")}.`,
     );
@@ -105,6 +107,10 @@ export async function listTrajectories(
   const limit = resolveLimit(input.limit);
   const items = await lister(input.root);
   return paginate(items, input.cursor, limit);
+}
+
+function isKnownNormalizationOnlySource(source: AnyTrajectorySource): boolean {
+  return source === "gemini-cli" || source === "opencode";
 }
 
 function resolveLimit(limit: number | undefined): number {

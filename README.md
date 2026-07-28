@@ -75,6 +75,7 @@ and is empty when the transcript required no recoverable cleanup.
 | [`claude-code`](src/adapters/claude-code/) | Native Claude Code JSONL | `claude-code` |
 | [`codex`](src/adapters/codex/) | Native Codex rollout JSONL | `codex` |
 | [`droid`](src/adapters/droid/) | Native Droid session JSONL | `droid` |
+| [`gemini-cli`](src/adapters/gemini-cli/) | Native Gemini CLI whole-session JSON | `gemini-cli` |
 | [`hermes`](src/adapters/hermes/) | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
 | [`letta-code`](src/adapters/letta-code/) | Letta Code client `transcript.jsonl` | `letta-code` |
 | [`omp`](src/adapters/omp/) | Native OMP (Oh My Pi) coding-agent session JSONL (pi-agent session format) | `omp` |
@@ -87,8 +88,9 @@ and is empty when the transcript required no recoverable cleanup.
 Tool result records may include `ok: boolean` when the source exposes an
 authoritative structured outcome, such as Pi/OpenClaw `isError`, Claude Code
 `is_error`, Letta Code `resultOk`, OpenHands observation `is_error`, or
-OpenCode terminal state. The field is omitted when the source does not expose
-a reliable status; result text is never interpreted as success or failure.
+OpenCode/Gemini terminal state. The field is omitted when the source does not
+expose a reliable status; result text is never interpreted as success or
+failure.
 
 Each adapter lives in its own folder under [`src/adapters/`](src/adapters/)
 with a README documenting the exact input contract, decoding behavior, and
@@ -99,8 +101,8 @@ what the adapter drops.
 `listTrajectories()` enumerates the sessions in a source's standard local
 store, newest first, with cursor pagination. It is a discovery layer beside
 normalization — `normalizeTranscript()` itself never touches the filesystem.
-OpenCode is an export-only input contract and intentionally returns
-`listing_unavailable`; callers locate and read the export themselves.
+Gemini CLI and OpenCode are export-only input contracts and intentionally
+return `listing_unavailable`; callers locate and read the exports themselves.
 
 ```ts
 import { listTrajectories } from "@letta-ai/trajectory";

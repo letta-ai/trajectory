@@ -1,0 +1,49 @@
+{
+  "sessionId": "gemini-session-cleanup",
+  "projectHash": "project-hash",
+  "startTime": "2026-01-04T00:00:00.000Z",
+  "messages": [
+    {
+      "id": "gemini-unknown",
+      "type": "telemetry",
+      "timestamp": "2026-01-04T00:00:00.000Z",
+      "content": "ignored"
+    },
+    {
+      "id": "gemini-cleanup-user",
+      "type": "user",
+      "timestamp": "2026-01-04T00:00:01.000Z",
+      "content": "Read the missing file."
+    },
+    {
+      "id": "gemini-cleanup-assistant",
+      "type": "gemini",
+      "timestamp": "2026-01-04T00:00:02.000Z",
+      "model": "gemini-test",
+      "thoughts": [],
+      "content": "",
+      "toolCalls": [
+        {
+          "id": "gemini-call-error",
+          "name": "read_file",
+          "args": {
+            "file_path": "missing.txt"
+          },
+          "result": [
+            {
+              "functionResponse": {
+                "id": "gemini-call-error",
+                "name": "read_file",
+                "response": {
+                  "error": "file missing"
+                }
+              }
+            }
+          ],
+          "status": "error",
+          "timestamp": "2026-01-04T00:00:03.000Z"
+        }
+      ]
+    }
+  ]
+}

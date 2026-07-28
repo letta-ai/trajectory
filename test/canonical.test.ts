@@ -41,6 +41,7 @@ const goldenFixtures = [
 }>;
 
 const additionalInvariantFixtures = [
+  { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "opencode", name: "opencode/tool-calls" },
 ] as const satisfies ReadonlyArray<{
   source: TrajectorySource;
@@ -78,6 +79,7 @@ describe("canonical invariants", () => {
       const inputFile =
         fixture.source === "openhands" ||
         fixture.source === "hermes" ||
+        fixture.source === "gemini-cli" ||
         fixture.source === "opencode"
           ? "input.json"
           : "input.jsonl";
@@ -109,18 +111,20 @@ describe("canonical invariants", () => {
   }
 });
 
-describe("OpenCode source-native identity", () => {
-  test("uses native part and message ids", () => {
-    const result = normalizeToCanonical({
-      source: "opencode",
-      transcript: fixtureText("opencode/tool-calls", "input.json"),
+describe("new source-native identity", () => {
+  for (const fixture of additionalInvariantFixtures) {
+    test(fixture.source, () => {
+      const result = normalizeToCanonical({
+        source: fixture.source,
+        transcript: fixtureText(fixture.name, "input.json"),
+      });
+      const body = result.records.filter((record) => record.record_type !== "meta");
+      expect(body.length).toBeGreaterThan(0);
+      expect(body.every((record) => record.source_identity_kind === "native")).toBe(
+        true,
+      );
     });
-    const body = result.records.filter((record) => record.record_type !== "meta");
-    expect(body.length).toBeGreaterThan(0);
-    expect(body.every((record) => record.source_identity_kind === "native")).toBe(
-      true,
-    );
-  });
+  }
 });
 
 describe("canonical tool result status", () => {

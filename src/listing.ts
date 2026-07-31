@@ -19,6 +19,7 @@ import { listLettaCodeTrajectories } from "./adapters/letta-code/list.js";
 import { listOpenClawTrajectories } from "./adapters/openclaw/list.js";
 import { listOpenHandsTrajectories } from "./adapters/openhands/list.js";
 import { listPiTrajectories } from "./adapters/pi/list.js";
+import { listPoolTrajectories } from "./adapters/pool/list.js";
 import { listOmpTrajectories } from "./adapters/omp/list.js";
 import type { AnyTrajectorySource } from "./types.js";
 import { NormalizationError } from "./types.js";
@@ -70,6 +71,7 @@ const LISTERS: Partial<Record<AnyTrajectorySource, SourceLister>> = {
   openclaw: listOpenClawTrajectories,
   openhands: listOpenHandsTrajectories,
   pi: listPiTrajectories,
+  pool: listPoolTrajectories,
   omp: listOmpTrajectories,
 };
 

@@ -1,0 +1,45 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "pool",
+      "cwd": "/tmp/pool-demo",
+      "model": "poolside/laguna-s-2.1"
+    },
+    {
+      "role": "user",
+      "content": "read the config file please mate",
+      "timestamp": "2026-07-27T06:18:53.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "The user wants me to read a config file. I'll use the read tool.",
+      "timestamp": "2026-07-27T06:18:53.300Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "chatcmpl-tool-call-a",
+          "name": "read",
+          "args": "{\"path\": \"/tmp/pool-demo/config.yaml\"}"
+        }
+      ],
+      "timestamp": "2026-07-27T06:18:53.500Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "chatcmpl-tool-call-a",
+      "content": "pool:\n  api_url: https://inference.poolside.ai\n",
+      "ok": true,
+      "timestamp": "2026-07-27T06:18:53.700Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I read the config. It points at `https://inference.poolside.ai`.",
+      "timestamp": "2026-07-27T06:18:54.300Z"
+    }
+  ],
+  "diagnostics": []
+}

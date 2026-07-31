@@ -1850,6 +1850,164 @@ var piAdapter = {
   }
 };
 
+// src/adapters/pool/index.ts
+var poolAdapter = {
+  source: "pool",
+  decode(transcript) {
+    const diagnostics = [];
+    const events = [];
+    const lines = parseJsonLines(transcript, diagnostics);
+    let cwd;
+    let model;
+    let createdAt;
+    const sessionStartIds = new Set;
+    let seenMessageRow = false;
+    for (const { value: event, line } of lines) {
+      if (!isObject(event) || typeof event.type !== "string")
+        continue;
+      const type = event.type;
+      const timestamp = parseTimestamp(event.timestamp);
+      const sourceRecordId = typeof event.id === "string" && event.id ? event.id : undefined;
+      if (type === "session.start") {
+        if (typeof event.id === "string" && event.id) {
+          seenMessageRow = true;
+          sessionStartIds.add(event.id);
+        }
+        const sessionStart = isObject(event.session_start) ? event.session_start : {};
+        if (!cwd && poolFirstString(sessionStart.working_directories)) {
+          cwd = poolFirstString(sessionStart.working_directories);
+        }
+        if (!cwd && typeof sessionStart.workspace === "string" && sessionStart.workspace) {
+          cwd = sessionStart.workspace;
+        }
+        createdAt ??= timestamp;
+        continue;
+      }
+      if (type === "session.input") {
+        seenMessageRow = true;
+        const sessionInput = isObject(event.session_input) ? event.session_input : {};
+        const prompt = toStringValue(sessionInput.prompt);
+        if (prompt && prompt.trim()) {
+          events.push({
+            type: "message",
+            role: "user",
+            content: prompt,
+            ...sourceRecordId ? { sourceRecordId } : {},
+            ...timestamp ? { timestamp } : {},
+            inputLine: line
+          });
+        }
+        continue;
+      }
+      if (type === "tool_call.inference.start") {
+        const inference = isObject(event.tool_call_inference_start) ? event.tool_call_inference_start : {};
+        const request = isObject(inference.chat_completion_request) ? inference.chat_completion_request : {};
+        if (!model && typeof request.model === "string" && request.model) {
+          model = request.model;
+        }
+        continue;
+      }
+      if (type === "thought.end") {
+        const thoughtEnd = isObject(event.thought_end) ? event.thought_end : {};
+        const content = toStringValue(thoughtEnd.thought);
+        if (content && content.trim()) {
+          events.push({
+            type: "reasoning",
+            content,
+            ...sourceRecordId ? { sourceRecordId } : {},
+            ...timestamp ? { timestamp } : {},
+            ...model ? { model } : {},
+            inputLine: line
+          });
+        }
+        continue;
+      }
+      if (type === "assistant_message.end") {
+        const messageEnd = isObject(event.assistant_message_end) ? event.assistant_message_end : {};
+        const content = toStringValue(messageEnd.assistant_message);
+        if (content && content.trim()) {
+          events.push({
+            type: "message",
+            role: "assistant",
+            content,
+            ...sourceRecordId ? { sourceRecordId } : {},
+            ...timestamp ? { timestamp } : {},
+            ...model ? { model } : {},
+            inputLine: line
+          });
+        }
+        continue;
+      }
+      if (type === "tool_call.parsed") {
+        seenMessageRow = true;
+        const parsed = isObject(event.tool_call_parsed) ? event.tool_call_parsed : {};
+        const callId = typeof parsed.id === "string" && parsed.id ? parsed.id : undefined;
+        const name = typeof parsed.name === "string" && parsed.name ? parsed.name : undefined;
+        const rawArgs = typeof parsed.raw_args === "string" && parsed.raw_args ? parsed.raw_args : jsonString(parsed.args ?? {});
+        events.push({
+          type: "tool_call",
+          ...callId ? { id: callId } : {},
+          ...name ? { name } : {},
+          args: rawArgs,
+          ...sourceRecordId ? { sourceRecordId } : {},
+          ...timestamp ? { timestamp } : {},
+          inputLine: line
+        });
+        continue;
+      }
+      if (type === "tool_call.result") {
+        const result = isObject(event.tool_call_result) ? event.tool_call_result : {};
+        const callId = typeof result.id === "string" && result.id ? result.id : undefined;
+        const content = typeof result.observation === "string" ? result.observation : "";
+        const ok = typeof result.is_error === "boolean" ? !result.is_error : undefined;
+        events.push({
+          type: "tool_result",
+          ...callId ? { callId } : {},
+          content,
+          ...ok !== undefined ? { ok } : {},
+          ...sourceRecordId ? { sourceRecordId } : {},
+          ...timestamp ? { timestamp } : {},
+          inputLine: line
+        });
+        continue;
+      }
+    }
+    if (!seenMessageRow) {
+      throw new NormalizationError("invalid_input", "Pool transcript must be session JSONL containing a session.start header and message entries.");
+    }
+    const sourceGroupId = resolveGroupId2(sessionStartIds);
+    return {
+      events,
+      context: {
+        source: "pool",
+        ...cwd ? { cwd } : {},
+        ...model ? { model } : {},
+        ...createdAt ? { createdAt } : {},
+        ...sourceGroupId ? { sourceGroupId, sourceGroupAmbiguous: sessionStartIds.size > 1 } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function poolFirstString(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item === "string" && item)
+        return item;
+    }
+  }
+  return;
+}
+function toStringValue(value) {
+  return typeof value === "string" ? value : "";
+}
+function resolveGroupId2(sessionStartIds) {
+  if (sessionStartIds.size === 1) {
+    return [...sessionStartIds][0];
+  }
+  return;
+}
+
 // src/bounds.ts
 var DEFAULT_NORMALIZATION_BOUNDS = Object.freeze({
   toolArguments: Object.freeze({ maxCharacters: 20000 }),
@@ -3277,14 +3435,42 @@ function defaultAgentDir() {
   return join11(homedir10(), ".pi", "agent");
 }
 
+// src/adapters/pool/list.ts
+import { homedir as homedir11 } from "node:os";
+import { join as join12 } from "node:path";
+var TRAJECTORIES_DIR = "trajectories";
+var FILE_PREFIX = "trajectory-standalone_";
+var FILE_SUFFIX = ".ndjson";
+async function listPoolTrajectories(root) {
+  const stateDir = root ?? join12(homedir11(), ".local", "state", "poolside");
+  const base = join12(stateDir, TRAJECTORIES_DIR);
+  const items = [];
+  for (const path of collectFiles(base, FILE_SUFFIX, 0)) {
+    const id = sessionIdFromFilename(path.split("/").pop());
+    if (!id)
+      continue;
+    const listing = listingFromFile(id, path);
+    if (listing)
+      items.push(listing);
+  }
+  return sortListings(items);
+}
+function sessionIdFromFilename(filename) {
+  if (!filename.startsWith(FILE_PREFIX) || !filename.endsWith(FILE_SUFFIX)) {
+    return;
+  }
+  const id = filename.slice(FILE_PREFIX.length, -FILE_SUFFIX.length);
+  return id || undefined;
+}
+
 // src/adapters/omp/list.ts
 import { existsSync as existsSync2 } from "node:fs";
-import { homedir as homedir11 } from "node:os";
-import { basename as basename6, join as join12 } from "node:path";
+import { homedir as homedir12 } from "node:os";
+import { basename as basename6, join as join13 } from "node:path";
 async function listOmpTrajectories(root) {
   const items = [];
-  const sessionsPath = root ? join12(root, "sessions") : resolveOmpSessionsPath({
-    home: homedir11(),
+  const sessionsPath = root ? join13(root, "sessions") : resolveOmpSessionsPath({
+    home: homedir12(),
     platform: process.platform,
     env: process.env,
     exists: existsSync2
@@ -3292,11 +3478,11 @@ async function listOmpTrajectories(root) {
   for (const project of safeReadDir(sessionsPath)) {
     if (!project.isDirectory)
       continue;
-    const projectPath = join12(sessionsPath, project.name);
+    const projectPath = join13(sessionsPath, project.name);
     for (const entry of safeReadDir(projectPath)) {
       if (!entry.isFile || !entry.name.endsWith(".jsonl"))
         continue;
-      const path = join12(projectPath, entry.name);
+      const path = join13(projectPath, entry.name);
       const listing = listingFromFile(basename6(entry.name, ".jsonl"), path);
       if (listing)
         items.push(listing);
@@ -3306,18 +3492,18 @@ async function listOmpTrajectories(root) {
 }
 function resolveOmpSessionsPath(options) {
   const profile = resolveProfile(options.env.OMP_PROFILE, options.env.PI_PROFILE);
-  const configRoot = join12(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
+  const configRoot = join13(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
   const agentOverride = profile ? undefined : options.env.PI_CODING_AGENT_DIR?.trim() || undefined;
-  const agentDir = agentOverride ?? join12(configRoot, "agent");
+  const agentDir = agentOverride ?? join13(configRoot, "agent");
   if (agentOverride === undefined && (options.platform === "linux" || options.platform === "darwin")) {
     const xdgData = options.env.XDG_DATA_HOME?.trim();
     if (xdgData) {
-      const xdgRoot = join12(xdgData, "omp", ...profile ? ["profiles", profile] : []);
+      const xdgRoot = join13(xdgData, "omp", ...profile ? ["profiles", profile] : []);
       if (options.exists(xdgRoot))
-        return join12(xdgRoot, "sessions");
+        return join13(xdgRoot, "sessions");
     }
   }
-  return join12(agentDir, "sessions");
+  return join13(agentDir, "sessions");
 }
 function resolveProfile(ompProfile, piProfile) {
   const value = (ompProfile !== undefined ? ompProfile : piProfile)?.trim();
@@ -3342,6 +3528,7 @@ var LISTERS = {
   openclaw: listOpenClawTrajectories,
   openhands: listOpenHandsTrajectories,
   pi: listPiTrajectories,
+  pool: listPoolTrajectories,
   omp: listOmpTrajectories
 };
 async function listTrajectories(input) {
@@ -3421,6 +3608,7 @@ var ADAPTERS = {
   opencode: openCodeAdapter,
   openhands: openHandsAdapter,
   pi: piAdapter,
+  pool: poolAdapter,
   omp: ompAdapter
 };
 function decodeTranscript(input) {

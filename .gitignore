@@ -10,3 +10,6 @@ build/
 dist-python/
 .env
 .letta/
+
+# dev output of scripts/ingest-pool.ts
+out/

@@ -37,6 +37,7 @@ const fixtures = [
   { source: "openhands", name: "openhands/cleanup" },
   { source: "pi", name: "pi/tool-calls" },
   { source: "pi", name: "pi/cleanup" },
+  { source: "pool", name: "pool/happy-path" },
 ] as const satisfies ReadonlyArray<{ source: TrajectorySource; name: string }>;
 
 const toolFixtures = fixtures.filter(
@@ -172,6 +173,58 @@ describe("source-native tool result status", () => {
     const tool = result.records.find((record) => record.role === "tool");
     expect(tool?.role).toBe("tool");
     expect(tool?.role === "tool" ? tool.ok : undefined).toBeUndefined();
+  });
+
+  test("maps Pool is_error to tool result ok, omitting it when absent", () => {
+    const transcript = [
+      JSON.stringify({
+        id: "pool-session-1",
+        timestamp: "2026-07-27T06:18:52.000000Z",
+        type: "session.start",
+        session_start: { working_directories: ["/tmp/pool-demo"] },
+      }),
+      JSON.stringify({
+        id: "pool-input-1",
+        timestamp: "2026-07-27T06:18:53.000000Z",
+        type: "session.input",
+        session_input: { prompt: "list the files" },
+      }),
+      JSON.stringify({
+        id: "pool-call-1",
+        timestamp: "2026-07-27T06:18:54.000000Z",
+        type: "tool_call.parsed",
+        tool_call_parsed: { id: "call-ok", name: "shell", args: { cmd: "ls" }, raw_args: '{"cmd":"ls"}' },
+      }),
+      JSON.stringify({
+        id: "pool-result-1",
+        timestamp: "2026-07-27T06:18:55.000000Z",
+        type: "tool_call.result",
+        tool_call_result: { id: "call-ok", tool_name: "shell", observation: "ok\n", is_error: false },
+      }),
+      JSON.stringify({
+        id: "pool-call-2",
+        timestamp: "2026-07-27T06:18:56.000000Z",
+        type: "tool_call.parsed",
+        tool_call_parsed: { id: "call-err", name: "shell", args: { cmd: "false" }, raw_args: '{"cmd":"false"}' },
+      }),
+      JSON.stringify({
+        id: "pool-result-2",
+        timestamp: "2026-07-27T06:18:57.000000Z",
+        type: "tool_call.result",
+        tool_call_result: { id: "call-err", tool_name: "shell", observation: "Error: permission denied" },
+      }),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "pool", transcript });
+    const okResult = result.records.find(
+      (record) => record.role === "tool" && record.tool_call_id === "call-ok",
+    );
+    const noStatusResult = result.records.find(
+      (record) => record.role === "tool" && record.tool_call_id === "call-err",
+    );
+    expect(okResult?.role === "tool" ? okResult.ok : undefined).toBe(true);
+    expect(noStatusResult?.role === "tool" ? noStatusResult.ok : undefined).toBeUndefined();
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([]);
   });
 });
 

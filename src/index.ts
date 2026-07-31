@@ -11,6 +11,7 @@ import { openHandsAdapter } from "./adapters/openhands/index.js";
 import { openCodeAdapter } from "./adapters/opencode/index.js";
 import { ompAdapter } from "./adapters/omp/index.js";
 import { piAdapter } from "./adapters/pi/index.js";
+import { poolAdapter } from "./adapters/pool/index.js";
 import type { ResolvedNormalizationBounds } from "./bounds.js";
 import { resolveBounds } from "./bounds.js";
 import type { ResolvedNormalizationFilters } from "./filters.js";
@@ -42,6 +43,7 @@ const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
   opencode: openCodeAdapter,
   openhands: openHandsAdapter,
   pi: piAdapter,
+  pool: poolAdapter,
   omp: ompAdapter,
 };
 

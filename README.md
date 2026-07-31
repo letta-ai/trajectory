@@ -93,14 +93,15 @@ and is empty when the transcript required no recoverable cleanup.
 | [`opencode`](src/adapters/opencode/) | Native OpenCode `{ "info": ..., "messages": [...] }` session JSON | `opencode` |
 | [`openhands`](src/adapters/openhands/) | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | [`pi`](src/adapters/pi/) | Native pi-coding-agent session JSONL | `pi` |
+| [`pool`](src/adapters/pool/) | Native Pool (poolside) session `.ndjson` | `pool` |
 | [`deepagents`](src/adapters/deepagents/) | Deep Agents CLI LangGraph SQLite store plus `threadId` | `deepagents` |
 
 Tool result records may include `ok: boolean` when the source exposes an
 authoritative structured outcome, such as Pi/OpenClaw `isError`, Claude Code
 `is_error`, Letta Code `resultOk`, OpenHands/Cursor `is_error`,
-OpenCode/Gemini terminal state, or Copilot CLI `success`. The field is omitted
-when the source does not expose a reliable status; result text is never
-interpreted as success or failure.
+OpenCode/Gemini terminal state, Pool `is_error`, or Copilot CLI `success`.
+The field is omitted when the source does not expose a reliable status;
+result text is never interpreted as success or failure.
 
 Each adapter lives in its own folder under [`src/adapters/`](src/adapters/)
 with a README documenting the exact input contract, decoding behavior, and

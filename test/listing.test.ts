@@ -103,6 +103,27 @@ beforeAll(() => {
     `{"type":"session"}\n`,
   );
 
+  // pool: trajectory-standalone_<session-id>.ndjson files, newest first.
+  const poolRoot = join(base, "pool", "trajectories");
+  for (const [session, at] of [
+    [
+      "019fa000-1111-4aaa-8bbb-111111111111",
+      "2026-07-24T06:21:03.000Z",
+    ],
+    [
+      "019fa000-2222-4bbb-9ccc-222222222222",
+      "2026-07-25T06:21:03.000Z",
+    ],
+  ] as const) {
+    mkdirSync(poolRoot, { recursive: true });
+    const file = join(poolRoot, `trajectory-standalone_${session}.ndjson`);
+    writeFileSync(file, `{"id":"${session}","type":"session.start"}\n`);
+    const time = new Date(at);
+    utimesSync(file, time, time);
+  }
+  // Non-conforming files in the pool dir must be ignored.
+  writeFileSync(join(poolRoot, "journal.jsonl"), `{"type":"started"}\n`);
+
   // openhands: one directory per session.
   mkdirSync(join(base, "openhands", "sess-1"), { recursive: true });
   mkdirSync(join(base, "openhands", "sess-2"), { recursive: true });
@@ -230,6 +251,19 @@ describe("listTrajectories", () => {
     expect(result.items[0]?.path.endsWith(".jsonl")).toBe(true);
   });
 
+  test("lists pool sessions newest first and ignores non-trajectory files", async () => {
+    const result = await listTrajectories({
+      source: "pool",
+      root: join(base, "pool"),
+    });
+    expect(result.items.map((item) => item.id)).toEqual([
+      "019fa000-2222-4bbb-9ccc-222222222222",
+      "019fa000-1111-4aaa-8bbb-111111111111",
+    ]);
+    expect(result.items[0]?.path.endsWith(".ndjson")).toBe(true);
+    expect(result.items[0]?.updatedAt).toBe("2026-07-25T06:21:03.000Z");
+  });
+
   test("lists openhands session directories", async () => {
     const result = await listTrajectories({
       source: "openhands",
@@ -263,7 +297,7 @@ describe("listTrajectories", () => {
   });
 
   test("returns an empty listing for a missing store", async () => {
-    for (const source of ["claude-code", "hermes", "deepagents"] as const) {
+    for (const source of ["claude-code", "pool", "hermes", "deepagents"] as const) {
       const result = await listTrajectories({
         source,
         root: join(base, "does-not-exist"),

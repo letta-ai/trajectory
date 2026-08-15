@@ -13,6 +13,7 @@
 import { listClaudeCodeTrajectories } from "./adapters/claude-code/list.js";
 import { listCodexTrajectories } from "./adapters/codex/list.js";
 import { listDroidTrajectories } from "./adapters/droid/list.js";
+import { listDshTrajectories } from "./adapters/dsh/list.js";
 import { listDeepAgentsTrajectories } from "./adapters/deepagents/list.js";
 import { listHermesTrajectories } from "./adapters/hermes/list.js";
 import { listLettaCodeTrajectories } from "./adapters/letta-code/list.js";
@@ -64,6 +65,7 @@ const LISTERS: Partial<Record<AnyTrajectorySource, SourceLister>> = {
   "claude-code": listClaudeCodeTrajectories,
   codex: listCodexTrajectories,
   droid: listDroidTrajectories,
+  dsh: listDshTrajectories,
   deepagents: listDeepAgentsTrajectories,
   hermes: listHermesTrajectories,
   "letta-code": listLettaCodeTrajectories,

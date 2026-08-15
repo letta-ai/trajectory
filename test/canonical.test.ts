@@ -43,6 +43,7 @@ const goldenFixtures = [
 const additionalInvariantFixtures = [
   { source: "copilot-cli", name: "copilot-cli/tool-calls" },
   { source: "cursor", name: "cursor/tool-calls" },
+  { source: "dsh", name: "dsh/happy-path" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "opencode", name: "opencode/tool-calls" },
 ] as const satisfies ReadonlyArray<{

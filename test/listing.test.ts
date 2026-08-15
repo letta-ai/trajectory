@@ -85,6 +85,11 @@ beforeAll(() => {
   writeFileSync(join(openclawSessions, "oc-1.jsonl"), `{"type":"session"}\n`);
   writeFileSync(join(openclawSessions, "sessions.json"), "{}\n");
 
+  // dsh: sessions are nested under cwd slugs and stored compressed.
+  const dshSession = join(base, "dsh", "home-user-project", "session-dsh-1");
+  mkdirSync(dshSession, { recursive: true });
+  writeFileSync(join(dshSession, "session.jsonl.zstd"), "compressed");
+
   // pi: <agentDir>/sessions/<escaped-cwd>/<timestamp>_<uuid>.jsonl layout.
   const piSessions = join(base, "pi", "sessions", "-home-user-pi-demo--");
   mkdirSync(piSessions, { recursive: true });
@@ -207,6 +212,12 @@ describe("listTrajectories", () => {
       root: join(base, "openclaw"),
     });
     expect(result.items.map((item) => item.id)).toEqual(["oc-1"]);
+  });
+
+  test("lists compressed dsh session logs", async () => {
+    const result = await listTrajectories({ source: "dsh", root: join(base, "dsh") });
+    expect(result.items.map((item) => item.id)).toEqual(["session-dsh-1"]);
+    expect(result.items[0]?.path.endsWith("session.jsonl.zstd")).toBe(true);
   });
 
   test("lists pi sessions and ignores files outside project directories", async () => {

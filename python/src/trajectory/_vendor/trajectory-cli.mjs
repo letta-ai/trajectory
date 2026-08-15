@@ -749,6 +749,138 @@ function invalidCursorTranscript() {
   return new NormalizationError("invalid_input", "Cursor transcript must be JSONL with role and message.content records.");
 }
 
+// src/adapters/dsh/index.ts
+var dshAdapter = {
+  source: "dsh",
+  decode(transcript) {
+    const diagnostics = [];
+    const events = [];
+    let cwd;
+    let sourceGroupId;
+    let createdAt;
+    let model;
+    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
+      if (record.type === "session") {
+        if (!sourceGroupId)
+          sourceGroupId = nonemptyString2(record.id);
+        if (!cwd)
+          cwd = nonemptyString2(record.cwd);
+        if (!createdAt)
+          createdAt = parseTimestamp(record.createdAt);
+        continue;
+      }
+      const data = isObject(record.data) ? record.data : {};
+      if (record.type === "request/header") {
+        const header = isObject(data.header) ? data.header : data;
+        const config = isObject(header.config) ? header.config : header;
+        if (!model)
+          model = nonemptyString2(config.model);
+        continue;
+      }
+      if (record.type === "request/context") {
+        if (!model)
+          model = nonemptyString2(data.model);
+        continue;
+      }
+      const timestamp = parseTimestamp(record.time);
+      const sourceSequence = typeof record.seq === "number" ? record.seq : undefined;
+      const base = {
+        inputLine: line,
+        ...sourceSequence !== undefined ? { sourceSequence } : {},
+        ...timestamp ? { timestamp } : {}
+      };
+      const sourceIdentity = (id, componentIndex) => id ? { sourceRecordId: id, componentIndex } : { sourceOffset: byteOffset, sourceAnchorKind: "byte", componentIndex };
+      if (record.type === "user/message") {
+        const message = messageData(data);
+        const content = blocksText(message.content);
+        if (content) {
+          events.push({
+            type: "message",
+            role: "user",
+            content,
+            ...base,
+            ...sourceIdentity(nonemptyString2(message.id), 0)
+          });
+        }
+        continue;
+      }
+      if (record.type === "assistant/message") {
+        const message = messageData(data);
+        let componentIndex = 0;
+        for (const block of messageBlocks(message.content)) {
+          if (block.type === "reasoning" && typeof block.text === "string") {
+            events.push({
+              type: "reasoning",
+              content: block.text,
+              ...base,
+              ...sourceIdentity(nonemptyString2(message.id), componentIndex++)
+            });
+          } else if (block.type === "text" && typeof block.text === "string") {
+            events.push({
+              type: "message",
+              role: "assistant",
+              content: block.text,
+              ...base,
+              ...sourceIdentity(nonemptyString2(message.id), componentIndex++)
+            });
+          }
+        }
+        continue;
+      }
+      if (record.type === "tool/call") {
+        const call = isObject(data.call) ? data.call : data;
+        const id = nonemptyString2(call.id) ?? nonemptyString2(call.callId);
+        const name = nonemptyString2(call.name);
+        events.push({
+          type: "tool_call",
+          args: typeof call.arguments === "string" ? call.arguments : jsonString(call.arguments),
+          ...base,
+          ...sourceIdentity(id, 0),
+          ...id ? { id } : {},
+          ...name ? { name } : {}
+        });
+        continue;
+      }
+      if (record.type === "tool/result") {
+        const result = isObject(data.result) ? data.result : data;
+        const message = messageData(data);
+        const block = messageBlocks(message.content).find((candidate) => candidate.type === "tool-result");
+        const callId = nonemptyString2(result.id) ?? nonemptyString2(result.callId) ?? (block ? nonemptyString2(block.toolCallId) : undefined);
+        const isError = typeof result.error === "boolean" ? result.error : block?.isError === true;
+        const content = typeof result.output === "string" ? result.output : typeof result.content === "string" ? result.content : block ? blocksText(block.content) : blocksText(message.content);
+        events.push({
+          type: "tool_result",
+          content,
+          ...base,
+          ...sourceIdentity(callId, 0),
+          ...callId ? { callId } : {},
+          ...typeof isError === "boolean" ? { ok: !isError } : {}
+        });
+      }
+    }
+    return {
+      events,
+      context: {
+        source: "dsh",
+        ...cwd ? { cwd } : {},
+        ...sourceGroupId ? { sourceGroupId } : {},
+        ...createdAt ? { createdAt } : {},
+        ...model ? { model } : {}
+      },
+      diagnostics
+    };
+  }
+};
+function nonemptyString2(value) {
+  return typeof value === "string" && value ? value : undefined;
+}
+function messageData(data) {
+  return isObject(data.message) ? data.message : data;
+}
+function messageBlocks(content) {
+  return Array.isArray(content) ? content.filter(isObject) : [];
+}
+
 // src/adapters/droid/index.ts
 var TRANSPORT_TYPES2 = new Set([
   "todo_state",
@@ -859,8 +991,8 @@ var geminiCliAdapter = {
       if (messageType === "info")
         continue;
       const timestamp = parseTimestamp(message.timestamp);
-      const model = nonemptyString2(message.model);
-      const sourceRecordId = nonemptyString2(message.id);
+      const model = nonemptyString3(message.model);
+      const sourceRecordId = nonemptyString3(message.id);
       let componentIndex = 0;
       const emit = (event) => {
         events.push({
@@ -914,8 +1046,8 @@ var geminiCliAdapter = {
       for (const rawCall of message.toolCalls) {
         if (!isObject(rawCall))
           continue;
-        const callId = nonemptyString2(rawCall.id);
-        const name = nonemptyString2(rawCall.name);
+        const callId = nonemptyString3(rawCall.id);
+        const name = nonemptyString3(rawCall.name);
         const callTimestamp = parseTimestamp(rawCall.timestamp) ?? timestamp;
         emit({
           type: "tool_call",
@@ -925,7 +1057,7 @@ var geminiCliAdapter = {
           ...callTimestamp ? { timestamp: callTimestamp } : {},
           ...model ? { model } : {}
         });
-        const status = nonemptyString2(rawCall.status);
+        const status = nonemptyString3(rawCall.status);
         const outputs = toolOutputs(rawCall.result);
         if (outputs.length === 0 && (!status || !TERMINAL_TOOL_STATUSES.has(status))) {
           continue;
@@ -941,8 +1073,8 @@ var geminiCliAdapter = {
         });
       }
     }
-    const sourceGroupId = nonemptyString2(document.sessionId);
-    const sourceGroupRequired = !sourceGroupId && !nonemptyString2(document.projectHash);
+    const sourceGroupId = nonemptyString3(document.sessionId);
+    const sourceGroupRequired = !sourceGroupId && !nonemptyString3(document.projectHash);
     const createdAt = parseTimestamp(document.startTime);
     return {
       events,
@@ -968,7 +1100,7 @@ function parseGeminiDocument(transcript) {
   }
   return parsed;
 }
-function nonemptyString2(value) {
+function nonemptyString3(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function thoughtContent(value) {
@@ -1277,7 +1409,7 @@ var lettaCodeAdapter = {
     for (const { value: row } of rows) {
       if (row.kind !== "reasoning")
         continue;
-      const sourceRecordId = nonemptyString3(row.source_message_id) ?? nonemptyString3(row.source_line_id);
+      const sourceRecordId = nonemptyString4(row.source_message_id) ?? nonemptyString4(row.source_line_id);
       if (sourceRecordId)
         reasoningRecordIds.add(sourceRecordId);
     }
@@ -1300,8 +1432,8 @@ var lettaCodeAdapter = {
         continue;
       }
       const timestamp = parseTimestamp(row.captured_at);
-      const sourceMessageId = nonemptyString3(row.source_message_id);
-      const sourceLineId = nonemptyString3(row.source_line_id);
+      const sourceMessageId = nonemptyString4(row.source_message_id);
+      const sourceLineId = nonemptyString4(row.source_line_id);
       const sourceRecordId = sourceMessageId ?? sourceLineId;
       const sourceFields = sourceRecordId ? { sourceRecordId } : {
         sourceOffset: line - 1,
@@ -1340,10 +1472,10 @@ var lettaCodeAdapter = {
         continue;
       }
       const callId = sourceLineId ?? sourceMessageId ?? `letta-code-tool-line-${line}`;
-      const name = nonemptyString3(row.name);
+      const name = nonemptyString4(row.name);
       events.push({
         type: "tool_call",
-        args: nonemptyString3(row.argsText) ?? "{}",
+        args: nonemptyString4(row.argsText) ?? "{}",
         inputLine: line,
         ...sourceFields,
         componentIndex: 0,
@@ -1378,7 +1510,7 @@ var lettaCodeAdapter = {
     };
   }
 };
-function nonemptyString3(value) {
+function nonemptyString4(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function invalidLettaCodeTranscript() {
@@ -1689,9 +1821,9 @@ var openCodeAdapter = {
         continue;
       const info = isObject(message.info) ? message.info : {};
       const role = info.role;
-      const messageId = nonemptyString4(info.id);
+      const messageId = nonemptyString5(info.id);
       const timestamp = parseTimestamp(isObject(info.time) ? info.time.created : undefined);
-      const model = nonemptyString4(info.modelID);
+      const model = nonemptyString5(info.modelID);
       const parts = Array.isArray(message.parts) ? message.parts : [];
       let messageComponentIndex = 0;
       let latestTimestamp;
@@ -1708,7 +1840,7 @@ var openCodeAdapter = {
         const ordinal = partOrdinal++;
         if (!isObject(part))
           continue;
-        const partId = nonemptyString4(part.id);
+        const partId = nonemptyString5(part.id);
         const sourceRecordId = partId ?? messageId;
         let partComponentIndex = 0;
         const emit = (event) => {
@@ -1750,8 +1882,8 @@ var openCodeAdapter = {
           const stateTime = isObject(state.time) ? state.time : {};
           const callTimestamp = orderedTimestamp(parseTimestamp(stateTime.start) ?? timestamp);
           const resultTimestamp = orderedTimestamp(parseTimestamp(stateTime.end) ?? callTimestamp);
-          const callId = nonemptyString4(part.callID);
-          const name = nonemptyString4(part.tool);
+          const callId = nonemptyString5(part.callID);
+          const name = nonemptyString5(part.tool);
           emit({
             type: "tool_call",
             args: jsonString(state.input),
@@ -1760,7 +1892,7 @@ var openCodeAdapter = {
             ...callTimestamp ? { timestamp: callTimestamp } : {},
             ...model ? { model } : {}
           });
-          const status = nonemptyString4(state.status);
+          const status = nonemptyString5(state.status);
           const output = state.output !== undefined ? stringContent2(state.output) : status === "error" ? errorContent(state.error) : undefined;
           if (output !== undefined) {
             emit({
@@ -1782,8 +1914,8 @@ var openCodeAdapter = {
         }
       }
     }
-    const cwd = nonemptyString4(sessionInfo.directory);
-    const sourceGroupId = nonemptyString4(sessionInfo.id);
+    const cwd = nonemptyString5(sessionInfo.directory);
+    const sourceGroupId = nonemptyString5(sessionInfo.id);
     const createdAt = parseTimestamp(isObject(sessionInfo.time) ? sessionInfo.time.created : undefined);
     return {
       events,
@@ -1809,7 +1941,7 @@ function parseOpenCodeDocument(transcript) {
   }
   return parsed;
 }
-function nonemptyString4(value) {
+function nonemptyString5(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function stringContent2(value) {
@@ -3110,9 +3242,24 @@ async function listDroidTrajectories(root) {
   return sortListings(items);
 }
 
-// src/adapters/deepagents/list.ts
+// src/adapters/dsh/list.ts
 import { homedir as homedir5 } from "node:os";
-import { join as join6 } from "node:path";
+import { basename as basename4, join as join6 } from "node:path";
+async function listDshTrajectories(root) {
+  const base = root ?? join6(homedir5(), ".dsh", "sessions");
+  const items = [];
+  for (const path of collectFiles(base, ".jsonl.zstd", 4)) {
+    const sessionDir = basename4(join6(path, ".."));
+    const listing = listingFromFile(sessionDir, path);
+    if (listing)
+      items.push(listing);
+  }
+  return sortListings(items);
+}
+
+// src/adapters/deepagents/list.ts
+import { homedir as homedir6 } from "node:os";
+import { join as join7 } from "node:path";
 async function listDeepAgentsTrajectories(root) {
   const path = resolveStorePath(root);
   if (!safeStat(path))
@@ -3133,13 +3280,13 @@ async function listDeepAgentsTrajectories(root) {
 }
 function resolveStorePath(root) {
   if (root === undefined)
-    return join6(homedir5(), ".deepagents", "sessions.db");
-  return root.endsWith(".db") ? root : join6(root, "sessions.db");
+    return join7(homedir6(), ".deepagents", "sessions.db");
+  return root.endsWith(".db") ? root : join7(root, "sessions.db");
 }
 
 // src/adapters/hermes/list.ts
-import { homedir as homedir6 } from "node:os";
-import { join as join7 } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { join as join8 } from "node:path";
 async function listHermesTrajectories(root) {
   const path = resolveStorePath2(root);
   if (!safeStat(path))
@@ -3166,27 +3313,27 @@ async function listHermesTrajectories(root) {
 }
 function resolveStorePath2(root) {
   if (root === undefined)
-    return join7(homedir6(), ".hermes", "state.db");
-  return root.endsWith(".db") ? root : join7(root, "state.db");
+    return join8(homedir7(), ".hermes", "state.db");
+  return root.endsWith(".db") ? root : join8(root, "state.db");
 }
 function numeric(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 // src/adapters/letta-code/list.ts
-import { homedir as homedir7 } from "node:os";
-import { join as join8 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { join as join9 } from "node:path";
 async function listLettaCodeTrajectories(root) {
-  const base = root ?? join8(homedir7(), ".letta", "transcripts");
+  const base = root ?? join9(homedir8(), ".letta", "transcripts");
   const items = [];
   for (const agent of safeReadDir(base)) {
     if (!agent.isDirectory)
       continue;
-    const agentPath = join8(base, agent.name);
+    const agentPath = join9(base, agent.name);
     for (const conversation of safeReadDir(agentPath)) {
       if (!conversation.isDirectory)
         continue;
-      const path = join8(agentPath, conversation.name, "transcript.jsonl");
+      const path = join9(agentPath, conversation.name, "transcript.jsonl");
       const listing = listingFromFile(`${agent.name}/${conversation.name}`, path);
       if (listing && (listing.sizeBytes ?? 0) > 0)
         items.push(listing);
@@ -3197,21 +3344,21 @@ async function listLettaCodeTrajectories(root) {
 
 // src/adapters/openclaw/list.ts
 import { existsSync } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { basename as basename4, join as join9 } from "node:path";
+import { homedir as homedir9 } from "node:os";
+import { basename as basename5, join as join10 } from "node:path";
 async function listOpenClawTrajectories(root) {
   const base = root ?? defaultStateDir();
   const items = [];
-  const agentsPath = join9(base, "agents");
+  const agentsPath = join10(base, "agents");
   for (const agent of safeReadDir(agentsPath)) {
     if (!agent.isDirectory)
       continue;
-    const sessionsPath = join9(agentsPath, agent.name, "sessions");
+    const sessionsPath = join10(agentsPath, agent.name, "sessions");
     for (const entry of safeReadDir(sessionsPath)) {
       if (!entry.isFile || !entry.name.endsWith(".jsonl"))
         continue;
-      const path = join9(sessionsPath, entry.name);
-      const listing = listingFromFile(basename4(entry.name, ".jsonl"), path);
+      const path = join10(sessionsPath, entry.name);
+      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
       if (listing)
         items.push(listing);
     }
@@ -3222,22 +3369,22 @@ function defaultStateDir() {
   const override = process.env.OPENCLAW_STATE_DIR?.trim() || process.env.CLAWDBOT_STATE_DIR?.trim();
   if (override)
     return override;
-  const current = join9(homedir8(), ".openclaw");
+  const current = join10(homedir9(), ".openclaw");
   if (existsSync(current))
     return current;
-  return join9(homedir8(), ".clawdbot");
+  return join10(homedir9(), ".clawdbot");
 }
 
 // src/adapters/openhands/list.ts
-import { homedir as homedir9 } from "node:os";
-import { join as join10 } from "node:path";
+import { homedir as homedir10 } from "node:os";
+import { join as join11 } from "node:path";
 async function listOpenHandsTrajectories(root) {
-  const base = root ?? join10(homedir9(), ".openhands", "sessions");
+  const base = root ?? join11(homedir10(), ".openhands", "sessions");
   const items = [];
   for (const entry of safeReadDir(base)) {
     if (!entry.isDirectory)
       continue;
-    const path = join10(base, entry.name);
+    const path = join11(base, entry.name);
     const facts = safeStat(path);
     items.push({
       id: entry.name,
@@ -3249,46 +3396,12 @@ async function listOpenHandsTrajectories(root) {
 }
 
 // src/adapters/pi/list.ts
-import { homedir as homedir10 } from "node:os";
-import { basename as basename5, join as join11 } from "node:path";
+import { homedir as homedir11 } from "node:os";
+import { basename as basename6, join as join12 } from "node:path";
 async function listPiTrajectories(root) {
   const base = root ?? defaultAgentDir();
   const items = [];
-  const sessionsPath = join11(base, "sessions");
-  for (const project of safeReadDir(sessionsPath)) {
-    if (!project.isDirectory)
-      continue;
-    const projectPath = join11(sessionsPath, project.name);
-    for (const entry of safeReadDir(projectPath)) {
-      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
-        continue;
-      const path = join11(projectPath, entry.name);
-      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
-      if (listing)
-        items.push(listing);
-    }
-  }
-  return sortListings(items);
-}
-function defaultAgentDir() {
-  const override = process.env.PI_CODING_AGENT_DIR?.trim();
-  if (override)
-    return override;
-  return join11(homedir10(), ".pi", "agent");
-}
-
-// src/adapters/omp/list.ts
-import { existsSync as existsSync2 } from "node:fs";
-import { homedir as homedir11 } from "node:os";
-import { basename as basename6, join as join12 } from "node:path";
-async function listOmpTrajectories(root) {
-  const items = [];
-  const sessionsPath = root ? join12(root, "sessions") : resolveOmpSessionsPath({
-    home: homedir11(),
-    platform: process.platform,
-    env: process.env,
-    exists: existsSync2
-  });
+  const sessionsPath = join12(base, "sessions");
   for (const project of safeReadDir(sessionsPath)) {
     if (!project.isDirectory)
       continue;
@@ -3304,20 +3417,54 @@ async function listOmpTrajectories(root) {
   }
   return sortListings(items);
 }
+function defaultAgentDir() {
+  const override = process.env.PI_CODING_AGENT_DIR?.trim();
+  if (override)
+    return override;
+  return join12(homedir11(), ".pi", "agent");
+}
+
+// src/adapters/omp/list.ts
+import { existsSync as existsSync2 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { basename as basename7, join as join13 } from "node:path";
+async function listOmpTrajectories(root) {
+  const items = [];
+  const sessionsPath = root ? join13(root, "sessions") : resolveOmpSessionsPath({
+    home: homedir12(),
+    platform: process.platform,
+    env: process.env,
+    exists: existsSync2
+  });
+  for (const project of safeReadDir(sessionsPath)) {
+    if (!project.isDirectory)
+      continue;
+    const projectPath = join13(sessionsPath, project.name);
+    for (const entry of safeReadDir(projectPath)) {
+      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+        continue;
+      const path = join13(projectPath, entry.name);
+      const listing = listingFromFile(basename7(entry.name, ".jsonl"), path);
+      if (listing)
+        items.push(listing);
+    }
+  }
+  return sortListings(items);
+}
 function resolveOmpSessionsPath(options) {
   const profile = resolveProfile(options.env.OMP_PROFILE, options.env.PI_PROFILE);
-  const configRoot = join12(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
+  const configRoot = join13(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
   const agentOverride = profile ? undefined : options.env.PI_CODING_AGENT_DIR?.trim() || undefined;
-  const agentDir = agentOverride ?? join12(configRoot, "agent");
+  const agentDir = agentOverride ?? join13(configRoot, "agent");
   if (agentOverride === undefined && (options.platform === "linux" || options.platform === "darwin")) {
     const xdgData = options.env.XDG_DATA_HOME?.trim();
     if (xdgData) {
-      const xdgRoot = join12(xdgData, "omp", ...profile ? ["profiles", profile] : []);
+      const xdgRoot = join13(xdgData, "omp", ...profile ? ["profiles", profile] : []);
       if (options.exists(xdgRoot))
-        return join12(xdgRoot, "sessions");
+        return join13(xdgRoot, "sessions");
     }
   }
-  return join12(agentDir, "sessions");
+  return join13(agentDir, "sessions");
 }
 function resolveProfile(ompProfile, piProfile) {
   const value = (ompProfile !== undefined ? ompProfile : piProfile)?.trim();
@@ -3336,6 +3483,7 @@ var LISTERS = {
   "claude-code": listClaudeCodeTrajectories,
   codex: listCodexTrajectories,
   droid: listDroidTrajectories,
+  dsh: listDshTrajectories,
   deepagents: listDeepAgentsTrajectories,
   hermes: listHermesTrajectories,
   "letta-code": listLettaCodeTrajectories,
@@ -3413,6 +3561,7 @@ var ADAPTERS = {
   codex: codexAdapter,
   "copilot-cli": copilotCliAdapter,
   cursor: cursorAdapter,
+  dsh: dshAdapter,
   droid: droidAdapter,
   "gemini-cli": geminiCliAdapter,
   hermes: hermesAdapter,

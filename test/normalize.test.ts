@@ -20,6 +20,7 @@ const fixtures = [
   { source: "copilot-cli", name: "copilot-cli/cleanup" },
   { source: "cursor", name: "cursor/tool-calls" },
   { source: "cursor", name: "cursor/cleanup" },
+  { source: "dsh", name: "dsh/happy-path" },
   { source: "droid", name: "droid/happy-path" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/cleanup" },
@@ -306,6 +307,32 @@ describe("public API", () => {
         }),
       ]),
     );
+  });
+
+  test("decodes dsh direct tool lifecycle events, ignores chunks, and tolerates malformed lines", () => {
+    const transcript = [
+      fixtureText("dsh/happy-path", "input.jsonl"),
+      "{not json}",
+    ].join("\n");
+    const result = normalizeTranscript({ source: "dsh", transcript });
+
+    expect(result.records.filter((record) => record.role === "assistant")).toHaveLength(2);
+    expect(result.records).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        role: "assistant",
+        content: null,
+        tool_calls: [{ id: "toolu-1", name: "bash", args: "{\"cmd\":\"ls\"}" }],
+      }),
+      expect.objectContaining({
+        role: "tool",
+        tool_call_id: "toolu-1",
+        content: "README.md\nsrc",
+        ok: true,
+      }),
+    ]));
+    expect(result.diagnostics).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "invalid_json_line" }),
+    ]));
   });
 
   test("always returns diagnostics", () => {

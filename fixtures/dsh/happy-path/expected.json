@@ -1,0 +1,11 @@
+{
+  "records": [
+    { "role": "meta", "source": "dsh", "cwd": "/home/user/project", "model": "deepseek-chat" },
+    { "role": "user", "content": "List the project files.", "timestamp": "2026-08-15T22:07:26.800Z" },
+    { "role": "assistant", "content": null, "tool_calls": [{ "id": "toolu-1", "name": "bash", "args": "{\"cmd\":\"ls\"}" }], "timestamp": "2026-08-15T22:07:27.000Z" },
+    { "role": "reasoning", "content": "I should inspect the directory.", "timestamp": "2026-08-15T22:07:27.100Z" },
+    { "role": "tool", "tool_call_id": "toolu-1", "content": "README.md\nsrc", "ok": true, "timestamp": "2026-08-15T22:07:27.200Z" },
+    { "role": "assistant", "content": "The project contains README.md and src.", "timestamp": "2026-08-15T22:07:27.400Z" }
+  ],
+  "diagnostics": []
+}

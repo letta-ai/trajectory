@@ -1,0 +1,12 @@
+{"type":"session","version":0,"id":"session-00000000-0000-0000-0000-000000000001","createdAt":1786831646414,"cwd":"/home/user/project","delegationDepth":0,"agentPreset":"standard"}
+{"type":"permission/preset","seq":0,"time":1786831646606,"data":{"preset":"workspace-write"}}
+{"type":"request/header","seq":1,"time":1786831646610,"data":{"header":{"system":"<redacted>","tools":[{"name":"bash"}],"config":{"provider":"deepseek","model":"deepseek-chat","maxTokens":8192}},"reason":"initial"}}
+{"type":"turn/start","seq":2,"time":1786831646700,"data":{"turn":1}}
+{"type":"user/message","seq":3,"time":1786831646800,"data":{"id":"msg-user-1","role":"user","content":[{"type":"text","text":"List the project files."}],"source":{"kind":"interactive"}}}
+{"type":"assistant/chunk","seq":4,"time":1786831646900,"data":{"turn":1,"step":1,"chunk":{"type":"text","text":"I will "}}}
+{"type":"tool/call","seq":5,"time":1786831647000,"data":{"turn":1,"step":1,"callId":"toolu-1","name":"bash","arguments":"{\"cmd\":\"ls\"}"}}
+{"type":"assistant/message","seq":6,"time":1786831647100,"data":{"turn":1,"step":1,"message":{"id":"msg-assistant-call","role":"assistant","content":[{"type":"reasoning","text":"I should inspect the directory."},{"type":"tool-call","id":"toolu-1","name":"bash","arguments":"{\"cmd\":\"ls\"}"}],"source":{"kind":"model"}}}}
+{"type":"tool/result","seq":7,"time":1786831647200,"data":{"turn":1,"step":1,"message":{"id":"msg-tool-1","role":"tool","content":[{"type":"tool-result","toolCallId":"toolu-1","content":[{"type":"text","text":"README.md\nsrc"}],"isError":false}],"source":{"kind":"tool"}}}}
+{"type":"assistant/chunk","seq":8,"time":1786831647300,"data":{"turn":1,"step":2,"chunk":{"type":"text","text":"The project "}}}
+{"type":"assistant/message","seq":9,"time":1786831647400,"data":{"turn":1,"step":2,"message":{"id":"msg-assistant-final","role":"assistant","content":[{"type":"text","text":"The project contains README.md and src."}],"source":{"kind":"model"}}}}
+{"type":"turn/end","seq":10,"time":1786831647500,"data":{"turn":1,"reason":{"kind":"completed"}}}

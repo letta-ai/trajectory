@@ -155,6 +155,24 @@ JavaScript saver rejected Python's `msgpack` serializer type. The production
 adapter therefore delegates to the official Python saver and message reducer
 instead of decoding SQLite blobs or assuming cross-language wire compatibility.
 
+## DeepSeek Harness (dsh)
+
+The dsh adapter was checked on 2026-08-15 against three local DeepSeek Harness
+sessions without retaining or printing transcript content, paths, identifiers,
+arguments, results, or other private fields. dsh persists a zstd-compressed
+append-only JSONL event stream; the adapter intentionally accepts the
+decompressed JSONL payload and does not add a zstd dependency.
+
+Observed sessions used a top-level `session` header; `request/header` model
+configuration; `user/message` and aggregate `assistant/message` content blocks;
+direct `tool/call` and `tool/result` lifecycle events; plus turn/step,
+permission, title, request-context, and streaming chunk events. The decoder
+maps message text/reasoning and direct tool lifecycle events, ignores chunks to
+avoid duplicate assistant text, and uses source-native message/call ids for
+canonical identity. Sanitized fixtures cover the header, model and cwd metadata,
+turns, user and assistant messages, reasoning, a linked successful tool call and
+result, and ignored chunks.
+
 ## OpenCode native export
 
 The OpenCode adapter was implemented against the native-format parser in

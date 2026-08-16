@@ -25,6 +25,7 @@ except ModuleNotFoundError:
 FIXTURES = (
     ("claude-code", "claude-code/tool-call", "input.jsonl"),
     ("claude-code", "claude-code/cleanup", "input.jsonl"),
+    ("claude-code", "claude-code/subagent", "input.jsonl"),
     ("codex", "codex/tool-calls", "input.jsonl"),
     ("codex", "codex/cleanup", "input.jsonl"),
     ("copilot-cli", "copilot-cli/tool-calls", "input.jsonl"),

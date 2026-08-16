@@ -4,7 +4,15 @@ import { NormalizationError } from "./types.js";
 const TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 
-const META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model"]);
+const META_KEYS = new Set([
+  "role",
+  "source",
+  "cwd",
+  "git_branch",
+  "model",
+  "kind",
+  "parent_id",
+]);
 const CONTENT_KEYS = new Set(["role", "content", "timestamp"]);
 const ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls"]);
 const TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "ok", "timestamp"]);
@@ -52,6 +60,15 @@ export function validateTranscript(
       optionalString(record, "cwd", index);
       optionalString(record, "git_branch", index);
       optionalString(record, "model", index);
+      if ("kind" in record && record.kind !== "subagent") {
+        fail(`Record ${index}: meta.kind must be "subagent" when present.`);
+      }
+      if (
+        "parent_id" in record &&
+        (typeof record.parent_id !== "string" || !record.parent_id)
+      ) {
+        fail(`Record ${index}: meta.parent_id must be a non-empty string when present.`);
+      }
       continue;
     }
 

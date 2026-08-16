@@ -844,6 +844,126 @@ describe("partial transcript fragments", () => {
   });
 });
 
+describe("subagent meta identity", () => {
+  test("Claude Code parent sessions omit kind and parent_id", () => {
+    const result = normalizeTranscript({
+      source: "claude-code",
+      transcript: fixtureText("claude-code/tool-call", "input.jsonl"),
+    });
+    const meta = result.records[0];
+    expect(meta?.role).toBe("meta");
+    expect(meta).not.toHaveProperty("kind");
+    expect(meta).not.toHaveProperty("parent_id");
+  });
+
+  test("standalone Claude Code subagents set kind and parent_id", () => {
+    const result = normalizeTranscript({
+      source: "claude-code",
+      transcript: fixtureText("claude-code/subagent", "input.jsonl"),
+    });
+    expect(result.records[0]).toMatchObject({
+      role: "meta",
+      kind: "subagent",
+      parent_id: "parent-session-fixture",
+    });
+  });
+
+  test("standalone Claude Code subagents omit parent_id when session ids are missing", () => {
+    const transcript = [
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        isSidechain: true,
+        message: { role: "user", content: "Inspect the retry path." },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        isSidechain: true,
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Looking." }],
+        },
+      }),
+    ].join("\n");
+    const result = normalizeTranscript({ source: "claude-code", transcript });
+    const meta = result.records[0];
+    expect(meta).toMatchObject({ role: "meta", kind: "subagent" });
+    expect(meta).not.toHaveProperty("parent_id");
+  });
+
+  test("standalone Claude Code subagents omit parent_id when session ids are ambiguous", () => {
+    const transcript = [
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        isSidechain: true,
+        sessionId: "parent-a",
+        message: { role: "user", content: "Inspect the retry path." },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        isSidechain: true,
+        sessionId: "parent-b",
+        message: {
+          role: "assistant",
+          content: [{ type: "text", text: "Looking." }],
+        },
+      }),
+    ].join("\n");
+    const result = normalizeTranscript({ source: "claude-code", transcript });
+    const meta = result.records[0];
+    expect(meta).toMatchObject({ role: "meta", kind: "subagent" });
+    expect(meta).not.toHaveProperty("parent_id");
+  });
+
+  test("Cursor captures without a locator omit kind and parent_id", () => {
+    const result = normalizeTranscript({
+      source: "cursor",
+      transcript: fixtureText("cursor/cleanup", "input.jsonl"),
+    });
+    const meta = result.records[0];
+    expect(meta?.role).toBe("meta");
+    expect(meta).not.toHaveProperty("kind");
+    expect(meta).not.toHaveProperty("parent_id");
+  });
+
+  test("Cursor subagent locators set kind and parent_id from path segments", () => {
+    const transcript = fixtureText("cursor/cleanup", "input.jsonl");
+    for (const locator of [
+      "/Users/me/.cursor/projects/slug/agent-transcripts/parent-uuid/subagents/child-uuid.jsonl",
+      "C:\\Users\\me\\.cursor\\projects\\slug\\agent-transcripts\\parent-uuid\\subagents\\child-uuid.jsonl",
+    ]) {
+      const result = normalizeTranscript({
+        source: "cursor",
+        transcript,
+        sourceContext: { locator },
+      });
+      expect(result.records[0]).toMatchObject({
+        role: "meta",
+        kind: "subagent",
+        parent_id: "parent-uuid",
+      });
+    }
+  });
+
+  test("Cursor parent locators do not set kind", () => {
+    const result = normalizeTranscript({
+      source: "cursor",
+      transcript: fixtureText("cursor/cleanup", "input.jsonl"),
+      sourceContext: {
+        locator:
+          "/Users/me/.cursor/projects/slug/agent-transcripts/parent-uuid/parent-uuid.jsonl",
+      },
+    });
+    const meta = result.records[0];
+    expect(meta?.role).toBe("meta");
+    expect(meta).not.toHaveProperty("kind");
+    expect(meta).not.toHaveProperty("parent_id");
+  });
+});
+
 describe("validation", () => {
   test("rejects tool arguments that do not encode an object", () => {
     const invalid = [

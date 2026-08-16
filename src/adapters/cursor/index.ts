@@ -3,7 +3,7 @@ import type {
   DecodedSession,
   SourceAdapter,
 } from "../../internal.js";
-import type { Diagnostic } from "../../types.js";
+import type { Diagnostic, SourceContext } from "../../types.js";
 import { NormalizationError } from "../../types.js";
 import {
   blocksText,
@@ -16,7 +16,7 @@ import {
 export const cursorAdapter: SourceAdapter = {
   source: "cursor",
 
-  decode(transcript: string): DecodedSession {
+  decode(transcript: string, sourceContext?: SourceContext): DecodedSession {
     const diagnostics: Diagnostic[] = [];
     const events: DecodedEvent[] = [];
     let recognizedRows = 0;
@@ -114,13 +114,43 @@ export const cursorAdapter: SourceAdapter = {
     }
 
     if (recognizedRows === 0) throw invalidCursorTranscript();
+    const identity = parseCursorLocator(sourceContext?.locator);
     return {
       events,
-      context: { source: "cursor" },
+      context: {
+        source: "cursor",
+        ...identity,
+      },
       diagnostics,
     };
   },
 };
+
+/**
+ * Parse a store path for Cursor identity. The locator is never read; only its
+ * path segments matter. A `subagents` directory marks a child transcript.
+ */
+function parseCursorLocator(
+  locator: string | undefined,
+): {
+  kind?: "subagent";
+  parentId?: string;
+  sourceGroupId?: string;
+} {
+  if (!locator) return {};
+  const segments = locator.split(/[\\/]+/).filter(Boolean);
+  const filename = segments[segments.length - 1];
+  if (!filename) return {};
+  const sourceGroupId = filename.replace(/\.jsonl$/i, "");
+  const subagentsIndex = segments.findIndex((segment) => segment === "subagents");
+  if (subagentsIndex > 0) {
+    const parentId = segments[subagentsIndex - 1];
+    if (parentId) {
+      return { kind: "subagent", parentId, sourceGroupId };
+    }
+  }
+  return { sourceGroupId };
+}
 
 function resultContent(value: unknown): string {
   if (typeof value === "string") return value;

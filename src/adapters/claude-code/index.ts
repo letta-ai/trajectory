@@ -220,6 +220,8 @@ export const claudeCodeAdapter: SourceAdapter = {
         ...(gitBranch ? { gitBranch } : {}),
         ...(sourceGroupId ? { sourceGroupId } : {}),
         ...(sourceGroupAmbiguous ? { sourceGroupAmbiguous: true } : {}),
+        ...(standaloneSidechain ? { kind: "subagent" as const } : {}),
+        ...(standaloneSidechain && sessionId ? { parentId: sessionId } : {}),
       },
       diagnostics,
     };

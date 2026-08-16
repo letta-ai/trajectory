@@ -3,6 +3,7 @@ import type { ResolvedNormalizationFilters } from "./filters.js";
 import type {
   Diagnostic,
   NormalizedRecord,
+  SourceContext,
   TranscriptTrajectorySource,
 } from "./types.js";
 
@@ -95,6 +96,10 @@ export interface SessionContext {
    * Canonical callers must provide the authoritative group.
    */
   sourceGroupRequired?: boolean;
+  /** Present only on standalone subagent transcripts. */
+  kind?: "subagent";
+  /** Spawning session id, when uniquely resolved. */
+  parentId?: string;
 }
 
 export interface DecodedSession {
@@ -105,7 +110,7 @@ export interface DecodedSession {
 
 export interface SourceAdapter {
   source: TranscriptTrajectorySource;
-  decode(transcript: string): DecodedSession;
+  decode(transcript: string, sourceContext?: SourceContext): DecodedSession;
 }
 
 /**

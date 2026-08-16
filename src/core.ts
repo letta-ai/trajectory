@@ -478,6 +478,8 @@ function buildMeta(
     ...(context.cwd ? { cwd: context.cwd } : {}),
     ...(context.gitBranch ? { git_branch: context.gitBranch } : {}),
     ...(model ? { model } : {}),
+    ...(context.kind ? { kind: context.kind } : {}),
+    ...(context.parentId ? { parent_id: context.parentId } : {}),
   };
 }
 

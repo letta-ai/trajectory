@@ -12,6 +12,7 @@
 
 import { listClaudeCodeTrajectories } from "./adapters/claude-code/list.js";
 import { listCodexTrajectories } from "./adapters/codex/list.js";
+import { listCursorTrajectories } from "./adapters/cursor/list.js";
 import { listDroidTrajectories } from "./adapters/droid/list.js";
 import { listDeepAgentsTrajectories } from "./adapters/deepagents/list.js";
 import { listHermesTrajectories } from "./adapters/hermes/list.js";
@@ -63,6 +64,7 @@ type SourceLister = (root: string | undefined) => Promise<TrajectoryListing[]>;
 const LISTERS: Partial<Record<AnyTrajectorySource, SourceLister>> = {
   "claude-code": listClaudeCodeTrajectories,
   codex: listCodexTrajectories,
+  cursor: listCursorTrajectories,
   droid: listDroidTrajectories,
   deepagents: listDeepAgentsTrajectories,
   hermes: listHermesTrajectories,
@@ -112,7 +114,6 @@ export async function listTrajectories(
 function isKnownNormalizationOnlySource(source: AnyTrajectorySource): boolean {
   return (
     source === "copilot-cli" ||
-    source === "cursor" ||
     source === "gemini-cli" ||
     source === "opencode"
   );

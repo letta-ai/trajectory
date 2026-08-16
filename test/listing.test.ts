@@ -119,6 +119,36 @@ beforeAll(() => {
       "('h-new', NULL, 1783100000.0, 1783100500.0)",
   );
   hermes.close();
+
+  // cursor: parents + subagents, plus a duplicate id across project folders.
+  for (const [relativePath, at] of [
+    [
+      "slug-old/agent-transcripts/parent-aaa/parent-aaa.jsonl",
+      "2026-07-01T10:00:00Z",
+    ],
+    [
+      "slug-old/agent-transcripts/parent-aaa/subagents/child-bbb.jsonl",
+      "2026-07-02T10:00:00Z",
+    ],
+    [
+      "slug-new/agent-transcripts/parent-aaa/parent-aaa.jsonl",
+      "2026-07-04T10:00:00Z",
+    ],
+    [
+      "slug-new/agent-transcripts/parent-ccc/parent-ccc.jsonl",
+      "2026-07-03T10:00:00Z",
+    ],
+    [
+      "slug-new/agent-transcripts/parent-ccc/subagents/child-ddd.jsonl",
+      "2026-07-05T10:00:00Z",
+    ],
+  ] as const) {
+    const file = join(base, "cursor", relativePath);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, `{"role":"user","message":{"content":"hi"}}\n`);
+    const time = new Date(at);
+    utimesSync(file, time, time);
+  }
 });
 
 afterAll(() => {
@@ -129,7 +159,6 @@ describe("listTrajectories", () => {
   test("reports normalization-only sources without pretending to discover a store", async () => {
     for (const source of [
       "copilot-cli",
-      "cursor",
       "gemini-cli",
       "opencode",
     ] as const) {
@@ -137,6 +166,24 @@ describe("listTrajectories", () => {
         expect.objectContaining({ code: "listing_unavailable" }),
       );
     }
+  });
+
+  test("lists cursor parents and subagents and collapses duplicate ids to newest", async () => {
+    const result = await listTrajectories({
+      source: "cursor",
+      root: join(base, "cursor"),
+    });
+    expect(result.items.map((item) => item.id)).toEqual([
+      "child-ddd",
+      "parent-aaa",
+      "parent-ccc",
+      "child-bbb",
+    ]);
+    expect(result.items[1]?.path.includes("slug-new")).toBe(true);
+    expect(result.items[1]?.updatedAt).toBe("2026-07-04T10:00:00.000Z");
+    expect(result.items.some((item) => item.path.includes("subagents"))).toBe(
+      true,
+    );
   });
 
   test("lists claude-code parent and subagent sessions newest first", async () => {
@@ -263,7 +310,7 @@ describe("listTrajectories", () => {
   });
 
   test("returns an empty listing for a missing store", async () => {
-    for (const source of ["claude-code", "hermes", "deepagents"] as const) {
+    for (const source of ["claude-code", "cursor", "hermes", "deepagents"] as const) {
       const result = await listTrajectories({
         source,
         root: join(base, "does-not-exist"),

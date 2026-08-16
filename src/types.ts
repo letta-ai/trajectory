@@ -79,6 +79,11 @@ export interface SourceContext {
    * partial. Full-transcript callers omit this and stay strict.
    */
   partial?: boolean;
+  /**
+   * Store path of this transcript. Adapters may parse it for identity (for
+   * example Cursor `kind` / `parent_id`); it is never read from disk.
+   */
+  locator?: string;
 }
 
 export interface NormalizeInput {
@@ -120,6 +125,10 @@ export interface MetaRecord {
   cwd?: string;
   git_branch?: string;
   model?: string;
+  /** Present only on standalone subagent transcripts. */
+  kind?: "subagent";
+  /** Spawning session id, when the adapter can resolve it uniquely. */
+  parent_id?: string;
 }
 
 export interface UserRecord {

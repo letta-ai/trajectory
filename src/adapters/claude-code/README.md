@@ -14,7 +14,9 @@ Standalone subagent JSONL is also supported. Claude Code marks every
 conversational row in those files with `isSidechain: true`; when no ordinary
 conversation rows are present, the adapter treats the sidechain as the primary
 conversation and uses its `agentId` as the source group rather than the parent
-`sessionId`.
+`sessionId`. The leading meta record then includes `kind: "subagent"` and, when
+exactly one parent `sessionId` is present, `parent_id`. Missing or conflicting
+parent session ids omit `parent_id` rather than failing.
 
 Resumed or concatenated exports may contain records carrying multiple parent
 `sessionId` values. They remain valid trajectory-v1 input. Canonical callers

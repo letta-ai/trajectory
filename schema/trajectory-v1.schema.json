@@ -28,7 +28,9 @@
         "source": { "type": "string", "minLength": 1 },
         "cwd": { "type": "string" },
         "git_branch": { "type": "string" },
-        "model": { "type": "string" }
+        "model": { "type": "string" },
+        "kind": { "const": "subagent" },
+        "parent_id": { "type": "string", "minLength": 1 }
       }
     },
     "user": {

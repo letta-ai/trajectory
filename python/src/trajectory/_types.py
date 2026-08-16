@@ -89,6 +89,7 @@ class SourceContext(TypedDict, total=False):
     groupId: str
     baseByteOffset: int
     partial: bool
+    locator: str
 
 
 class _NormalizeInputOptional(TypedDict, total=False):
@@ -139,6 +140,8 @@ class _MetaOptional(TypedDict, total=False):
     cwd: str
     git_branch: str
     model: str
+    kind: Literal["subagent"]
+    parent_id: str
 
 
 class MetaRecord(_MetaOptional):

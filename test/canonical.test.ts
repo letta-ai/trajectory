@@ -738,6 +738,10 @@ describe("meta determinism", () => {
       "assistant",
     ]);
     expect(result.diagnostics).toEqual([]);
+    expect(JSON.parse(result.records[0]?.record_json ?? "{}")).toMatchObject({
+      kind: "subagent",
+      parent_id: "parent-session-fixture",
+    });
   });
 
   test("subagent identity survives parent session-id drift", () => {
@@ -753,6 +757,30 @@ describe("meta determinism", () => {
     expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
       new Set(["subagent-fixture"]),
     );
+    const meta = JSON.parse(result.records[0]?.record_json ?? "{}") as {
+      kind?: string;
+      parent_id?: string;
+    };
+    expect(meta.kind).toBe("subagent");
+    expect(meta.parent_id).toBeUndefined();
+  });
+
+  test("Cursor locator supplies canonical group and subagent meta", () => {
+    const result = normalizeToCanonical({
+      source: "cursor",
+      transcript: fixtureText("cursor/cleanup", "input.jsonl"),
+      sourceContext: {
+        locator:
+          "/Users/me/.cursor/projects/slug/agent-transcripts/parent-uuid/subagents/child-uuid.jsonl",
+      },
+    });
+    expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
+      new Set(["child-uuid"]),
+    );
+    expect(JSON.parse(result.records[0]?.record_json ?? "{}")).toMatchObject({
+      kind: "subagent",
+      parent_id: "parent-uuid",
+    });
   });
 });
 

@@ -229,7 +229,9 @@ var claudeCodeAdapter = {
         ...cwd ? { cwd } : {},
         ...gitBranch ? { gitBranch } : {},
         ...sourceGroupId ? { sourceGroupId } : {},
-        ...sourceGroupAmbiguous ? { sourceGroupAmbiguous: true } : {}
+        ...sourceGroupAmbiguous ? { sourceGroupAmbiguous: true } : {},
+        ...standaloneSidechain ? { kind: "subagent" } : {},
+        ...standaloneSidechain && sessionId ? { parentId: sessionId } : {}
       },
       diagnostics
     };
@@ -657,7 +659,7 @@ function invalidCopilotTranscript() {
 // src/adapters/cursor/index.ts
 var cursorAdapter = {
   source: "cursor",
-  decode(transcript) {
+  decode(transcript, sourceContext) {
     const diagnostics = [];
     const events = [];
     let recognizedRows = 0;
@@ -729,13 +731,34 @@ var cursorAdapter = {
     }
     if (recognizedRows === 0)
       throw invalidCursorTranscript();
+    const identity = parseCursorLocator(sourceContext?.locator);
     return {
       events,
-      context: { source: "cursor" },
+      context: {
+        source: "cursor",
+        ...identity
+      },
       diagnostics
     };
   }
 };
+function parseCursorLocator(locator) {
+  if (!locator)
+    return {};
+  const segments = locator.split(/[\\/]+/).filter(Boolean);
+  const filename = segments[segments.length - 1];
+  if (!filename)
+    return {};
+  const sourceGroupId = filename.replace(/\.jsonl$/i, "");
+  const subagentsIndex = segments.findIndex((segment) => segment === "subagents");
+  if (subagentsIndex > 0) {
+    const parentId = segments[subagentsIndex - 1];
+    if (parentId) {
+      return { kind: "subagent", parentId, sourceGroupId };
+    }
+  }
+  return { sourceGroupId };
+}
 function resultContent(value) {
   if (typeof value === "string")
     return value;
@@ -1950,7 +1973,15 @@ function invalidFilters(message) {
 
 // src/validate.ts
 var TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
-var META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model"]);
+var META_KEYS = new Set([
+  "role",
+  "source",
+  "cwd",
+  "git_branch",
+  "model",
+  "kind",
+  "parent_id"
+]);
 var CONTENT_KEYS = new Set(["role", "content", "timestamp"]);
 var ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls"]);
 var TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "ok", "timestamp"]);
@@ -1980,6 +2011,12 @@ function validateTranscript(value, options) {
       optionalString(record, "cwd", index);
       optionalString(record, "git_branch", index);
       optionalString(record, "model", index);
+      if ("kind" in record && record.kind !== "subagent") {
+        fail(`Record ${index}: meta.kind must be "subagent" when present.`);
+      }
+      if ("parent_id" in record && (typeof record.parent_id !== "string" || !record.parent_id)) {
+        fail(`Record ${index}: meta.parent_id must be a non-empty string when present.`);
+      }
       continue;
     }
     validateTimestamp(record.timestamp, index);
@@ -2390,7 +2427,9 @@ function buildMeta(context, modelCounts) {
     source: context.source,
     ...context.cwd ? { cwd: context.cwd } : {},
     ...context.gitBranch ? { git_branch: context.gitBranch } : {},
-    ...model ? { model } : {}
+    ...model ? { model } : {},
+    ...context.kind ? { kind: context.kind } : {},
+    ...context.parentId ? { parent_id: context.parentId } : {}
   };
 }
 function fillTimestamps(count, anchors, context, diagnostics) {
@@ -3096,14 +3135,60 @@ async function listCodexTrajectories(root) {
   return sortListings(items);
 }
 
-// src/adapters/droid/list.ts
+// src/adapters/cursor/list.ts
 import { homedir as homedir4 } from "node:os";
 import { basename as basename3, join as join5 } from "node:path";
+var JSONL_SUFFIX2 = ".jsonl";
+async function listCursorTrajectories(root) {
+  const base = root ?? join5(homedir4(), ".cursor", "projects");
+  const items = [];
+  for (const project of safeReadDir(base)) {
+    if (!project.isDirectory)
+      continue;
+    const transcripts = join5(base, project.name, "agent-transcripts");
+    for (const session of safeReadDir(transcripts)) {
+      if (!session.isDirectory)
+        continue;
+      const sessionDir = join5(transcripts, session.name);
+      const parent = listingFromFile(session.name, join5(sessionDir, `${session.name}${JSONL_SUFFIX2}`));
+      if (parent)
+        items.push(parent);
+      const subagentsDir = join5(sessionDir, "subagents");
+      for (const child of safeReadDir(subagentsDir)) {
+        if (!child.isFile || !child.name.endsWith(JSONL_SUFFIX2))
+          continue;
+        const listing = listingFromFile(basename3(child.name, JSONL_SUFFIX2), join5(subagentsDir, child.name));
+        if (listing)
+          items.push(listing);
+      }
+    }
+  }
+  return sortListings(collapseNewestById(items));
+}
+function collapseNewestById(items) {
+  const newest = new Map;
+  for (const item of items) {
+    const current = newest.get(item.id);
+    if (!current) {
+      newest.set(item.id, item);
+      continue;
+    }
+    const currentTime = current.updatedAt ?? "";
+    const nextTime = item.updatedAt ?? "";
+    if (nextTime > currentTime)
+      newest.set(item.id, item);
+  }
+  return [...newest.values()];
+}
+
+// src/adapters/droid/list.ts
+import { homedir as homedir5 } from "node:os";
+import { basename as basename4, join as join6 } from "node:path";
 async function listDroidTrajectories(root) {
-  const base = root ?? join5(homedir4(), ".factory", "sessions");
+  const base = root ?? join6(homedir5(), ".factory", "sessions");
   const items = [];
   for (const path of collectFiles(base, ".jsonl", 12)) {
-    const listing = listingFromFile(basename3(path, ".jsonl"), path);
+    const listing = listingFromFile(basename4(path, ".jsonl"), path);
     if (listing)
       items.push(listing);
   }
@@ -3111,8 +3196,8 @@ async function listDroidTrajectories(root) {
 }
 
 // src/adapters/deepagents/list.ts
-import { homedir as homedir5 } from "node:os";
-import { join as join6 } from "node:path";
+import { homedir as homedir6 } from "node:os";
+import { join as join7 } from "node:path";
 async function listDeepAgentsTrajectories(root) {
   const path = resolveStorePath(root);
   if (!safeStat(path))
@@ -3133,13 +3218,13 @@ async function listDeepAgentsTrajectories(root) {
 }
 function resolveStorePath(root) {
   if (root === undefined)
-    return join6(homedir5(), ".deepagents", "sessions.db");
-  return root.endsWith(".db") ? root : join6(root, "sessions.db");
+    return join7(homedir6(), ".deepagents", "sessions.db");
+  return root.endsWith(".db") ? root : join7(root, "sessions.db");
 }
 
 // src/adapters/hermes/list.ts
-import { homedir as homedir6 } from "node:os";
-import { join as join7 } from "node:path";
+import { homedir as homedir7 } from "node:os";
+import { join as join8 } from "node:path";
 async function listHermesTrajectories(root) {
   const path = resolveStorePath2(root);
   if (!safeStat(path))
@@ -3166,27 +3251,27 @@ async function listHermesTrajectories(root) {
 }
 function resolveStorePath2(root) {
   if (root === undefined)
-    return join7(homedir6(), ".hermes", "state.db");
-  return root.endsWith(".db") ? root : join7(root, "state.db");
+    return join8(homedir7(), ".hermes", "state.db");
+  return root.endsWith(".db") ? root : join8(root, "state.db");
 }
 function numeric(value) {
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : undefined;
 }
 
 // src/adapters/letta-code/list.ts
-import { homedir as homedir7 } from "node:os";
-import { join as join8 } from "node:path";
+import { homedir as homedir8 } from "node:os";
+import { join as join9 } from "node:path";
 async function listLettaCodeTrajectories(root) {
-  const base = root ?? join8(homedir7(), ".letta", "transcripts");
+  const base = root ?? join9(homedir8(), ".letta", "transcripts");
   const items = [];
   for (const agent of safeReadDir(base)) {
     if (!agent.isDirectory)
       continue;
-    const agentPath = join8(base, agent.name);
+    const agentPath = join9(base, agent.name);
     for (const conversation of safeReadDir(agentPath)) {
       if (!conversation.isDirectory)
         continue;
-      const path = join8(agentPath, conversation.name, "transcript.jsonl");
+      const path = join9(agentPath, conversation.name, "transcript.jsonl");
       const listing = listingFromFile(`${agent.name}/${conversation.name}`, path);
       if (listing && (listing.sizeBytes ?? 0) > 0)
         items.push(listing);
@@ -3197,21 +3282,21 @@ async function listLettaCodeTrajectories(root) {
 
 // src/adapters/openclaw/list.ts
 import { existsSync } from "node:fs";
-import { homedir as homedir8 } from "node:os";
-import { basename as basename4, join as join9 } from "node:path";
+import { homedir as homedir9 } from "node:os";
+import { basename as basename5, join as join10 } from "node:path";
 async function listOpenClawTrajectories(root) {
   const base = root ?? defaultStateDir();
   const items = [];
-  const agentsPath = join9(base, "agents");
+  const agentsPath = join10(base, "agents");
   for (const agent of safeReadDir(agentsPath)) {
     if (!agent.isDirectory)
       continue;
-    const sessionsPath = join9(agentsPath, agent.name, "sessions");
+    const sessionsPath = join10(agentsPath, agent.name, "sessions");
     for (const entry of safeReadDir(sessionsPath)) {
       if (!entry.isFile || !entry.name.endsWith(".jsonl"))
         continue;
-      const path = join9(sessionsPath, entry.name);
-      const listing = listingFromFile(basename4(entry.name, ".jsonl"), path);
+      const path = join10(sessionsPath, entry.name);
+      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
       if (listing)
         items.push(listing);
     }
@@ -3222,22 +3307,22 @@ function defaultStateDir() {
   const override = process.env.OPENCLAW_STATE_DIR?.trim() || process.env.CLAWDBOT_STATE_DIR?.trim();
   if (override)
     return override;
-  const current = join9(homedir8(), ".openclaw");
+  const current = join10(homedir9(), ".openclaw");
   if (existsSync(current))
     return current;
-  return join9(homedir8(), ".clawdbot");
+  return join10(homedir9(), ".clawdbot");
 }
 
 // src/adapters/openhands/list.ts
-import { homedir as homedir9 } from "node:os";
-import { join as join10 } from "node:path";
+import { homedir as homedir10 } from "node:os";
+import { join as join11 } from "node:path";
 async function listOpenHandsTrajectories(root) {
-  const base = root ?? join10(homedir9(), ".openhands", "sessions");
+  const base = root ?? join11(homedir10(), ".openhands", "sessions");
   const items = [];
   for (const entry of safeReadDir(base)) {
     if (!entry.isDirectory)
       continue;
-    const path = join10(base, entry.name);
+    const path = join11(base, entry.name);
     const facts = safeStat(path);
     items.push({
       id: entry.name,
@@ -3249,46 +3334,12 @@ async function listOpenHandsTrajectories(root) {
 }
 
 // src/adapters/pi/list.ts
-import { homedir as homedir10 } from "node:os";
-import { basename as basename5, join as join11 } from "node:path";
+import { homedir as homedir11 } from "node:os";
+import { basename as basename6, join as join12 } from "node:path";
 async function listPiTrajectories(root) {
   const base = root ?? defaultAgentDir();
   const items = [];
-  const sessionsPath = join11(base, "sessions");
-  for (const project of safeReadDir(sessionsPath)) {
-    if (!project.isDirectory)
-      continue;
-    const projectPath = join11(sessionsPath, project.name);
-    for (const entry of safeReadDir(projectPath)) {
-      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
-        continue;
-      const path = join11(projectPath, entry.name);
-      const listing = listingFromFile(basename5(entry.name, ".jsonl"), path);
-      if (listing)
-        items.push(listing);
-    }
-  }
-  return sortListings(items);
-}
-function defaultAgentDir() {
-  const override = process.env.PI_CODING_AGENT_DIR?.trim();
-  if (override)
-    return override;
-  return join11(homedir10(), ".pi", "agent");
-}
-
-// src/adapters/omp/list.ts
-import { existsSync as existsSync2 } from "node:fs";
-import { homedir as homedir11 } from "node:os";
-import { basename as basename6, join as join12 } from "node:path";
-async function listOmpTrajectories(root) {
-  const items = [];
-  const sessionsPath = root ? join12(root, "sessions") : resolveOmpSessionsPath({
-    home: homedir11(),
-    platform: process.platform,
-    env: process.env,
-    exists: existsSync2
-  });
+  const sessionsPath = join12(base, "sessions");
   for (const project of safeReadDir(sessionsPath)) {
     if (!project.isDirectory)
       continue;
@@ -3304,20 +3355,54 @@ async function listOmpTrajectories(root) {
   }
   return sortListings(items);
 }
+function defaultAgentDir() {
+  const override = process.env.PI_CODING_AGENT_DIR?.trim();
+  if (override)
+    return override;
+  return join12(homedir11(), ".pi", "agent");
+}
+
+// src/adapters/omp/list.ts
+import { existsSync as existsSync2 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { basename as basename7, join as join13 } from "node:path";
+async function listOmpTrajectories(root) {
+  const items = [];
+  const sessionsPath = root ? join13(root, "sessions") : resolveOmpSessionsPath({
+    home: homedir12(),
+    platform: process.platform,
+    env: process.env,
+    exists: existsSync2
+  });
+  for (const project of safeReadDir(sessionsPath)) {
+    if (!project.isDirectory)
+      continue;
+    const projectPath = join13(sessionsPath, project.name);
+    for (const entry of safeReadDir(projectPath)) {
+      if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+        continue;
+      const path = join13(projectPath, entry.name);
+      const listing = listingFromFile(basename7(entry.name, ".jsonl"), path);
+      if (listing)
+        items.push(listing);
+    }
+  }
+  return sortListings(items);
+}
 function resolveOmpSessionsPath(options) {
   const profile = resolveProfile(options.env.OMP_PROFILE, options.env.PI_PROFILE);
-  const configRoot = join12(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
+  const configRoot = join13(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
   const agentOverride = profile ? undefined : options.env.PI_CODING_AGENT_DIR?.trim() || undefined;
-  const agentDir = agentOverride ?? join12(configRoot, "agent");
+  const agentDir = agentOverride ?? join13(configRoot, "agent");
   if (agentOverride === undefined && (options.platform === "linux" || options.platform === "darwin")) {
     const xdgData = options.env.XDG_DATA_HOME?.trim();
     if (xdgData) {
-      const xdgRoot = join12(xdgData, "omp", ...profile ? ["profiles", profile] : []);
+      const xdgRoot = join13(xdgData, "omp", ...profile ? ["profiles", profile] : []);
       if (options.exists(xdgRoot))
-        return join12(xdgRoot, "sessions");
+        return join13(xdgRoot, "sessions");
     }
   }
-  return join12(agentDir, "sessions");
+  return join13(agentDir, "sessions");
 }
 function resolveProfile(ompProfile, piProfile) {
   const value = (ompProfile !== undefined ? ompProfile : piProfile)?.trim();
@@ -3335,6 +3420,7 @@ var MAX_LIMIT = 1000;
 var LISTERS = {
   "claude-code": listClaudeCodeTrajectories,
   codex: listCodexTrajectories,
+  cursor: listCursorTrajectories,
   droid: listDroidTrajectories,
   deepagents: listDeepAgentsTrajectories,
   hermes: listHermesTrajectories,
@@ -3360,7 +3446,7 @@ async function listTrajectories(input) {
   return paginate(items, input.cursor, limit);
 }
 function isKnownNormalizationOnlySource(source) {
-  return source === "copilot-cli" || source === "cursor" || source === "gemini-cli" || source === "opencode";
+  return source === "copilot-cli" || source === "gemini-cli" || source === "opencode";
 }
 function resolveLimit2(limit) {
   if (limit === undefined)
@@ -3435,7 +3521,7 @@ function decodeTranscript(input) {
     throw new NormalizationError("unknown_source", `Unknown trajectory source ${JSON.stringify(input.source)}. Supported sources: ${Object.keys(ADAPTERS).join(", ")}.`);
   }
   return {
-    decoded: adapter.decode(input.transcript),
+    decoded: adapter.decode(input.transcript, input.sourceContext),
     bounds: resolveBounds(input.bounds),
     filters: resolveFilters(input.filters)
   };

@@ -69,7 +69,7 @@ function decodeTranscript(input: NormalizeInput): {
   }
 
   return {
-    decoded: adapter.decode(input.transcript),
+    decoded: adapter.decode(input.transcript, input.sourceContext),
     bounds: resolveBounds(input.bounds),
     filters: resolveFilters(input.filters),
   };

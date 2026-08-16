@@ -111,9 +111,12 @@ what the adapter drops.
 `listTrajectories()` enumerates the sessions in a source's standard local
 store, newest first, with cursor pagination. It is a discovery layer beside
 normalization — `normalizeTranscript()` itself never touches the filesystem.
-Copilot CLI, Cursor, Gemini CLI, and OpenCode are export-only input contracts
-and intentionally return `listing_unavailable`; callers locate and read the
-exports themselves.
+Copilot CLI, Gemini CLI, and OpenCode are export-only input contracts and
+intentionally return `listing_unavailable`; callers locate and read the
+exports themselves. Cursor lists `~/.cursor/projects/*/agent-transcripts`
+(parents and `subagents/` children); pass each item's `path` as
+`sourceContext.locator` when normalizing so subagent identity can be parsed
+from the path without reading it.
 
 ```ts
 import { listTrajectories } from "@letta-ai/trajectory";

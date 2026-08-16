@@ -5,7 +5,9 @@
       "source": "claude-code",
       "cwd": "/workspace/project",
       "git_branch": "main",
-      "model": "claude-sonnet"
+      "model": "claude-sonnet",
+      "kind": "subagent",
+      "parent_id": "parent-session-fixture"
     },
     {
       "role": "user",

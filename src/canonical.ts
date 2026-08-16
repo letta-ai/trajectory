@@ -233,6 +233,10 @@ function semanticContent(
               ? { git_branch: record.git_branch }
               : {}),
             ...(record.model !== undefined ? { model: record.model } : {}),
+            ...(record.kind !== undefined ? { kind: record.kind } : {}),
+            ...(record.parent_id !== undefined
+              ? { parent_id: record.parent_id }
+              : {}),
           }
         : {};
     case "user":

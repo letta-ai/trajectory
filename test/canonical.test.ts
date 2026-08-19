@@ -232,7 +232,70 @@ describe("canonical filtering", () => {
     expect(
       result.records.some((record) => record.record_type === "assistant-tool-call"),
     ).toBe(true);
-    expect(result.config.filters).toEqual({ toolResults: "omit" });
+    expect(result.config.filters).toEqual({
+      toolResults: "omit",
+      systemMessages: "omit",
+    });
+  });
+
+  test("projects explicitly included system messages", () => {
+    const transcript = [
+      codexMessage(
+        "system",
+        "Follow the project instructions.",
+        "2026-08-19T09:00:00Z",
+      ),
+      codexMessage("user", "Inspect the project.", "2026-08-19T09:00:01Z"),
+      codexMessage("assistant", "I inspected it.", "2026-08-19T09:00:02Z"),
+    ].join("\n");
+    const result = normalizeToCanonical({
+      source: "codex",
+      transcript,
+      filters: { systemMessages: "include" },
+      sourceContext: { groupId: "system-filter-test" },
+    });
+
+    const system = result.records.find((record) => record.record_type === "system");
+    expect(system).toMatchObject({
+      source_type: "codex",
+      source_identity_kind: "location",
+      content: "Follow the project instructions.",
+      tool_call_id: null,
+      tool_name: null,
+      tool_arguments_json: null,
+      tool_result_json: null,
+      tool_result_ok: null,
+    });
+    expect(system?.record_id).toMatch(HEX_64);
+    expect(system?.record_hash).toMatch(HEX_64);
+    expect(system?.content_hash).toMatch(HEX_64);
+    expect(result.config.filters).toEqual({
+      toolResults: "include",
+      systemMessages: "include",
+    });
+    expect(validateCanonical(result.records)).toBe(true);
+  });
+
+  test("omits system messages from canonical output by default", () => {
+    const transcript = [
+      codexMessage(
+        "system",
+        "Follow the project instructions.",
+        "2026-08-19T09:00:00Z",
+      ),
+      codexMessage("user", "Inspect the project.", "2026-08-19T09:00:01Z"),
+      codexMessage("assistant", "I inspected it.", "2026-08-19T09:00:02Z"),
+    ].join("\n");
+    const result = normalizeToCanonical({
+      source: "codex",
+      transcript,
+      sourceContext: { groupId: "system-default-test" },
+    });
+
+    expect(result.records.some((record) => record.record_type === "system")).toBe(
+      false,
+    );
+    expect(result.config.filters.systemMessages).toBe("omit");
   });
 });
 
@@ -886,14 +949,20 @@ function codexMeta(id: string, cwd: string, timestamp: string): string {
   return JSON.stringify({ type: "session_meta", payload: { id, cwd, timestamp } });
 }
 
-function codexMessage(role: "user" | "assistant", text: string, timestamp: string): string {
+function codexMessage(
+  role: "system" | "user" | "assistant",
+  text: string,
+  timestamp: string,
+): string {
   return JSON.stringify({
     type: "response_item",
     timestamp,
     payload: {
       type: "message",
       role,
-      content: [{ type: role === "user" ? "input_text" : "output_text", text }],
+      content: [
+        { type: role === "assistant" ? "output_text" : "input_text", text },
+      ],
     },
   });
 }

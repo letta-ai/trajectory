@@ -42,7 +42,7 @@ interface DecodedEventBase {
 
 export interface DecodedMessageEvent extends DecodedEventBase {
   type: "message";
-  role: "user" | "assistant";
+  role: "system" | "user" | "assistant";
   content: string;
 }
 

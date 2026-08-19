@@ -129,7 +129,7 @@
   ],
   "diagnostics": [],
   "normalizer_version": "0.2.0",
-  "canonical_schema_version": 2,
+  "canonical_schema_version": 3,
   "config": {
     "bounds": {
       "toolArguments": {
@@ -141,7 +141,8 @@
       }
     },
     "filters": {
-      "toolResults": "include"
+      "toolResults": "include",
+      "systemMessages": "omit"
     }
   }
 }

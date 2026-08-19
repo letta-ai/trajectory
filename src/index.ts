@@ -217,6 +217,8 @@ export {
   type ReasoningRecord,
   type SourceContext,
   type SourceIdentityKind,
+  type SystemMessagePolicy,
+  type SystemRecord,
   type ToolCall,
   type ToolArgumentBounds,
   type ToolResultBounds,

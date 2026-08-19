@@ -39,7 +39,7 @@ fields it must compute from stored cross-upload state.
 | `source_identity_kind` | library | `native` \| `location` \| `content` \| `synthetic` — how identity was derived (see below). **Requires a `source_identity_kind LowCardinality(String)` column in ClickHouse.** |
 | `source_order_id` | library | fixed-width, lexicographically sortable logical order key within the group |
 | `component_index` | library | index within one source record; worker sort input, **not** a ClickHouse column |
-| `record_type` | library | `meta` \| `user` \| `reasoning` \| `assistant` \| `assistant-tool-call` \| `tool` |
+| `record_type` | library | `meta` \| `system` \| `user` \| `reasoning` \| `assistant` \| `assistant-tool-call` \| `tool` |
 | `record_id` | library | per-canonical-record dedup identity (64-hex sha256) |
 | `record_hash` | library | sha256 of `record_json` (64-hex) |
 | `content_hash` | library | sha256 of canonical semantic content, excluding transport metadata/timestamps (64-hex) |

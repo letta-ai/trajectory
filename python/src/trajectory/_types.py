@@ -11,6 +11,7 @@ AnyTrajectorySource = Literal[
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 ToolResultPolicy = Literal["include", "omit"]
+SystemMessagePolicy = Literal["include", "omit"]
 DiagnosticCode = Literal[
     "invalid_json_line",
     "non_object_json_line",
@@ -83,6 +84,7 @@ class NormalizationBounds(TypedDict, total=False):
 
 class NormalizationFilters(TypedDict, total=False):
     toolResults: ToolResultPolicy
+    systemMessages: SystemMessagePolicy
 
 
 class SourceContext(TypedDict, total=False):
@@ -152,6 +154,12 @@ class UserRecord(TypedDict):
     timestamp: str
 
 
+class SystemRecord(TypedDict):
+    role: Literal["system"]
+    content: str
+    timestamp: str
+
+
 class ReasoningRecord(TypedDict):
     role: Literal["reasoning"]
     content: str
@@ -190,6 +198,7 @@ class ToolResultRecord(_ToolResultOptional):
 
 NormalizedRecord = Union[
     MetaRecord,
+    SystemRecord,
     UserRecord,
     ReasoningRecord,
     AssistantMessageRecord,

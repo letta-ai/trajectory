@@ -1,12 +1,17 @@
-import type { NormalizationFilters, ToolResultPolicy } from "./types.js";
+import type {
+  NormalizationFilters,
+  SystemMessagePolicy,
+  ToolResultPolicy,
+} from "./types.js";
 import { NormalizationError } from "./types.js";
 
 export interface ResolvedNormalizationFilters {
   readonly toolResults: ToolResultPolicy;
+  readonly systemMessages: SystemMessagePolicy;
 }
 
 export const DEFAULT_NORMALIZATION_FILTERS: Readonly<ResolvedNormalizationFilters> =
-  Object.freeze({ toolResults: "include" });
+  Object.freeze({ toolResults: "include", systemMessages: "omit" });
 
 export function resolveFilters(
   filters: NormalizationFilters | undefined,
@@ -14,7 +19,9 @@ export function resolveFilters(
   if (filters === undefined) return { ...DEFAULT_NORMALIZATION_FILTERS };
   assertObject(filters, "filters");
 
-  const unknown = Object.keys(filters).find((key) => key !== "toolResults");
+  const unknown = Object.keys(filters).find(
+    (key) => key !== "toolResults" && key !== "systemMessages",
+  );
   if (unknown !== undefined) {
     throw invalidFilters(
       `filters contains unknown option ${JSON.stringify(unknown)}.`,
@@ -28,7 +35,15 @@ export function resolveFilters(
     );
   }
 
-  return { toolResults };
+  const systemMessages =
+    filters.systemMessages ?? DEFAULT_NORMALIZATION_FILTERS.systemMessages;
+  if (systemMessages !== "include" && systemMessages !== "omit") {
+    throw invalidFilters(
+      'filters.systemMessages must be either "include" or "omit".',
+    );
+  }
+
+  return { toolResults, systemMessages };
 }
 
 function assertObject(value: unknown, path: string): asserts value is object {

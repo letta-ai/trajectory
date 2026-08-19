@@ -64,7 +64,7 @@ def codex_message(role: str, text: str) -> str:
                 "role": role,
                 "content": [
                     {
-                        "type": "input_text" if role == "user" else "output_text",
+                        "type": "output_text" if role == "assistant" else "input_text",
                         "text": text,
                     }
                 ],
@@ -196,6 +196,25 @@ class WrapperTests(unittest.TestCase):
                 for record in result["records"]
             )
         )
+
+    def test_system_messages_are_explicitly_opt_in(self) -> None:
+        transcript = "\n".join(
+            [
+                codex_message("system", "Follow the project instructions."),
+                codex_message("user", "Inspect the project."),
+                codex_message("assistant", "I inspected it."),
+            ]
+        )
+
+        default_result = normalize_transcript(source="codex", transcript=transcript)
+        self.assertNotIn("system", [record["role"] for record in default_result["records"]])
+
+        included = normalize_transcript(
+            source="codex",
+            transcript=transcript,
+            filters={"systemMessages": "include"},
+        )
+        self.assertIn("system", [record["role"] for record in included["records"]])
 
     def test_partial_fragment_is_opt_in(self) -> None:
         with self.assertRaises(NormalizationError) as raised:

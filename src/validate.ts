@@ -56,7 +56,11 @@ export function validateTranscript(
     }
 
     validateTimestamp(record.timestamp, index);
-    if (record.role === "user" || record.role === "reasoning") {
+    if (
+      record.role === "system" ||
+      record.role === "user" ||
+      record.role === "reasoning"
+    ) {
       exactKeys(record, CONTENT_KEYS, index);
       if (typeof record.content !== "string") {
         fail(`Record ${index}: ${record.role} content must be a string.`);

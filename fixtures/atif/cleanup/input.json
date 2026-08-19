@@ -1,0 +1,67 @@
+{
+  "schema_version": "ATIF-v1.7",
+  "trajectory_id": "trajectory-atif-cleanup",
+  "agent": {
+    "name": "example-agent",
+    "version": "1.0.0"
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "timestamp": "2026-08-18T11:00:00Z",
+      "source": "system",
+      "message": "Use the provided tools."
+    },
+    {
+      "step_id": 2,
+      "timestamp": "2026-08-18T11:00:01Z",
+      "source": "user",
+      "message": "Run the check."
+    },
+    {
+      "step_id": 3,
+      "timestamp": "2026-08-18T11:00:02Z",
+      "source": "agent",
+      "message": "",
+      "tool_calls": [
+        {
+          "tool_call_id": "call-check",
+          "function_name": "check",
+          "arguments": ["fast"]
+        }
+      ],
+      "observation": {
+        "results": [
+          {
+            "source_call_id": "call-check",
+            "content": [
+              { "type": "text", "text": "Check complete." },
+              {
+                "type": "image",
+                "source": { "media_type": "image/png", "path": "images/result.png" }
+              }
+            ]
+          },
+          { "content": "Environment reset complete." }
+        ]
+      }
+    },
+    {
+      "step_id": 4,
+      "timestamp": "2026-08-18T11:00:03Z",
+      "source": "agent",
+      "message": "The check completed."
+    }
+  ],
+  "subagent_trajectories": [
+    {
+      "schema_version": "ATIF-v1.7",
+      "trajectory_id": "embedded-1",
+      "agent": { "name": "subagent", "version": "1.0.0" },
+      "steps": [
+        { "step_id": 1, "source": "user", "message": "Inspect config." },
+        { "step_id": 2, "source": "agent", "message": "Config is valid." }
+      ]
+    }
+  ]
+}

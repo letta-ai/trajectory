@@ -23,6 +23,8 @@ try:
 except ModuleNotFoundError:
     HAS_LANGGRAPH_SQLITE = False
 FIXTURES = (
+    ("atif", "atif/tool-calls", "input.json"),
+    ("atif", "atif/cleanup", "input.json"),
     ("claude-code", "claude-code/tool-call", "input.jsonl"),
     ("claude-code", "claude-code/cleanup", "input.jsonl"),
     ("codex", "codex/tool-calls", "input.jsonl"),

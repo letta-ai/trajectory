@@ -1,0 +1,70 @@
+{
+  "schema_version": "ATIF-v1.7",
+  "session_id": "run-atif-1",
+  "trajectory_id": "trajectory-atif-1",
+  "agent": {
+    "name": "example-agent",
+    "version": "1.0.0",
+    "model_name": "example-default-model"
+  },
+  "steps": [
+    {
+      "step_id": 1,
+      "timestamp": "2026-08-18T10:00:00Z",
+      "source": "user",
+      "message": [
+        { "type": "text", "text": "Inspect the workspace." },
+        {
+          "type": "image",
+          "source": { "media_type": "image/png", "path": "images/workspace.png" }
+        }
+      ]
+    },
+    {
+      "step_id": 2,
+      "timestamp": "2026-08-18T10:00:01Z",
+      "source": "agent",
+      "model_name": "example-step-model",
+      "message": "I'll inspect it now.",
+      "reasoning_content": "I should list the files before reading one.",
+      "tool_calls": [
+        {
+          "tool_call_id": "call-list",
+          "function_name": "shell",
+          "arguments": { "command": "find . -maxdepth 1 -type f" }
+        },
+        {
+          "tool_call_id": "call-delegate",
+          "function_name": "delegate",
+          "arguments": { "task": "inspect config" }
+        }
+      ],
+      "observation": {
+        "results": [
+          {
+            "source_call_id": "call-list",
+            "content": [
+              { "type": "text", "text": "README.md" },
+              { "type": "text", "text": "package.json" }
+            ]
+          },
+          {
+            "source_call_id": "call-delegate",
+            "subagent_trajectory_ref": [
+              {
+                "trajectory_path": "subagents/config.json",
+                "session_id": "run-atif-1"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "step_id": 3,
+      "timestamp": "2026-08-18T10:00:02Z",
+      "source": "agent",
+      "message": "The workspace contains the expected project files."
+    }
+  ]
+}

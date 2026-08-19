@@ -1,3 +1,4 @@
+import { atifAdapter } from "./adapters/atif/index.js";
 import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
 import { codexAdapter } from "./adapters/codex/index.js";
 import { copilotCliAdapter } from "./adapters/copilot-cli/index.js";
@@ -30,6 +31,7 @@ import type {
 import { NormalizationError } from "./types.js";
 
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
+  atif: atifAdapter,
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
   "copilot-cli": copilotCliAdapter,

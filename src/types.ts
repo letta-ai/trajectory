@@ -2,6 +2,7 @@ import type { ResolvedNormalizationBounds } from "./bounds.js";
 import type { ResolvedNormalizationFilters } from "./filters.js";
 
 export type TrajectorySource =
+  | "atif"
   | "claude-code"
   | "codex"
   | "copilot-cli"

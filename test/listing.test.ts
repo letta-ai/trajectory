@@ -128,6 +128,7 @@ afterAll(() => {
 describe("listTrajectories", () => {
   test("reports normalization-only sources without pretending to discover a store", async () => {
     for (const source of [
+      "atif",
       "copilot-cli",
       "cursor",
       "gemini-cli",

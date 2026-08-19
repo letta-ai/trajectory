@@ -8,6 +8,7 @@ import { NormalizationError } from "../../types.js";
 import {
   isObject,
   jsonString,
+  nonemptyString,
   parseJsonLines,
   parseTimestamp,
 } from "../shared.js";
@@ -191,10 +192,6 @@ export const copilotCliAdapter: SourceAdapter = {
     };
   },
 };
-
-function nonemptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
 
 function copilotResultContent(data: Record<string, unknown>): string {
   if (isObject(data.result)) {

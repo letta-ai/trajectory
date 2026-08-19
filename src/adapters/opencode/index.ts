@@ -8,6 +8,7 @@ import { NormalizationError } from "../../types.js";
 import {
   isObject,
   jsonString,
+  nonemptyString,
   parseTimestamp,
 } from "../shared.js";
 
@@ -203,10 +204,6 @@ function parseOpenCodeDocument(transcript: string): OpenCodeDocument {
     throw invalidOpenCodeTranscript();
   }
   return parsed as OpenCodeDocument;
-}
-
-function nonemptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function stringContent(value: unknown): string {

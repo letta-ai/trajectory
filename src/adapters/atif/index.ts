@@ -23,9 +23,10 @@ export const atifAdapter: SourceAdapter = {
     const document = parseAtifDocument(transcript);
     const diagnostics: Diagnostic[] = [];
     const events: DecodedEvent[] = [];
-    const trajectoryId = nonemptyString(document.trajectory_id);
-    const sessionId = nonemptyString(document.session_id);
-    const rootModel = nonemptyString(document.agent.model_name);
+    const trajectoryId = atifNonemptyString(document.trajectory_id);
+    const sessionId = atifNonemptyString(document.session_id);
+    const rootModel = atifNonemptyString(document.agent.model_name);
+    let createdAt: Date | undefined;
 
     for (let index = 0; index < document.steps.length; index += 1) {
       const step = document.steps[index];
@@ -44,9 +45,10 @@ export const atifAdapter: SourceAdapter = {
       }
 
       const timestamp = parseTimestamp(step.timestamp);
+      createdAt ??= timestamp;
       const model =
         step.source === "agent"
-          ? nonemptyString(step.model_name) ?? rootModel
+          ? atifNonemptyString(step.model_name) ?? rootModel
           : undefined;
       const sourceRecordId = trajectoryId
         ? `trajectory:${trajectoryId}:step:${expectedStepId}`
@@ -102,8 +104,8 @@ export const atifAdapter: SourceAdapter = {
         }
         for (const rawCall of step.tool_calls ?? []) {
           if (!isObject(rawCall)) throw invalidAtifTranscript();
-          const callId = nonemptyString(rawCall.tool_call_id);
-          const name = nonemptyString(rawCall.function_name);
+          const callId = atifNonemptyString(rawCall.tool_call_id);
+          const name = atifNonemptyString(rawCall.function_name);
           emit({
             type: "tool_call",
             args: jsonString(rawCall.arguments),
@@ -120,7 +122,7 @@ export const atifAdapter: SourceAdapter = {
       }
       for (const rawResult of step.observation.results) {
         if (!isObject(rawResult)) throw invalidAtifTranscript();
-        const callId = nonemptyString(rawResult.source_call_id);
+        const callId = atifNonemptyString(rawResult.source_call_id);
         const content = observationContent(rawResult);
         emit(
           callId
@@ -141,9 +143,6 @@ export const atifAdapter: SourceAdapter = {
       });
     }
 
-    const createdAt = document.steps
-      .map((step) => (isObject(step) ? parseTimestamp(step.timestamp) : undefined))
-      .find((value): value is Date => value !== undefined);
     const sourceGroupId = sessionId ?? trajectoryId;
     return {
       events,
@@ -199,7 +198,7 @@ function observationContent(result: Record<string, unknown>): string {
   return "";
 }
 
-function nonemptyString(value: unknown): string | undefined {
+function atifNonemptyString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 

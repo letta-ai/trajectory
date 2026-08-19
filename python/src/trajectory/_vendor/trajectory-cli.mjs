@@ -102,9 +102,10 @@ var atifAdapter = {
     const document = parseAtifDocument(transcript);
     const diagnostics = [];
     const events = [];
-    const trajectoryId = nonemptyString(document.trajectory_id);
-    const sessionId = nonemptyString(document.session_id);
-    const rootModel = nonemptyString(document.agent.model_name);
+    const trajectoryId = atifNonemptyString(document.trajectory_id);
+    const sessionId = atifNonemptyString(document.session_id);
+    const rootModel = atifNonemptyString(document.agent.model_name);
+    let createdAt;
     for (let index = 0;index < document.steps.length; index += 1) {
       const step = document.steps[index];
       if (!isObject(step))
@@ -119,7 +120,8 @@ var atifAdapter = {
         throw invalidAtifTranscript();
       }
       const timestamp = parseTimestamp(step.timestamp);
-      const model = step.source === "agent" ? nonemptyString(step.model_name) ?? rootModel : undefined;
+      createdAt ??= timestamp;
+      const model = step.source === "agent" ? atifNonemptyString(step.model_name) ?? rootModel : undefined;
       const sourceRecordId = trajectoryId ? `trajectory:${trajectoryId}:step:${expectedStepId}` : `step:${expectedStepId}`;
       let componentIndex = 0;
       const emit = (event) => {
@@ -170,8 +172,8 @@ var atifAdapter = {
         for (const rawCall of step.tool_calls ?? []) {
           if (!isObject(rawCall))
             throw invalidAtifTranscript();
-          const callId = nonemptyString(rawCall.tool_call_id);
-          const name = nonemptyString(rawCall.function_name);
+          const callId = atifNonemptyString(rawCall.tool_call_id);
+          const name = atifNonemptyString(rawCall.function_name);
           emit({
             type: "tool_call",
             args: jsonString(rawCall.arguments),
@@ -189,7 +191,7 @@ var atifAdapter = {
       for (const rawResult of step.observation.results) {
         if (!isObject(rawResult))
           throw invalidAtifTranscript();
-        const callId = nonemptyString(rawResult.source_call_id);
+        const callId = atifNonemptyString(rawResult.source_call_id);
         const content = observationContent(rawResult);
         emit(callId ? { type: "tool_result", callId, content, ...shared } : { type: "observation", content, ...shared });
       }
@@ -201,7 +203,6 @@ var atifAdapter = {
         count: document.subagent_trajectories.length
       });
     }
-    const createdAt = document.steps.map((step) => isObject(step) ? parseTimestamp(step.timestamp) : undefined).find((value) => value !== undefined);
     const sourceGroupId = sessionId ?? trajectoryId;
     return {
       events,
@@ -242,7 +243,7 @@ function observationContent(result) {
   }
   return "";
 }
-function nonemptyString(value) {
+function atifNonemptyString(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function invalidAtifTranscript() {
@@ -670,21 +671,21 @@ var copilotCliAdapter = {
         continue;
       const data = isObject(row.data) ? row.data : {};
       if (row.type === "session.start") {
-        sourceGroupId ??= nonemptyString2(data.sessionId);
+        sourceGroupId ??= nonemptyString(data.sessionId);
         createdAt ??= parseTimestamp(data.startTime);
         const context = isObject(data.context) ? data.context : {};
-        cwd ??= nonemptyString2(context.cwd);
-        gitBranch ??= nonemptyString2(context.branch);
+        cwd ??= nonemptyString(context.cwd);
+        gitBranch ??= nonemptyString(context.branch);
       } else if (row.type === "hook.start" && data.hookType === "userPromptSubmitted") {
         const input = isObject(data.input) ? data.input : {};
-        sourceGroupId ??= nonemptyString2(input.sessionId);
-        cwd ??= nonemptyString2(input.cwd);
+        sourceGroupId ??= nonemptyString(input.sessionId);
+        cwd ??= nonemptyString(input.cwd);
       } else if (row.type === "tool.execution_complete") {
-        model ??= nonemptyString2(data.model);
+        model ??= nonemptyString(data.model);
       } else if (row.type === "session.model_change") {
-        model ??= nonemptyString2(data.newModel);
+        model ??= nonemptyString(data.newModel);
       } else if (row.type === "session.shutdown") {
-        model ??= nonemptyString2(data.currentModel);
+        model ??= nonemptyString(data.currentModel);
       }
     }
     for (const { value: row, line, byteOffset } of rows) {
@@ -700,7 +701,7 @@ var copilotCliAdapter = {
       recognizedRows += 1;
       const data = isObject(row.data) ? row.data : {};
       const timestamp = parseTimestamp(row.timestamp);
-      const sourceRecordId = nonemptyString2(row.id);
+      const sourceRecordId = nonemptyString(row.id);
       let componentIndex = 0;
       const emit = (event) => {
         events.push({
@@ -723,7 +724,7 @@ var copilotCliAdapter = {
         continue;
       }
       if (rowType === "assistant.message") {
-        const eventModel = nonemptyString2(data.model);
+        const eventModel = nonemptyString(data.model);
         if (typeof data.reasoningText === "string" && data.reasoningText.trim()) {
           emit({
             type: "reasoning",
@@ -745,8 +746,8 @@ var copilotCliAdapter = {
           for (const request of data.toolRequests) {
             if (!isObject(request))
               continue;
-            const callId = nonemptyString2(request.toolCallId);
-            const name = nonemptyString2(request.name);
+            const callId = nonemptyString(request.toolCallId);
+            const name = nonemptyString(request.name);
             emit({
               type: "tool_call",
               args: typeof request.arguments === "string" ? request.arguments : jsonString(request.arguments),
@@ -760,8 +761,8 @@ var copilotCliAdapter = {
         continue;
       }
       if (rowType === "tool.execution_complete") {
-        const callId = nonemptyString2(data.toolCallId);
-        const eventModel = nonemptyString2(data.model);
+        const callId = nonemptyString(data.toolCallId);
+        const eventModel = nonemptyString(data.model);
         emit({
           type: "tool_result",
           content: copilotResultContent(data),
@@ -788,7 +789,7 @@ var copilotCliAdapter = {
     };
   }
 };
-function nonemptyString2(value) {
+function nonemptyString(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function copilotResultContent(data) {
@@ -1022,8 +1023,8 @@ var geminiCliAdapter = {
       if (messageType === "info")
         continue;
       const timestamp = parseTimestamp(message.timestamp);
-      const model = nonemptyString3(message.model);
-      const sourceRecordId = nonemptyString3(message.id);
+      const model = nonemptyString2(message.model);
+      const sourceRecordId = nonemptyString2(message.id);
       let componentIndex = 0;
       const emit = (event) => {
         events.push({
@@ -1077,8 +1078,8 @@ var geminiCliAdapter = {
       for (const rawCall of message.toolCalls) {
         if (!isObject(rawCall))
           continue;
-        const callId = nonemptyString3(rawCall.id);
-        const name = nonemptyString3(rawCall.name);
+        const callId = nonemptyString2(rawCall.id);
+        const name = nonemptyString2(rawCall.name);
         const callTimestamp = parseTimestamp(rawCall.timestamp) ?? timestamp;
         emit({
           type: "tool_call",
@@ -1088,7 +1089,7 @@ var geminiCliAdapter = {
           ...callTimestamp ? { timestamp: callTimestamp } : {},
           ...model ? { model } : {}
         });
-        const status = nonemptyString3(rawCall.status);
+        const status = nonemptyString2(rawCall.status);
         const outputs = toolOutputs(rawCall.result);
         if (outputs.length === 0 && (!status || !TERMINAL_TOOL_STATUSES.has(status))) {
           continue;
@@ -1104,8 +1105,8 @@ var geminiCliAdapter = {
         });
       }
     }
-    const sourceGroupId = nonemptyString3(document.sessionId);
-    const sourceGroupRequired = !sourceGroupId && !nonemptyString3(document.projectHash);
+    const sourceGroupId = nonemptyString2(document.sessionId);
+    const sourceGroupRequired = !sourceGroupId && !nonemptyString2(document.projectHash);
     const createdAt = parseTimestamp(document.startTime);
     return {
       events,
@@ -1131,7 +1132,7 @@ function parseGeminiDocument(transcript) {
   }
   return parsed;
 }
-function nonemptyString3(value) {
+function nonemptyString2(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function thoughtContent(value) {
@@ -1440,7 +1441,7 @@ var lettaCodeAdapter = {
     for (const { value: row } of rows) {
       if (row.kind !== "reasoning")
         continue;
-      const sourceRecordId = nonemptyString4(row.source_message_id) ?? nonemptyString4(row.source_line_id);
+      const sourceRecordId = nonemptyString3(row.source_message_id) ?? nonemptyString3(row.source_line_id);
       if (sourceRecordId)
         reasoningRecordIds.add(sourceRecordId);
     }
@@ -1463,8 +1464,8 @@ var lettaCodeAdapter = {
         continue;
       }
       const timestamp = parseTimestamp(row.captured_at);
-      const sourceMessageId = nonemptyString4(row.source_message_id);
-      const sourceLineId = nonemptyString4(row.source_line_id);
+      const sourceMessageId = nonemptyString3(row.source_message_id);
+      const sourceLineId = nonemptyString3(row.source_line_id);
       const sourceRecordId = sourceMessageId ?? sourceLineId;
       const sourceFields = sourceRecordId ? { sourceRecordId } : {
         sourceOffset: line - 1,
@@ -1503,10 +1504,10 @@ var lettaCodeAdapter = {
         continue;
       }
       const callId = sourceLineId ?? sourceMessageId ?? `letta-code-tool-line-${line}`;
-      const name = nonemptyString4(row.name);
+      const name = nonemptyString3(row.name);
       events.push({
         type: "tool_call",
-        args: nonemptyString4(row.argsText) ?? "{}",
+        args: nonemptyString3(row.argsText) ?? "{}",
         inputLine: line,
         ...sourceFields,
         componentIndex: 0,
@@ -1541,7 +1542,7 @@ var lettaCodeAdapter = {
     };
   }
 };
-function nonemptyString4(value) {
+function nonemptyString3(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function invalidLettaCodeTranscript() {
@@ -1860,9 +1861,9 @@ var openCodeAdapter = {
         continue;
       const info = isObject(message.info) ? message.info : {};
       const role = info.role;
-      const messageId = nonemptyString5(info.id);
+      const messageId = nonemptyString4(info.id);
       const timestamp = parseTimestamp(isObject(info.time) ? info.time.created : undefined);
-      const model = nonemptyString5(info.modelID);
+      const model = nonemptyString4(info.modelID);
       const parts = Array.isArray(message.parts) ? message.parts : [];
       let messageComponentIndex = 0;
       let latestTimestamp;
@@ -1879,7 +1880,7 @@ var openCodeAdapter = {
         const ordinal = partOrdinal++;
         if (!isObject(part))
           continue;
-        const partId = nonemptyString5(part.id);
+        const partId = nonemptyString4(part.id);
         const sourceRecordId = partId ?? messageId;
         let partComponentIndex = 0;
         const emit = (event) => {
@@ -1921,8 +1922,8 @@ var openCodeAdapter = {
           const stateTime = isObject(state.time) ? state.time : {};
           const callTimestamp = orderedTimestamp(parseTimestamp(stateTime.start) ?? timestamp);
           const resultTimestamp = orderedTimestamp(parseTimestamp(stateTime.end) ?? callTimestamp);
-          const callId = nonemptyString5(part.callID);
-          const name = nonemptyString5(part.tool);
+          const callId = nonemptyString4(part.callID);
+          const name = nonemptyString4(part.tool);
           emit({
             type: "tool_call",
             args: jsonString(state.input),
@@ -1931,7 +1932,7 @@ var openCodeAdapter = {
             ...callTimestamp ? { timestamp: callTimestamp } : {},
             ...model ? { model } : {}
           });
-          const status = nonemptyString5(state.status);
+          const status = nonemptyString4(state.status);
           const output = state.output !== undefined ? stringContent2(state.output) : status === "error" ? errorContent(state.error) : undefined;
           if (output !== undefined) {
             emit({
@@ -1953,8 +1954,8 @@ var openCodeAdapter = {
         }
       }
     }
-    const cwd = nonemptyString5(sessionInfo.directory);
-    const sourceGroupId = nonemptyString5(sessionInfo.id);
+    const cwd = nonemptyString4(sessionInfo.directory);
+    const sourceGroupId = nonemptyString4(sessionInfo.id);
     const createdAt = parseTimestamp(isObject(sessionInfo.time) ? sessionInfo.time.created : undefined);
     return {
       events,
@@ -1980,7 +1981,7 @@ function parseOpenCodeDocument(transcript) {
   }
   return parsed;
 }
-function nonemptyString5(value) {
+function nonemptyString4(value) {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 function stringContent2(value) {

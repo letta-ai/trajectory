@@ -90,7 +90,15 @@ export const codexAdapter: SourceAdapter = {
       if (payloadType === "message") {
         const role = payload.role;
         const content = blocksText(payload.content);
-        if (role === "user") {
+        if (role === "system") {
+          emit({
+            type: "message",
+            role: "system",
+            content,
+            inputLine: line,
+            ...(timestamp ? { timestamp } : {}),
+          });
+        } else if (role === "user") {
           const head = content.trimStart();
           if (INJECTED_PREFIXES.some((prefix) => head.startsWith(prefix))) {
             diagnostics.push({

@@ -318,6 +318,58 @@ describe("public API", () => {
     expect(Array.isArray(result.diagnostics)).toBe(true);
   });
 
+  test("emits system messages only when explicitly requested", () => {
+    const transcript = [
+      JSON.stringify({
+        type: "response_item",
+        timestamp: "2026-08-19T09:00:00Z",
+        payload: {
+          type: "message",
+          role: "system",
+          content: [{ type: "input_text", text: "Follow the project instructions." }],
+        },
+      }),
+      JSON.stringify({
+        type: "response_item",
+        timestamp: "2026-08-19T09:00:01Z",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "Inspect the project." }],
+        },
+      }),
+      JSON.stringify({
+        type: "response_item",
+        timestamp: "2026-08-19T09:00:02Z",
+        payload: {
+          type: "message",
+          role: "assistant",
+          content: [{ type: "output_text", text: "I inspected it." }],
+        },
+      }),
+    ].join("\n");
+
+    const defaultResult = normalizeTranscript({ source: "codex", transcript });
+    expect(defaultResult.records.map((record) => record.role)).toEqual([
+      "meta",
+      "user",
+      "assistant",
+    ]);
+
+    const included = normalizeTranscript({
+      source: "codex",
+      transcript,
+      filters: { systemMessages: "include" },
+    });
+    expect(included.records).toContainEqual({
+      role: "system",
+      content: "Follow the project instructions.",
+      timestamp: "2026-08-19T09:00:00.000Z",
+    });
+    expect(validateSchema(included.records)).toBe(true);
+    expect(() => validateTranscript(included.records)).not.toThrow();
+  });
+
   test("rejects an unknown source", () => {
     expect(() =>
       normalizeTranscript({
@@ -636,7 +688,10 @@ describe("public API", () => {
     });
     expect(Object.isFrozen(DEFAULT_NORMALIZATION_BOUNDS)).toBe(true);
     expect(Object.isFrozen(DEFAULT_NORMALIZATION_BOUNDS.toolResults)).toBe(true);
-    expect(DEFAULT_NORMALIZATION_FILTERS).toEqual({ toolResults: "include" });
+    expect(DEFAULT_NORMALIZATION_FILTERS).toEqual({
+      toolResults: "include",
+      systemMessages: "omit",
+    });
     expect(Object.isFrozen(DEFAULT_NORMALIZATION_FILTERS)).toBe(true);
   });
 
@@ -646,6 +701,14 @@ describe("public API", () => {
         source: "codex",
         transcript: codexMessages("hello", "hi"),
         bounds: { toolResults: { maxCharacters: 0 } },
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+
+    expect(() =>
+      normalizeTranscript({
+        source: "codex",
+        transcript: codexMessages("hello", "hi"),
+        filters: { systemMessages: true } as never,
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));
 

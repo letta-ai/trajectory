@@ -270,7 +270,10 @@ printf '%s' '{"ok":true,"data":{"checkpointId":"checkpoint-1","checkpointNamespa
     expect(canonical.records.some((record) => record.record_type === "tool")).toBe(
       false,
     );
-    expect(canonical.config.filters).toEqual({ toolResults: "omit" });
+    expect(canonical.config.filters).toEqual({
+      toolResults: "omit",
+      systemMessages: "omit",
+    });
   });
 });
 

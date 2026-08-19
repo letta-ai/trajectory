@@ -13,6 +13,7 @@
     "record": {
       "oneOf": [
         { "$ref": "#/$defs/meta" },
+        { "$ref": "#/$defs/system" },
         { "$ref": "#/$defs/user" },
         { "$ref": "#/$defs/reasoning" },
         { "$ref": "#/$defs/assistant" },
@@ -37,6 +38,16 @@
       "additionalProperties": false,
       "properties": {
         "role": { "const": "user" },
+        "content": { "type": "string" },
+        "timestamp": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "system": {
+      "type": "object",
+      "required": ["role", "content", "timestamp"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "const": "system" },
         "content": { "type": "string" },
         "timestamp": { "$ref": "#/$defs/timestamp" }
       }

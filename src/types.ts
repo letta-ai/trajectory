@@ -43,10 +43,13 @@ export interface NormalizationBounds {
 }
 
 export type ToolResultPolicy = "include" | "omit";
+export type SystemMessagePolicy = "include" | "omit";
 
 export interface NormalizationFilters {
   /** Whether normalized `tool` result records are emitted. */
   toolResults?: ToolResultPolicy;
+  /** Whether normalized `system` message records are emitted. Defaults to `omit`. */
+  systemMessages?: SystemMessagePolicy;
 }
 
 /**
@@ -128,6 +131,12 @@ export interface UserRecord {
   timestamp: string;
 }
 
+export interface SystemRecord {
+  role: "system";
+  content: string;
+  timestamp: string;
+}
+
 export interface ReasoningRecord {
   role: "reasoning";
   content: string;
@@ -164,6 +173,7 @@ export interface ToolResultRecord {
 
 export type NormalizedRecord =
   | MetaRecord
+  | SystemRecord
   | UserRecord
   | ReasoningRecord
   | AssistantMessageRecord
@@ -184,6 +194,7 @@ export interface NormalizeResult {
  */
 export type CanonicalRecordType =
   | "meta"
+  | "system"
   | "user"
   | "reasoning"
   | "assistant"

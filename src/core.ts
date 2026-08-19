@@ -12,6 +12,7 @@ import type {
   MetaRecord,
   NormalizedRecord,
   ReasoningRecord,
+  SystemRecord,
   ToolResultRecord,
   UserRecord,
 } from "./types.js";
@@ -309,6 +310,14 @@ function normalizeEvent(
   if (event.type === "message") {
     if (!event.content.trim()) {
       return undefined;
+    }
+    if (event.role === "system") {
+      if (filters.systemMessages === "omit") return undefined;
+      const record: Omit<SystemRecord, "timestamp"> = {
+        role: "system",
+        content: event.content,
+      };
+      return record;
     }
     if (
       event.role === "user" &&

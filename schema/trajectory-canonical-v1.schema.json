@@ -45,6 +45,7 @@
           "type": "string",
           "enum": [
             "meta",
+            "system",
             "user",
             "reasoning",
             "assistant",

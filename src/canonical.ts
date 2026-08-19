@@ -175,6 +175,8 @@ function recordType(record: NormalizedRecord): CanonicalRecordType {
   switch (record.role) {
     case "meta":
       return "meta";
+    case "system":
+      return "system";
     case "user":
       return "user";
     case "reasoning":
@@ -203,6 +205,7 @@ function componentKeyFor(
   switch (type) {
     case "meta":
       return "meta";
+    case "system":
     case "user":
     case "assistant":
       return `message:${ordinal}`;
@@ -235,6 +238,7 @@ function semanticContent(
             ...(record.model !== undefined ? { model: record.model } : {}),
           }
         : {};
+    case "system":
     case "user":
     case "reasoning":
     case "assistant":
@@ -273,6 +277,7 @@ function flattenFields(
     toolResultOk: null,
   };
   switch (type) {
+    case "system":
     case "user":
     case "reasoning":
     case "assistant":

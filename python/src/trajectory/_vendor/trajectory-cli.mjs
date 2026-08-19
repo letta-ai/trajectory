@@ -354,7 +354,15 @@ var codexAdapter = {
       if (payloadType === "message") {
         const role = payload.role;
         const content = blocksText(payload.content);
-        if (role === "user") {
+        if (role === "system") {
+          emit({
+            type: "message",
+            role: "system",
+            content,
+            inputLine: line,
+            ...timestamp ? { timestamp } : {}
+          });
+        } else if (role === "user") {
           const head = content.trimStart();
           if (INJECTED_PREFIXES.some((prefix) => head.startsWith(prefix))) {
             diagnostics.push({
@@ -1924,12 +1932,12 @@ function invalidBounds(message) {
 }
 
 // src/filters.ts
-var DEFAULT_NORMALIZATION_FILTERS = Object.freeze({ toolResults: "include" });
+var DEFAULT_NORMALIZATION_FILTERS = Object.freeze({ toolResults: "include", systemMessages: "omit" });
 function resolveFilters(filters) {
   if (filters === undefined)
     return { ...DEFAULT_NORMALIZATION_FILTERS };
   assertObject2(filters, "filters");
-  const unknown = Object.keys(filters).find((key) => key !== "toolResults");
+  const unknown = Object.keys(filters).find((key) => key !== "toolResults" && key !== "systemMessages");
   if (unknown !== undefined) {
     throw invalidFilters(`filters contains unknown option ${JSON.stringify(unknown)}.`);
   }
@@ -1937,7 +1945,11 @@ function resolveFilters(filters) {
   if (toolResults !== "include" && toolResults !== "omit") {
     throw invalidFilters('filters.toolResults must be either "include" or "omit".');
   }
-  return { toolResults };
+  const systemMessages = filters.systemMessages ?? DEFAULT_NORMALIZATION_FILTERS.systemMessages;
+  if (systemMessages !== "include" && systemMessages !== "omit") {
+    throw invalidFilters('filters.systemMessages must be either "include" or "omit".');
+  }
+  return { toolResults, systemMessages };
 }
 function assertObject2(value, path) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -1983,7 +1995,7 @@ function validateTranscript(value, options) {
       continue;
     }
     validateTimestamp(record.timestamp, index);
-    if (record.role === "user" || record.role === "reasoning") {
+    if (record.role === "system" || record.role === "user" || record.role === "reasoning") {
       exactKeys(record, CONTENT_KEYS, index);
       if (typeof record.content !== "string") {
         fail(`Record ${index}: ${record.role} content must be a string.`);
@@ -2249,6 +2261,15 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
   if (event.type === "message") {
     if (!event.content.trim()) {
       return;
+    }
+    if (event.role === "system") {
+      if (filters.systemMessages === "omit")
+        return;
+      const record3 = {
+        role: "system",
+        content: event.content
+      };
+      return record3;
     }
     if (event.role === "user" && NOISE_PREFIXES.some((prefix) => event.content.trimStart().startsWith(prefix))) {
       diagnostics.push({

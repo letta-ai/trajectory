@@ -28,6 +28,11 @@
       "timestamp": "2026-07-04T08:00:04.000Z"
     },
     {
+      "role": "observation",
+      "content": "orphaned",
+      "timestamp": "2026-07-04T08:00:05.000Z"
+    },
+    {
       "role": "assistant",
       "content": "The action failed.",
       "timestamp": "2026-07-04T08:00:06.000Z"
@@ -43,11 +48,6 @@
       "code": "tool_arguments_reshaped",
       "message": "Reshaped arguments for tool call \"oh_action-1\" into a JSON object.",
       "recordIndex": 2
-    },
-    {
-      "code": "orphan_tool_result",
-      "message": "Dropped a tool result without a preceding call for \"\".",
-      "recordIndex": 4
     }
   ]
 }

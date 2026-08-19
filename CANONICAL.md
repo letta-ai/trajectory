@@ -39,7 +39,7 @@ fields it must compute from stored cross-upload state.
 | `source_identity_kind` | library | `native` \| `location` \| `content` \| `synthetic` — how identity was derived (see below). **Requires a `source_identity_kind LowCardinality(String)` column in ClickHouse.** |
 | `source_order_id` | library | fixed-width, lexicographically sortable logical order key within the group |
 | `component_index` | library | index within one source record; worker sort input, **not** a ClickHouse column |
-| `record_type` | library | `meta` \| `system` \| `user` \| `reasoning` \| `assistant` \| `assistant-tool-call` \| `tool` |
+| `record_type` | library | `meta` \| `system` \| `observation` \| `user` \| `reasoning` \| `assistant` \| `assistant-tool-call` \| `tool` |
 | `record_id` | library | per-canonical-record dedup identity (64-hex sha256) |
 | `record_hash` | library | sha256 of `record_json` (64-hex) |
 | `content_hash` | library | sha256 of canonical semantic content, excluding transport metadata/timestamps (64-hex) |
@@ -137,12 +137,13 @@ confidently it can interpret conflicts:
 
 `record_id = sha256([source_group_id, stable_source_record_id, componentKey])`,
 where `componentKey` is a semantic key: `meta`, `tool-call:<tool_call_id>`,
-`tool-result:<tool_call_id>`, or `message:<n>` / `reasoning:<n>`. Tool
-calls/results use their native `tool_call_id`. Messages and reasoning can repeat
-within one source record without a native id, so they always carry a type-local
-ordinal (`message:0` even when there is only one) — the ordinal is present from
-the start so a conflicting version that changes cardinality (one reasoning block
-becomes two) does not shift the original record's `record_id`. Keeping the key
+`tool-result:<tool_call_id>`, `message:<n>`, `observation:<n>`, or
+`reasoning:<n>`. Tool calls/results use their native `tool_call_id`. Messages,
+observations, and reasoning can repeat within one source record without a native
+id, so they always carry a type-local ordinal (`message:0` even when there is
+only one) — the ordinal is present from the start so a conflicting version that
+changes cardinality (one reasoning block becomes two) does not shift the original
+record's `record_id`. Keeping the key
 semantic (rather than a global component index) means inserting an unrelated
 component does not shift the surrounding records' `record_id`, so the worker can
 still recognize a conflicting version of the same logical record. Each

@@ -212,6 +212,7 @@ export {
   type NormalizationErrorCode,
   type NormalizedRecord,
   type NormalizedTranscript,
+  type ObservationRecord,
   type NormalizeInput,
   type NormalizeResult,
   type ReasoningRecord,

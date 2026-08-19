@@ -58,6 +58,7 @@ export function validateTranscript(
     validateTimestamp(record.timestamp, index);
     if (
       record.role === "system" ||
+      record.role === "observation" ||
       record.role === "user" ||
       record.role === "reasoning"
     ) {

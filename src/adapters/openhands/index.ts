@@ -92,13 +92,21 @@ export const openHandsAdapter: SourceAdapter = {
           : typeof event.action_id === "string"
             ? callIdByActionId.get(event.action_id)
             : undefined;
-      emit({
-        type: "tool_result",
-        content: result,
-        ...toolResultStatus(event),
-        ...(callId ? { callId } : {}),
-        ...(timestamp ? { timestamp } : {}),
-      });
+      if (callId) {
+        emit({
+          type: "tool_result",
+          content: result,
+          ...toolResultStatus(event),
+          callId,
+          ...(timestamp ? { timestamp } : {}),
+        });
+      } else {
+        emit({
+          type: "observation",
+          content: result,
+          ...(timestamp ? { timestamp } : {}),
+        });
+      }
     }
 
     return {

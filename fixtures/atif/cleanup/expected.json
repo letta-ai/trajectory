@@ -1,0 +1,53 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "atif"
+    },
+    {
+      "role": "user",
+      "content": "Run the check.",
+      "timestamp": "2026-08-18T11:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-check",
+          "name": "check",
+          "args": "{\"_raw\":\"[\\\"fast\\\"]\"}"
+        }
+      ],
+      "timestamp": "2026-08-18T11:00:02.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-check",
+      "content": "Check complete.\n[image]",
+      "timestamp": "2026-08-18T11:00:02.000Z"
+    },
+    {
+      "role": "observation",
+      "content": "Environment reset complete.",
+      "timestamp": "2026-08-18T11:00:02.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The check completed.",
+      "timestamp": "2026-08-18T11:00:03.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "noise_record_dropped",
+      "message": "Did not flatten 1 embedded ATIF subagent trajectory(ies); only root steps are normalized.",
+      "count": 1
+    },
+    {
+      "code": "tool_arguments_reshaped",
+      "message": "Reshaped arguments for tool call \"call-check\" into a JSON object.",
+      "recordIndex": 2
+    }
+  ]
+}

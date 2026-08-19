@@ -17,6 +17,38 @@ only to a temporary directory for mismatches, classified without printing
 content, and deleted when the run exits. Files that change between passes are
 excluded using byte-level input hashes.
 
+## ATIF interchange format
+
+The ATIF adapter was implemented against the active Harbor ATIF RFC and its
+reference Pydantic models as of 2026-08-19. The reference accepts schema
+versions `ATIF-v1.0` through `ATIF-v1.7`; automated coverage exercises every
+published version plus a sanitized v1.7 trajectory containing multimodal
+content, reasoning, multiple tool calls, linked observations, model metadata,
+run/document identity, and an external subagent reference.
+
+A privacy-safe bulk pass then covered 3,373 Harbor-generated trajectories
+(499,643,224 bytes) from a local benchmark corpus: 403 ATIF-v1.2, 793
+ATIF-v1.5, and 2,177 ATIF-v1.6 documents produced by eight agent integrations.
+All files were valid JSON, all had `session_id`, and none changed during the
+pass. Strict whole-transcript normalization succeeded for 2,583 files; 746
+OpenCode exports omitted user steps and 44 otherwise incomplete exports omitted
+assistant steps, so they correctly failed the shared whole-conversation
+invariants. With explicit partial-transcript semantics, all 3,373 normalized
+successfully to 311,712 records. Canonical normalization also succeeded for all
+files with native identity for all 308,339 body records and no duplicate record
+IDs within a trajectory.
+
+The corpus exercised 118,613 tool calls and 89,366 observation results. Of the
+results, 33,845 intentionally had no `source_call_id` (the Terminus family uses
+one unlinked observation per agent step); all 33,845 were preserved as generic
+`observation` records without inventing tool links. The 609 system steps remain
+omitted by default and raise the explicit-inclusion total to 312,321 records.
+Other aggregate cleanup was 19,397 synthesized timestamps, 215 synthesized
+tool-call IDs, 87 argument truncations, and 9,519 result truncations under the
+default bounds. Intentional target-schema differences are documented beside
+the adapter: embedded subagent timelines, metrics, and custom metadata have no
+equivalent in trajectory-v1.
+
 ## Production TypeScript reference
 
 Reference: `letta-agent-sdk` `dream-pipeline` commit `3d3e3e0`.

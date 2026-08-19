@@ -11,6 +11,8 @@ import {
 import type { NormalizeResult, TrajectorySource } from "../src/index.js";
 
 const fixtures = [
+  { source: "atif", name: "atif/tool-calls" },
+  { source: "atif", name: "atif/cleanup" },
   { source: "claude-code", name: "claude-code/tool-call" },
   { source: "claude-code", name: "claude-code/cleanup" },
   { source: "claude-code", name: "claude-code/subagent" },
@@ -56,7 +58,8 @@ describe("golden fixtures", () => {
     test(fixture.name, () => {
       const input = fixtureText(
         fixture.name,
-        fixture.source === "openhands" ||
+        fixture.source === "atif" ||
+          fixture.source === "openhands" ||
           fixture.source === "hermes" ||
           fixture.source === "gemini-cli" ||
           fixture.source === "opencode"
@@ -383,6 +386,74 @@ describe("public API", () => {
     );
   });
 
+  test("rejects malformed or unsupported ATIF documents", () => {
+    for (const transcript of [
+      "not json",
+      JSON.stringify({ schema_version: "ATIF-v1.8", agent: {}, steps: [] }),
+      JSON.stringify({
+        schema_version: "ATIF-v1.7",
+        agent: { name: "agent", version: "1" },
+        steps: [],
+      }),
+      JSON.stringify({
+        schema_version: "ATIF-v1.7",
+        agent: { name: "agent", version: "1" },
+        steps: [{ step_id: 2, source: "user", message: "out of order" }],
+      }),
+    ]) {
+      expect(() => normalizeTranscript({ source: "atif", transcript })).toThrow(
+        expect.objectContaining({ code: "invalid_input" }),
+      );
+    }
+  });
+
+  test("accepts every published ATIF v1 schema version", () => {
+    for (let minor = 0; minor <= 7; minor += 1) {
+      const result = normalizeTranscript({
+        source: "atif",
+        transcript: JSON.stringify({
+          schema_version: `ATIF-v1.${minor}`,
+          session_id: `atif-v1.${minor}`,
+          agent: { name: "agent", version: "1" },
+          steps: [
+            { step_id: 1, source: "user", message: "hello" },
+            { step_id: 2, source: "agent", message: "hi" },
+          ],
+        }),
+      });
+
+      expect(result.records.map((record) => record.role)).toEqual([
+        "meta",
+        "user",
+        "assistant",
+      ]);
+    }
+  });
+
+  test("preserves ATIF system and unlinked observation semantics", () => {
+    const transcript = fixtureText("atif/cleanup", "input.json");
+    const defaultResult = normalizeTranscript({ source: "atif", transcript });
+    expect(defaultResult.records.some((record) => record.role === "system")).toBe(
+      false,
+    );
+    expect(defaultResult.records).toContainEqual({
+      role: "observation",
+      content: "Environment reset complete.",
+      timestamp: "2026-08-18T11:00:02.000Z",
+    });
+
+    const included = normalizeTranscript({
+      source: "atif",
+      transcript,
+      filters: { systemMessages: "include" },
+    });
+    expect(included.records).toContainEqual({
+      role: "system",
+      content: "Use the provided tools.",
+      timestamp: "2026-08-18T11:00:00.000Z",
+    });
+  });
+
   test("rejects a transcript without a user turn", () => {
     const transcript = JSON.stringify({
       type: "response_item",
@@ -570,7 +641,8 @@ describe("public API", () => {
     test(`omits tool results while retaining calls for ${fixture.source}`, () => {
       const input = fixtureText(
         fixture.name,
-        fixture.source === "openhands" ||
+        fixture.source === "atif" ||
+          fixture.source === "openhands" ||
           fixture.source === "hermes" ||
           fixture.source === "gemini-cli" ||
           fixture.source === "opencode"

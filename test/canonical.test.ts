@@ -41,6 +41,7 @@ const goldenFixtures = [
 }>;
 
 const additionalInvariantFixtures = [
+  { source: "atif", name: "atif/tool-calls" },
   { source: "copilot-cli", name: "copilot-cli/tool-calls" },
   { source: "cursor", name: "cursor/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
@@ -79,6 +80,7 @@ describe("canonical invariants", () => {
   for (const fixture of [...goldenFixtures, ...additionalInvariantFixtures]) {
     test(fixture.name, () => {
       const inputFile =
+        fixture.source === "atif" ||
         fixture.source === "openhands" ||
         fixture.source === "hermes" ||
         fixture.source === "gemini-cli" ||
@@ -122,7 +124,9 @@ describe("new source-native identity", () => {
   )) {
     test(fixture.source, () => {
       const inputFile =
-        fixture.source === "gemini-cli" || fixture.source === "opencode"
+        fixture.source === "atif" ||
+        fixture.source === "gemini-cli" ||
+        fixture.source === "opencode"
           ? "input.json"
           : "input.jsonl";
       const result = normalizeToCanonical({
@@ -179,6 +183,48 @@ describe("new source-native identity", () => {
     expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
       new Set(["messages-only-export"]),
     );
+  });
+
+  test("ATIF documents without run or trajectory identity require an explicit canonical group", () => {
+    const transcript = JSON.stringify({
+      schema_version: "ATIF-v1.7",
+      agent: { name: "agent", version: "1" },
+      steps: [
+        { step_id: 1, source: "user", message: "Inspect it." },
+        { step_id: 2, source: "agent", message: "I inspected it." },
+      ],
+    });
+
+    expect(() => normalizeToCanonical({ source: "atif", transcript })).toThrow(
+      expect.objectContaining({ code: "source_group_required" }),
+    );
+    const result = normalizeToCanonical({
+      source: "atif",
+      transcript,
+      sourceContext: { groupId: "atif-import" },
+    });
+    expect(new Set(result.records.map((record) => record.source_group_id))).toEqual(
+      new Set(["atif-import"]),
+    );
+  });
+
+  test("ATIF preserves native identity for system and generic observation records", () => {
+    const result = normalizeToCanonical({
+      source: "atif",
+      transcript: fixtureText("atif/cleanup", "input.json"),
+      filters: { systemMessages: "include" },
+    });
+
+    for (const recordType of ["system", "observation"] as const) {
+      const record = result.records.find((item) => item.record_type === recordType);
+      expect(record).toMatchObject({
+        source_type: "atif",
+        source_identity_kind: "native",
+        record_type: recordType,
+      });
+      expect(record?.record_id).toMatch(HEX_64);
+    }
+    expect(validateCanonical(result.records)).toBe(true);
   });
 
   test("Gemini CLI projectHash-only exports retain the default canonical group", () => {

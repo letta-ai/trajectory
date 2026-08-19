@@ -80,6 +80,7 @@ and is empty when the transcript required no recoverable cleanup.
 
 | `source` | Accepted input format | Normalized `meta.source` |
 | --- | --- | --- |
+| [`atif`](src/adapters/atif/) | ATIF-v1.0 through ATIF-v1.7 whole-trajectory JSON | `atif` |
 | [`claude-code`](src/adapters/claude-code/) | Native Claude Code JSONL | `claude-code` |
 | [`codex`](src/adapters/codex/) | Native Codex rollout JSONL | `codex` |
 | [`copilot-cli`](src/adapters/copilot-cli/) | Native GitHub Copilot CLI event JSONL | `copilot-cli` |
@@ -111,9 +112,9 @@ what the adapter drops.
 `listTrajectories()` enumerates the sessions in a source's standard local
 store, newest first, with cursor pagination. It is a discovery layer beside
 normalization — `normalizeTranscript()` itself never touches the filesystem.
-Copilot CLI, Cursor, Gemini CLI, and OpenCode are export-only input contracts
-and intentionally return `listing_unavailable`; callers locate and read the
-exports themselves.
+ATIF, Copilot CLI, Cursor, Gemini CLI, and OpenCode are export-only input
+contracts and intentionally return `listing_unavailable`; callers locate and
+read the exports themselves.
 
 ```ts
 import { listTrajectories } from "@letta-ai/trajectory";

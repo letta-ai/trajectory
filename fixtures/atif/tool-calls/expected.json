@@ -1,0 +1,66 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "atif",
+      "model": "example-default-model"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the workspace.\n[image]",
+      "timestamp": "2026-08-18T10:00:00.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I should list the files before reading one.",
+      "timestamp": "2026-08-18T10:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "I'll inspect it now.",
+      "timestamp": "2026-08-18T10:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-list",
+          "name": "shell",
+          "args": "{\"command\":\"find . -maxdepth 1 -type f\"}"
+        }
+      ],
+      "timestamp": "2026-08-18T10:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-delegate",
+          "name": "delegate",
+          "args": "{\"task\":\"inspect config\"}"
+        }
+      ],
+      "timestamp": "2026-08-18T10:00:01.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-list",
+      "content": "README.md\npackage.json",
+      "timestamp": "2026-08-18T10:00:01.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-delegate",
+      "content": "{\"subagent_trajectory_ref\":[{\"trajectory_path\":\"subagents/config.json\",\"session_id\":\"run-atif-1\"}]}",
+      "timestamp": "2026-08-18T10:00:01.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The workspace contains the expected project files.",
+      "timestamp": "2026-08-18T10:00:02.000Z"
+    }
+  ],
+  "diagnostics": []
+}

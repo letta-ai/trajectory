@@ -11,6 +11,7 @@ import type {
   Diagnostic,
   MetaRecord,
   NormalizedRecord,
+  ObservationRecord,
   ReasoningRecord,
   SystemRecord,
   ToolResultRecord,
@@ -72,6 +73,8 @@ function semanticBucket(event: DecodedEvent): string {
   switch (event.type) {
     case "message":
       return "message";
+    case "observation":
+      return "observation";
     case "reasoning":
       return "reasoning";
     case "tool_call":
@@ -351,6 +354,15 @@ function normalizeEvent(
     }
     const record: Omit<ReasoningRecord, "timestamp"> = {
       role: "reasoning",
+      content: event.content,
+    };
+    return record;
+  }
+
+  if (event.type === "observation") {
+    if (!event.content.trim()) return undefined;
+    const record: Omit<ObservationRecord, "timestamp"> = {
+      role: "observation",
       content: event.content,
     };
     return record;

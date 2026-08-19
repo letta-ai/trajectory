@@ -160,6 +160,12 @@ class SystemRecord(TypedDict):
     timestamp: str
 
 
+class ObservationRecord(TypedDict):
+    role: Literal["observation"]
+    content: str
+    timestamp: str
+
+
 class ReasoningRecord(TypedDict):
     role: Literal["reasoning"]
     content: str
@@ -199,6 +205,7 @@ class ToolResultRecord(_ToolResultOptional):
 NormalizedRecord = Union[
     MetaRecord,
     SystemRecord,
+    ObservationRecord,
     UserRecord,
     ReasoningRecord,
     AssistantMessageRecord,

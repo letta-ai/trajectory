@@ -177,6 +177,8 @@ function recordType(record: NormalizedRecord): CanonicalRecordType {
       return "meta";
     case "system":
       return "system";
+    case "observation":
+      return "observation";
     case "user":
       return "user";
     case "reasoning":
@@ -190,11 +192,11 @@ function recordType(record: NormalizedRecord): CanonicalRecordType {
 
 /**
  * Semantic component key for `record_id`. Tool calls/results are keyed by their
- * tool_call_id (a native semantic id). Messages/reasoning can repeat within one
- * source record without a native id, so they always carry a type-local ordinal
- * (`message:0`) — included even when there is currently only one, so that a
- * conflicting version which changes cardinality (one reasoning block becomes
- * two) does not shift the original record's `record_id`.
+ * tool_call_id (a native semantic id). Messages, observations, and reasoning can
+ * repeat within one source record without a native id, so they always carry a
+ * type-local ordinal (`message:0`) — included even when there is currently only
+ * one, so that a conflicting version which changes cardinality (one reasoning
+ * block becomes two) does not shift the original record's `record_id`.
  */
 function componentKeyFor(
   record: NormalizedRecord,
@@ -209,6 +211,8 @@ function componentKeyFor(
     case "user":
     case "assistant":
       return `message:${ordinal}`;
+    case "observation":
+      return `observation:${ordinal}`;
     case "reasoning":
       return `reasoning:${ordinal}`;
     case "assistant-tool-call":
@@ -239,6 +243,7 @@ function semanticContent(
           }
         : {};
     case "system":
+    case "observation":
     case "user":
     case "reasoning":
     case "assistant":
@@ -278,6 +283,7 @@ function flattenFields(
   };
   switch (type) {
     case "system":
+    case "observation":
     case "user":
     case "reasoning":
     case "assistant":

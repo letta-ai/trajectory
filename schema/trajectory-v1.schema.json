@@ -14,6 +14,7 @@
       "oneOf": [
         { "$ref": "#/$defs/meta" },
         { "$ref": "#/$defs/system" },
+        { "$ref": "#/$defs/observation" },
         { "$ref": "#/$defs/user" },
         { "$ref": "#/$defs/reasoning" },
         { "$ref": "#/$defs/assistant" },
@@ -48,6 +49,16 @@
       "additionalProperties": false,
       "properties": {
         "role": { "const": "system" },
+        "content": { "type": "string" },
+        "timestamp": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "required": ["role", "content", "timestamp"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "const": "observation" },
         "content": { "type": "string" },
         "timestamp": { "$ref": "#/$defs/timestamp" }
       }

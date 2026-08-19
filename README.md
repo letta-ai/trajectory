@@ -136,6 +136,8 @@ A trajectory is an ordered array containing:
   metadata.
 - Optional system message records when `filters.systemMessages` is explicitly
   set to `"include"`; system messages are omitted by default.
+- Generic `observation` records for environment feedback that cannot be
+  attributed to one specific tool call, such as merged terminal output.
 - `user` and assistant prose records.
 - Optional `reasoning` records when the source exposes reasoning.
 - Assistant tool-call records with stable IDs and stringified JSON-object

@@ -51,6 +51,11 @@ export interface DecodedReasoningEvent extends DecodedEventBase {
   content: string;
 }
 
+export interface DecodedObservationEvent extends DecodedEventBase {
+  type: "observation";
+  content: string;
+}
+
 export interface DecodedToolCallEvent extends DecodedEventBase {
   type: "tool_call";
   id?: string;
@@ -68,6 +73,7 @@ export interface DecodedToolResultEvent extends DecodedEventBase {
 
 export type DecodedEvent =
   | DecodedMessageEvent
+  | DecodedObservationEvent
   | DecodedReasoningEvent
   | DecodedToolCallEvent
   | DecodedToolResultEvent;

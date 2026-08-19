@@ -1600,13 +1600,21 @@ var openHandsAdapter = {
       if (result === undefined)
         continue;
       const callId = typeof event.tool_call_id === "string" && event.tool_call_id ? event.tool_call_id : typeof event.action_id === "string" ? callIdByActionId.get(event.action_id) : undefined;
-      emit({
-        type: "tool_result",
-        content: result,
-        ...toolResultStatus(event),
-        ...callId ? { callId } : {},
-        ...timestamp ? { timestamp } : {}
-      });
+      if (callId) {
+        emit({
+          type: "tool_result",
+          content: result,
+          ...toolResultStatus(event),
+          callId,
+          ...timestamp ? { timestamp } : {}
+        });
+      } else {
+        emit({
+          type: "observation",
+          content: result,
+          ...timestamp ? { timestamp } : {}
+        });
+      }
     }
     return {
       events,
@@ -1995,7 +2003,7 @@ function validateTranscript(value, options) {
       continue;
     }
     validateTimestamp(record.timestamp, index);
-    if (record.role === "system" || record.role === "user" || record.role === "reasoning") {
+    if (record.role === "system" || record.role === "observation" || record.role === "user" || record.role === "reasoning") {
       exactKeys(record, CONTENT_KEYS, index);
       if (typeof record.content !== "string") {
         fail(`Record ${index}: ${record.role} content must be a string.`);
@@ -2123,6 +2131,8 @@ function semanticBucket(event) {
   switch (event.type) {
     case "message":
       return "message";
+    case "observation":
+      return "observation";
     case "reasoning":
       return "reasoning";
     case "tool_call":
@@ -2299,6 +2309,15 @@ function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bound
     }
     const record2 = {
       role: "reasoning",
+      content: event.content
+    };
+    return record2;
+  }
+  if (event.type === "observation") {
+    if (!event.content.trim())
+      return;
+    const record2 = {
+      role: "observation",
       content: event.content
     };
     return record2;

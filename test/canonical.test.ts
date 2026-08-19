@@ -735,6 +735,33 @@ describe("openhands linkage independent of arrival order", () => {
   });
 });
 
+describe("generic observations", () => {
+  test("projects unlinked environment feedback without inventing a tool link", () => {
+    const result = normalizeToCanonical({
+      source: "openhands",
+      transcript: fixtureText("openhands/cleanup", "input.json"),
+    });
+
+    const observation = result.records.find(
+      (record) => record.record_type === "observation",
+    );
+    expect(observation).toMatchObject({
+      source_type: "openhands",
+      source_identity_kind: "native",
+      content: "Environment ready.",
+      tool_call_id: null,
+      tool_name: null,
+      tool_arguments_json: null,
+      tool_result_json: null,
+      tool_result_ok: null,
+    });
+    expect(observation?.record_id).toMatch(HEX_64);
+    expect(observation?.record_hash).toMatch(HEX_64);
+    expect(observation?.content_hash).toMatch(HEX_64);
+    expect(validateCanonical(result.records)).toBe(true);
+  });
+});
+
 describe("timestamp-free determinism", () => {
   test("native records without timestamps keep stable order identity", () => {
     const lines = [

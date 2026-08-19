@@ -605,6 +605,21 @@ describe("public API", () => {
     );
   });
 
+  test("keeps generic observations when tool results are omitted", () => {
+    const result = normalizeTranscript({
+      source: "openhands",
+      transcript: fixtureText("openhands/cleanup", "input.json"),
+      filters: { toolResults: "omit" },
+    });
+
+    expect(result.records.some((record) => record.role === "tool")).toBe(false);
+    expect(result.records).toContainEqual({
+      role: "observation",
+      content: "Environment ready.",
+      timestamp: "2026-07-04T08:00:05.000Z",
+    });
+  });
+
   test("supports head-only tool-result truncation", () => {
     const result = normalizeTranscript({
       source: "codex",

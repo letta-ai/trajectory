@@ -137,6 +137,13 @@ export interface SystemRecord {
   timestamp: string;
 }
 
+/** Source-native environment feedback not attributable to one specific tool call. */
+export interface ObservationRecord {
+  role: "observation";
+  content: string;
+  timestamp: string;
+}
+
 export interface ReasoningRecord {
   role: "reasoning";
   content: string;
@@ -174,6 +181,7 @@ export interface ToolResultRecord {
 export type NormalizedRecord =
   | MetaRecord
   | SystemRecord
+  | ObservationRecord
   | UserRecord
   | ReasoningRecord
   | AssistantMessageRecord
@@ -195,6 +203,7 @@ export interface NormalizeResult {
 export type CanonicalRecordType =
   | "meta"
   | "system"
+  | "observation"
   | "user"
   | "reasoning"
   | "assistant"

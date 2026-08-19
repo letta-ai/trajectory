@@ -615,7 +615,7 @@ describe("public API", () => {
     expect(result.records.some((record) => record.role === "tool")).toBe(false);
     expect(result.records).toContainEqual({
       role: "observation",
-      content: "orphaned",
+      content: "Environment ready.",
       timestamp: "2026-07-04T08:00:05.000Z",
     });
   });

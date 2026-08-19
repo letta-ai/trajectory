@@ -748,7 +748,7 @@ describe("generic observations", () => {
     expect(observation).toMatchObject({
       source_type: "openhands",
       source_identity_kind: "native",
-      content: "orphaned",
+      content: "Environment ready.",
       tool_call_id: null,
       tool_name: null,
       tool_arguments_json: null,

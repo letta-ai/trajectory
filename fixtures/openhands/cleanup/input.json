@@ -34,9 +34,9 @@
     },
     {
       "kind": "ObservationEvent",
-      "id": "orphan-1",
+      "id": "environment-1",
       "timestamp": "2026-07-04T08:00:05",
-      "observation": { "content": [{ "type": "text", "text": "orphaned" }] }
+      "observation": { "content": [{ "type": "text", "text": "Environment ready." }] }
     },
     {
       "kind": "MessageEvent",

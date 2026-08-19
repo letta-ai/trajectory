@@ -219,7 +219,7 @@
     }
   ],
   "normalizer_version": "0.2.0",
-  "canonical_schema_version": 4,
+  "canonical_schema_version": 3,
   "config": {
     "bounds": {
       "toolArguments": {

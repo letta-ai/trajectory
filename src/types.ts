@@ -137,7 +137,7 @@ export interface SystemRecord {
   timestamp: string;
 }
 
-/** Source-native environment feedback without a precise tool-call link. */
+/** Source-native environment feedback not attributable to one specific tool call. */
 export interface ObservationRecord {
   role: "observation";
   content: string;

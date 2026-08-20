@@ -9,6 +9,7 @@ import {
   blocksText,
   isObject,
   jsonString,
+  nonemptyString,
   parseTimestamp,
 } from "../shared.js";
 
@@ -158,10 +159,6 @@ function parseGeminiDocument(transcript: string): GeminiDocument {
     throw invalidGeminiTranscript();
   }
   return parsed as GeminiDocument;
-}
-
-function nonemptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function thoughtContent(value: unknown): string {

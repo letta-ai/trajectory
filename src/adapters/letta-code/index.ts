@@ -5,7 +5,11 @@ import type {
 } from "../../internal.js";
 import type { Diagnostic } from "../../types.js";
 import { NormalizationError } from "../../types.js";
-import { parseJsonLines, parseTimestamp } from "../shared.js";
+import {
+  nonemptyString,
+  parseJsonLines,
+  parseTimestamp,
+} from "../shared.js";
 
 const SUPPORTED_KINDS = new Set([
   "user",
@@ -156,10 +160,6 @@ export const lettaCodeAdapter: SourceAdapter = {
     };
   },
 };
-
-function nonemptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
 
 function invalidLettaCodeTranscript(): NormalizationError {
   return new NormalizationError(

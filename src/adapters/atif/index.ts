@@ -9,6 +9,7 @@ import {
   blocksText,
   isObject,
   jsonString,
+  nonemptyString,
   parseTimestamp,
 } from "../shared.js";
 
@@ -23,9 +24,9 @@ export const atifAdapter: SourceAdapter = {
     const document = parseAtifDocument(transcript);
     const diagnostics: Diagnostic[] = [];
     const events: DecodedEvent[] = [];
-    const trajectoryId = atifNonemptyString(document.trajectory_id);
-    const sessionId = atifNonemptyString(document.session_id);
-    const rootModel = atifNonemptyString(document.agent.model_name);
+    const trajectoryId = nonemptyString(document.trajectory_id);
+    const sessionId = nonemptyString(document.session_id);
+    const rootModel = nonemptyString(document.agent.model_name);
     let createdAt: Date | undefined;
 
     for (let index = 0; index < document.steps.length; index += 1) {
@@ -48,7 +49,7 @@ export const atifAdapter: SourceAdapter = {
       createdAt ??= timestamp;
       const model =
         step.source === "agent"
-          ? atifNonemptyString(step.model_name) ?? rootModel
+          ? nonemptyString(step.model_name) ?? rootModel
           : undefined;
       const sourceRecordId = trajectoryId
         ? `trajectory:${trajectoryId}:step:${expectedStepId}`
@@ -104,8 +105,8 @@ export const atifAdapter: SourceAdapter = {
         }
         for (const rawCall of step.tool_calls ?? []) {
           if (!isObject(rawCall)) throw invalidAtifTranscript();
-          const callId = atifNonemptyString(rawCall.tool_call_id);
-          const name = atifNonemptyString(rawCall.function_name);
+          const callId = nonemptyString(rawCall.tool_call_id);
+          const name = nonemptyString(rawCall.function_name);
           emit({
             type: "tool_call",
             args: jsonString(rawCall.arguments),
@@ -122,7 +123,7 @@ export const atifAdapter: SourceAdapter = {
       }
       for (const rawResult of step.observation.results) {
         if (!isObject(rawResult)) throw invalidAtifTranscript();
-        const callId = atifNonemptyString(rawResult.source_call_id);
+        const callId = nonemptyString(rawResult.source_call_id);
         const content = observationContent(rawResult);
         emit(
           callId
@@ -196,10 +197,6 @@ function observationContent(result: Record<string, unknown>): string {
     return jsonString({ subagent_trajectory_ref: result.subagent_trajectory_ref });
   }
   return "";
-}
-
-function atifNonemptyString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function invalidAtifTranscript(): NormalizationError {

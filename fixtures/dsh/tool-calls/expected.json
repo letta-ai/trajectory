@@ -1,0 +1,45 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "dsh",
+      "cwd": "/workspace/project",
+      "model": "sglang-local/Qwen3.8-27B-NVFP4"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the governed memory.",
+      "timestamp": "2026-08-22T01:00:00.300Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I should use governed recall.",
+      "timestamp": "2026-08-22T01:00:00.600Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-memory-1",
+          "name": "ice_memory_recall",
+          "args": "{\"query\":\"preference\"}"
+        }
+      ],
+      "timestamp": "2026-08-22T01:00:00.600Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-memory-1",
+      "content": "Prefers concise status reports.",
+      "ok": true,
+      "timestamp": "2026-08-22T01:00:00.800Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The governed memory was recalled.",
+      "timestamp": "2026-08-22T01:00:01.100Z"
+    }
+  ],
+  "diagnostics": []
+}

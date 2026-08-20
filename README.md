@@ -85,6 +85,7 @@ and is empty when the transcript required no recoverable cleanup.
 | [`codex`](src/adapters/codex/) | Native Codex rollout JSONL | `codex` |
 | [`copilot-cli`](src/adapters/copilot-cli/) | Native GitHub Copilot CLI event JSONL | `copilot-cli` |
 | [`cursor`](src/adapters/cursor/) | Cursor role/message content-block JSONL capture | `cursor` |
+| [`dsh`](src/adapters/dsh/) | Decompressed logical DeepSeek Harness session JSONL | `dsh` |
 | [`droid`](src/adapters/droid/) | Native Droid session JSONL | `droid` |
 | [`gemini-cli`](src/adapters/gemini-cli/) | Native Gemini CLI whole-session JSON | `gemini-cli` |
 | [`hermes`](src/adapters/hermes/) | Session-store message-row array or a `{ "session": {...}, "messages": [...] }` envelope | `hermes` |
@@ -97,7 +98,7 @@ and is empty when the transcript required no recoverable cleanup.
 | [`deepagents`](src/adapters/deepagents/) | Deep Agents CLI LangGraph SQLite store plus `threadId` | `deepagents` |
 
 Tool result records may include `ok: boolean` when the source exposes an
-authoritative structured outcome, such as Pi/OpenClaw `isError`, Claude Code
+authoritative structured outcome, such as Pi/OpenClaw/DSH `isError`, Claude Code
 `is_error`, Letta Code `resultOk`, OpenHands/Cursor `is_error`,
 OpenCode/Gemini terminal state, or Copilot CLI `success`. The field is omitted
 when the source does not expose a reliable status; result text is never

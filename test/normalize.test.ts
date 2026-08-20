@@ -22,6 +22,8 @@ const fixtures = [
   { source: "copilot-cli", name: "copilot-cli/cleanup" },
   { source: "cursor", name: "cursor/tool-calls" },
   { source: "cursor", name: "cursor/cleanup" },
+  { source: "dsh", name: "dsh/tool-calls" },
+  { source: "dsh", name: "dsh/cleanup" },
   { source: "droid", name: "droid/happy-path" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/cleanup" },
@@ -81,6 +83,17 @@ describe("golden fixtures", () => {
 });
 
 describe("source-native tool result status", () => {
+  test("maps DeepSeek Harness isError", () => {
+    const result = normalizeTranscript({
+      source: "dsh",
+      transcript: fixtureText("dsh/cleanup", "input.jsonl"),
+    });
+    const tool = result.records.find(
+      (record) => record.role === "tool" && record.tool_call_id === "call-failed",
+    );
+    expect(tool?.role === "tool" ? tool.ok : undefined).toBe(false);
+  });
+
   test("maps Pi isError", () => {
     const result = normalizeTranscript({
       source: "pi",
@@ -179,6 +192,20 @@ describe("source-native tool result status", () => {
 });
 
 describe("public API", () => {
+  test("rejects a DeepSeek Harness event stream without its session header", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "dsh",
+        transcript: JSON.stringify({
+          type: "user/message",
+          seq: 0,
+          time: 1787364000200,
+          data: { id: "message-without-session" },
+        }),
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
   test("normalizes Droid tool-only messages and drops transport rows", () => {
     const transcript = [
       JSON.stringify({ type: "session_start", id: "droid-session", cwd: "/tmp/droid" }),

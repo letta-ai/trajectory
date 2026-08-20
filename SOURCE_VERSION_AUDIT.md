@@ -1,7 +1,7 @@
 # Source-version audit
 
-Audit dates: 2026-07-11 (Claude Code and Codex) and 2026-07-22
-(Letta Code).
+Audit dates: 2026-07-11 (Claude Code and Codex), 2026-07-22
+(Letta Code), and 2026-08-21 (DeepSeek Harness).
 
 This audit asks whether native transcript versions require different decoding
 logic. It records aggregate structure only. Transcript prose, tool arguments,
@@ -149,6 +149,33 @@ Conclusion: one structural decoder covers the observed client-log history.
 There is no embedded version on which to dispatch; future incompatible row
 shapes should be identified by their `kind` and keys and added as sanitized
 fixtures.
+
+## DeepSeek Harness
+
+The adapter was checked against the official DeepSeek Harness tag
+`dsh-v0.1.0-rc.8` at commit
+`141eb6fef83422698aef7a981029e843e8161534`. The accepted input is the
+decompressed logical `session.jsonl` returned by
+`SessionPersistence.readRaw()`, including the leading session header and the
+current `SESSION_FORMAT_VERSION = 0` event envelope.
+
+The source repository establishes these native signals:
+
+- `SessionHeader.id` identifies the source group and `createdAt` supplies its
+  creation time.
+- every session event carries a contiguous `seq` and epoch-millisecond `time`;
+- user, assistant, and tool-result messages carry stable message IDs;
+- assistant messages carry ordered text, reasoning, and tool-call blocks plus
+  an exact provider/model source pair;
+- tool-result blocks carry their call ID and authoritative `isError` boolean;
+- append-origin and replacement surface operations distinguish the durable
+  human transcript from model-only compaction checkpoints.
+
+Sanitized fixtures exercise those signals, a failed tool, packed stream-chunk
+rows, a malformed body line, and a compaction replacement. No private DSH
+transcript content or deployment path was read or retained. The format is
+pre-release and explicitly has no compatibility promise: a future DSH session
+format version must be qualified before this adapter accepts it.
 
 ## Decisions supported by this audit
 

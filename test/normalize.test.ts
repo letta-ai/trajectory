@@ -24,6 +24,7 @@ const fixtures = [
   { source: "cursor", name: "cursor/cleanup" },
   { source: "dsh", name: "dsh/tool-calls" },
   { source: "dsh", name: "dsh/cleanup" },
+  { source: "dsh", name: "dsh/real-qwen38-sanitized" },
   { source: "droid", name: "droid/happy-path" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/cleanup" },

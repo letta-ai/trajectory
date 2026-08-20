@@ -951,6 +951,15 @@ var dshAdapter = {
         if (isReplacement(record.surfaceOp))
           continue;
         const message = data;
+        const source = isObject(message.source) ? message.source : {};
+        if (source.kind !== "user") {
+          diagnostics.push({
+            code: "injected_context_dropped",
+            message: `Dropped DeepSeek Harness non-user injected content on line ${line}.`,
+            inputLine: line
+          });
+          continue;
+        }
         const content = blocksText(message.content);
         if (!content)
           continue;

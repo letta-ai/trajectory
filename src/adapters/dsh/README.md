@@ -19,6 +19,12 @@ The adapter targets DSH `SESSION_FORMAT_VERSION = 0` as published by
 | append-origin `assistant/message` | reasoning, assistant text, and tool calls in native block order |
 | append-origin `tool/result` | linked result with `isError` mapped to `ok` |
 
+Only `user/message` records whose source is exactly `kind: "user"` become user
+records. DSH also uses the same event type for system-prompt snapshots, skill
+catalogs, and plugin injections; those are dropped with an
+`injected_context_dropped` diagnostic rather than being mislabeled as human
+learning input.
+
 Message IDs become native canonical source identities. Event `seq` becomes the
 source ordering key, and event `time` becomes the source timestamp. Tool-call
 IDs and raw JSON argument strings are retained. Tool calls are decoded from the

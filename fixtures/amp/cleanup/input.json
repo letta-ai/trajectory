@@ -61,7 +61,12 @@
       "role": "info",
       "messageId": 3,
       "protocolMessageID": "cleanup-info-1",
-      "content": [{ "type": "summary", "summary": "Compaction summary." }]
+      "content": [
+        {
+          "type": "summary",
+          "summary": { "type": "message", "summary": "Compaction summary." }
+        }
+      ]
     },
     {
       "role": "assistant",

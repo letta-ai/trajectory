@@ -459,7 +459,7 @@ describe("public API", () => {
   });
 
   test("reports non-terminal and missing Amp tool results", () => {
-    for (const status of ["running", undefined]) {
+    for (const status of ["running", "pending", undefined]) {
       const exportDocument = JSON.parse(
         fixtureText("amp/orb-thread-export", "input.json"),
       );
@@ -492,6 +492,16 @@ describe("public API", () => {
     unknownRole.messages[0].role = "system";
     const unknownBlock = structuredClone(valid);
     unknownBlock.messages[1].content[0].type = "stream_delta";
+    const unknownInfoBlock = structuredClone(valid);
+    unknownInfoBlock.messages[3].content[0].type = "replacement_summary";
+    const unknownResultStatus = structuredClone(valid);
+    unknownResultStatus.messages[2].content[0].run.status = "success";
+    const missingToolName = structuredClone(valid);
+    delete missingToolName.messages[1].content[1].name;
+    const missingToolInput = structuredClone(valid);
+    delete missingToolInput.messages[1].content[1].input;
+    const missingToolResult = structuredClone(valid);
+    delete missingToolResult.messages[2].content[0].run.result;
 
     for (const transcript of [
       "{",
@@ -502,11 +512,39 @@ describe("public API", () => {
       JSON.stringify(duplicateProtocolId),
       JSON.stringify(unknownRole),
       JSON.stringify(unknownBlock),
+      JSON.stringify(unknownInfoBlock),
+      JSON.stringify(unknownResultStatus),
+      JSON.stringify(missingToolName),
+      JSON.stringify(missingToolInput),
+      JSON.stringify(missingToolResult),
     ]) {
       expect(() => normalizeTranscript({ source: "amp", transcript })).toThrow(
         expect.objectContaining({ code: "invalid_input" }),
       );
     }
+  });
+
+  test("reports every duplicate-ID Amp tool call without a result", () => {
+    const exportDocument = JSON.parse(
+      fixtureText("amp/orb-thread-export", "input.json"),
+    );
+    exportDocument.messages[1].content.push(
+      structuredClone(exportDocument.messages[1].content[1]),
+    );
+
+    const result = normalizeTranscript({
+      source: "amp",
+      transcript: JSON.stringify(exportDocument),
+    });
+
+    expect(result.diagnostics).toContainEqual({
+      code: "incomplete_transcript",
+      message: "Amp thread export contains a tool call without a result.",
+      count: 1,
+    });
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      "duplicate_tool_call_id",
+    );
   });
 
   test("accepts every published ATIF v1 schema version", () => {

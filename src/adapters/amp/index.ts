@@ -13,6 +13,7 @@ import {
 } from "../shared.js";
 
 const TERMINAL_TOOL_STATUSES = new Set(["done", "error", "cancelled"]);
+const NONTERMINAL_TOOL_STATUSES = new Set(["running", "pending"]);
 
 export const ampAdapter: SourceAdapter = {
   source: "amp",
@@ -29,9 +30,9 @@ export const ampAdapter: SourceAdapter = {
     const events: DecodedEvent[] = [];
     const messageIds = new Set<number>();
     const protocolMessageIds = new Set<string>();
-    const toolCallIds = new Set<string>();
-    const terminalResultIds = new Set<string>();
-    const nonterminalResultIds = new Set<string>();
+    const toolCallCounts = new Map<string, number>();
+    const terminalResultCounts = new Map<string, number>();
+    const nonterminalResultCounts = new Map<string, number>();
     let lastConversationalRole: "user" | "assistant" | undefined;
 
     for (let messageIndex = 0; messageIndex < root.messages.length; messageIndex += 1) {
@@ -62,6 +63,18 @@ export const ampAdapter: SourceAdapter = {
         invalid(`Amp message ${messageIndex} must contain a content array.`);
       }
       if (message.role === "info") {
+        for (let componentIndex = 0; componentIndex < message.content.length; componentIndex += 1) {
+          const block = message.content[componentIndex];
+          if (
+            !isObject(block) ||
+            block.type !== "summary" ||
+            !isObject(block.summary) ||
+            block.summary.type !== "message" ||
+            typeof block.summary.summary !== "string"
+          ) {
+            invalid(`Amp info block ${messageIndex}:${componentIndex} has an unsupported shape.`);
+          }
+        }
         diagnostics.push({
           code: "noise_record_dropped",
           message: `Dropped an Amp info record at message ${messageIndex}.`,
@@ -104,8 +117,8 @@ export const ampAdapter: SourceAdapter = {
           if (!callId || !isObject(block.run) || typeof block.run.status !== "string") {
             invalid(`Amp tool result ${messageIndex}:${componentIndex} is malformed.`);
           }
-          if (!TERMINAL_TOOL_STATUSES.has(block.run.status)) {
-            nonterminalResultIds.add(callId);
+          if (NONTERMINAL_TOOL_STATUSES.has(block.run.status)) {
+            increment(nonterminalResultCounts, callId);
             diagnostics.push({
               code: "incomplete_transcript",
               message: `Amp tool result at message ${messageIndex} is not terminal.`,
@@ -113,7 +126,13 @@ export const ampAdapter: SourceAdapter = {
             });
             continue;
           }
-          terminalResultIds.add(callId);
+          if (!TERMINAL_TOOL_STATUSES.has(block.run.status)) {
+            invalid(`Amp tool result ${messageIndex}:${componentIndex} has an unsupported status.`);
+          }
+          if (!Object.hasOwn(block.run, "result")) {
+            invalid(`Amp terminal tool result ${messageIndex}:${componentIndex} must contain result.`);
+          }
+          increment(terminalResultCounts, callId);
           events.push({
             type: "tool_result",
             callId,
@@ -187,11 +206,14 @@ export const ampAdapter: SourceAdapter = {
             invalid(`Amp tool use ${messageIndex}:${componentIndex} must contain an id.`);
           }
           const name = nonemptyString(block.name);
-          toolCallIds.add(callId);
+          if (!name || !isObject(block.input)) {
+            invalid(`Amp tool use ${messageIndex}:${componentIndex} is malformed.`);
+          }
+          increment(toolCallCounts, callId);
           events.push({
             type: "tool_call",
             id: callId,
-            ...(name ? { name } : {}),
+            name,
             args: jsonString(block.input),
             ...shared,
           });
@@ -199,12 +221,14 @@ export const ampAdapter: SourceAdapter = {
       }
     }
 
-    for (const callId of toolCallIds) {
-      if (!terminalResultIds.has(callId) && !nonterminalResultIds.has(callId)) {
+    for (const [callId, callCount] of toolCallCounts) {
+      const resultCount =
+        (terminalResultCounts.get(callId) ?? 0) + (nonterminalResultCounts.get(callId) ?? 0);
+      if (callCount > resultCount) {
         diagnostics.push({
           code: "incomplete_transcript",
           message: "Amp thread export contains a tool call without a result.",
-          count: 1,
+          count: callCount - resultCount,
         });
       }
     }
@@ -248,7 +272,14 @@ function parseExport(transcript: string): Record<string, unknown> {
 }
 
 function resultText(result: unknown): string {
-  return typeof result === "string" ? result : jsonString(result);
+  if (typeof result === "string") return result;
+  const serialized = JSON.stringify(result);
+  if (serialized === undefined) invalid("Amp terminal tool result is not JSON-serializable.");
+  return serialized;
+}
+
+function increment(counts: Map<string, number>, id: string): void {
+  counts.set(id, (counts.get(id) ?? 0) + 1);
 }
 
 function singleTreeRef(value: unknown): string | undefined {

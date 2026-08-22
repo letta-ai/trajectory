@@ -86,7 +86,12 @@
       "messageId": 3,
       "protocolMessageID": "msg-info-1",
       "protocolMessageVersion": 0,
-      "content": [{ "type": "summary", "summary": "Compaction summary." }]
+      "content": [
+        {
+          "type": "summary",
+          "summary": { "type": "message", "summary": "Compaction summary." }
+        }
+      ]
     },
     {
       "role": "assistant",

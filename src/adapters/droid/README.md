@@ -11,8 +11,12 @@ blocks (with JSON-stringified inputs), and user `tool_result` blocks linked by
 `tool_use_id`. Droid has no per-event timestamps or transcript model field, so
 the shared core synthesizes timestamps and no model is added to metadata.
 
-`todo_state`, `session_end`, and `compaction_state` rows are transport noise
-and are dropped.
+Current Droid `message` rows include a top-level timestamp. The adapter carries
+that timestamp to every canonical component emitted from the row. Older exports
+without timestamps remain supported and use the shared synthesized-time policy.
+
+`todo_state`, `session_end`, and `compaction_state` rows are transport noise and
+are dropped.
 
 ## Listing
 

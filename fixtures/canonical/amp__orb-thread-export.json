@@ -1,0 +1,159 @@
+{
+  "records": [
+    {
+      "source_type": "amp",
+      "source_group_id": "T-sanitized-orb-thread",
+      "stable_source_record_id": "meta",
+      "source_identity_kind": "synthetic",
+      "source_order_id": "0|0000-00-00T00:00:00.000Z|00000000000000000000|meta",
+      "component_index": 0,
+      "record_type": "meta",
+      "record_id": "29ce685cb554bc47023f558418db7958b960df8d8bb500e5805f964008f46f26",
+      "record_hash": "380fbed96fe806a1096a633a113366b4ce2833b7bd2e127545d7e5d3d89d9169",
+      "content_hash": "2d6f6665b10c17fe43afb2596fb3c2e05257cdda357e629dedb3eff8e6eda8ed",
+      "source_timestamp": null,
+      "record_timestamp": null,
+      "content": null,
+      "tool_call_id": null,
+      "tool_name": null,
+      "tool_arguments_json": null,
+      "tool_result_json": null,
+      "tool_result_ok": null,
+      "record_json": "{\"cwd\":\"/workspace/example\",\"git_branch\":\"main\",\"model\":\"example/model\",\"role\":\"meta\",\"source\":\"amp\"}"
+    },
+    {
+      "source_type": "amp",
+      "source_group_id": "T-sanitized-orb-thread",
+      "stable_source_record_id": "msg-user-1",
+      "source_identity_kind": "native",
+      "source_order_id": "1|0000-00-00T00:00:00.001Z|00000000000000000000|msg-user-1",
+      "component_index": 0,
+      "record_type": "user",
+      "record_id": "ce92e6104d53ebcdc729a935b934fc3e8aa79f356e21f937dd5ca4ca14a3d1b7",
+      "record_hash": "370f50b97d85f7bebded4f36a2ec390e8b693a38ad4e96472324564f979c26e8",
+      "content_hash": "3d24dab2ff33b90ff87d680cb66a61f35f97d5167d000de67634c989914e3511",
+      "source_timestamp": "2026-08-22T10:00:00.000Z",
+      "record_timestamp": "2026-08-22T10:00:00.000Z",
+      "content": "Inspect the workspace.",
+      "tool_call_id": null,
+      "tool_name": null,
+      "tool_arguments_json": null,
+      "tool_result_json": null,
+      "tool_result_ok": null,
+      "record_json": "{\"content\":\"Inspect the workspace.\",\"role\":\"user\",\"timestamp\":\"2026-08-22T10:00:00.000Z\"}"
+    },
+    {
+      "source_type": "amp",
+      "source_group_id": "T-sanitized-orb-thread",
+      "stable_source_record_id": "msg-assistant-1",
+      "source_identity_kind": "native",
+      "source_order_id": "1|0000-00-00T00:00:00.001Z|00000000000000000001|msg-assistant-1",
+      "component_index": 0,
+      "record_type": "reasoning",
+      "record_id": "ab0da11e396415974a29bb20a394686b5f303c7bf87fb69e6b115c2049544102",
+      "record_hash": "51c90c719f2e7e6d44684f53c5cbf8aafd837d4dcda7676e9e487be217f42797",
+      "content_hash": "66a8cf5fb4c8da2c585ead073514de8ce75d05c6f99f1e32a202d3cd982fcb2e",
+      "source_timestamp": "2026-08-22T10:00:00.500Z",
+      "record_timestamp": "2026-08-22T10:00:00.500Z",
+      "content": "I will inspect it.",
+      "tool_call_id": null,
+      "tool_name": null,
+      "tool_arguments_json": null,
+      "tool_result_json": null,
+      "tool_result_ok": null,
+      "record_json": "{\"content\":\"I will inspect it.\",\"role\":\"reasoning\",\"timestamp\":\"2026-08-22T10:00:00.500Z\"}"
+    },
+    {
+      "source_type": "amp",
+      "source_group_id": "T-sanitized-orb-thread",
+      "stable_source_record_id": "msg-assistant-1",
+      "source_identity_kind": "native",
+      "source_order_id": "1|0000-00-00T00:00:00.001Z|00000000000000000001|msg-assistant-1",
+      "component_index": 1,
+      "record_type": "assistant-tool-call",
+      "record_id": "b326ed4fc418db256d93957bf33aaf3c08419851b5c3b36254bb99036f43bba2",
+      "record_hash": "a5f75636e9a9b0a3bcaab62fe1da6c880b6a503d51a9b5b12022b6e02f485e80",
+      "content_hash": "37ff959d7491a75a6c1c3495eaf98ee89e9ed38bb906c86b5fff6749af776130",
+      "source_timestamp": "2026-08-22T10:00:01.000Z",
+      "record_timestamp": "2026-08-22T10:00:01.000Z",
+      "content": null,
+      "tool_call_id": "tool-1",
+      "tool_name": "shell_command",
+      "tool_arguments_json": "{\"command\":\"pwd\"}",
+      "tool_result_json": null,
+      "tool_result_ok": null,
+      "record_json": "{\"content\":null,\"role\":\"assistant\",\"timestamp\":\"2026-08-22T10:00:01.000Z\",\"tool_calls\":[{\"args\":\"{\\\"command\\\":\\\"pwd\\\"}\",\"id\":\"tool-1\",\"name\":\"shell_command\"}]}"
+    },
+    {
+      "source_type": "amp",
+      "source_group_id": "T-sanitized-orb-thread",
+      "stable_source_record_id": "msg-user-2",
+      "source_identity_kind": "native",
+      "source_order_id": "1|0000-00-00T00:00:00.001Z|00000000000000000002|msg-user-2",
+      "component_index": 0,
+      "record_type": "tool",
+      "record_id": "3a7ae30e134ae20f0e722f05df15a07e364d8d02a8f6390f17828ac02ddcbc9a",
+      "record_hash": "5cd717cbd175f4cbeaa6936f542aeb23769057b74c01c006fbf5a86094b49fb7",
+      "content_hash": "d38b5ef4ecc5befce180bdf9d8294a3e4e3dc0213c757f710d58706334a9d1ff",
+      "source_timestamp": null,
+      "record_timestamp": "2026-08-22T10:00:02.500Z",
+      "content": null,
+      "tool_call_id": "tool-1",
+      "tool_name": null,
+      "tool_arguments_json": null,
+      "tool_result_json": "{\"output\":\"/workspace/example\",\"exitCode\":0}",
+      "tool_result_ok": true,
+      "record_json": "{\"content\":\"{\\\"output\\\":\\\"/workspace/example\\\",\\\"exitCode\\\":0}\",\"ok\":true,\"role\":\"tool\",\"timestamp\":\"2026-08-22T10:00:02.500Z\",\"tool_call_id\":\"tool-1\"}"
+    },
+    {
+      "source_type": "amp",
+      "source_group_id": "T-sanitized-orb-thread",
+      "stable_source_record_id": "msg-assistant-2",
+      "source_identity_kind": "native",
+      "source_order_id": "1|0000-00-00T00:00:00.001Z|00000000000000000004|msg-assistant-2",
+      "component_index": 0,
+      "record_type": "assistant",
+      "record_id": "68be0565adc72d0aa2a35bd8da81aaacd4328bf7113a7f1f3113165feae68e60",
+      "record_hash": "bce0300676d5668598feaf41d1d851fcf1184dc4018d572ad83bd1f7e625cf64",
+      "content_hash": "d6898b005a044af67809fae95186fe40d8f5d7798bd20b28dfcb389d51fbfd41",
+      "source_timestamp": "2026-08-22T10:00:04.000Z",
+      "record_timestamp": "2026-08-22T10:00:04.000Z",
+      "content": "The workspace is ready.",
+      "tool_call_id": null,
+      "tool_name": null,
+      "tool_arguments_json": null,
+      "tool_result_json": null,
+      "tool_result_ok": null,
+      "record_json": "{\"content\":\"The workspace is ready.\",\"role\":\"assistant\",\"timestamp\":\"2026-08-22T10:00:04.000Z\"}"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "noise_record_dropped",
+      "message": "Dropped an Amp info record at message 3.",
+      "count": 1
+    },
+    {
+      "code": "timestamps_interpolated",
+      "message": "Interpolated timestamps for 1 normalized records.",
+      "count": 1
+    }
+  ],
+  "normalizer_version": "0.3.0",
+  "canonical_schema_version": 3,
+  "config": {
+    "bounds": {
+      "toolArguments": {
+        "maxCharacters": 20000
+      },
+      "toolResults": {
+        "maxCharacters": 2500,
+        "strategy": "head-tail"
+      }
+    },
+    "filters": {
+      "toolResults": "include",
+      "systemMessages": "omit"
+    }
+  }
+}

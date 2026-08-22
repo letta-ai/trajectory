@@ -1,0 +1,60 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "amp",
+      "cwd": "/workspace/cleanup"
+    },
+    {
+      "role": "user",
+      "content": "Run the check.",
+      "timestamp": "2026-08-22T11:00:00.000Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "cleanup-tool",
+          "name": "check",
+          "args": "{\"target\":\"workspace\"}"
+        }
+      ],
+      "timestamp": "2026-08-22T11:00:01.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "cleanup-tool",
+      "content": "check failed",
+      "ok": false,
+      "timestamp": "2026-08-22T11:00:02.500Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The check failed.",
+      "timestamp": "2026-08-22T11:00:04.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "incomplete_transcript",
+      "message": "Amp assistant block 1:1 is not complete.",
+      "count": 1
+    },
+    {
+      "code": "noise_record_dropped",
+      "message": "Dropped an Amp info record at message 3.",
+      "count": 1
+    },
+    {
+      "code": "duplicate_tool_result",
+      "message": "Dropped a duplicate result for tool call \"cleanup-tool\".",
+      "recordIndex": 4
+    },
+    {
+      "code": "timestamps_interpolated",
+      "message": "Interpolated timestamps for 2 normalized records.",
+      "count": 2
+    }
+  ]
+}

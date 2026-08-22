@@ -92,6 +92,12 @@ export interface SessionContext {
    */
   sourceGroupId?: string;
   /**
+   * The source's sequence is the authoritative order and its timestamps are
+   * descriptive or sparse. Canonical order uses sequence ahead of timestamp
+   * without discarding any observed source timestamps.
+   */
+  sourceSequencePrimary?: boolean;
+  /**
    * The input contains more than one plausible source group. Canonical callers
    * must provide the authoritative group instead of using a sentinel.
    */

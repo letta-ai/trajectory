@@ -84,6 +84,7 @@ export function buildCanonicalRecords(
         sourceTimestamp,
         basis,
         identity.stableSourceRecordId,
+        internal.context.sourceSequencePrimary ?? false,
       ),
       component_index: componentIndex,
       record_type: type,
@@ -158,12 +159,17 @@ function buildOrderId(
   sourceTimestamp: string | null,
   basis: CanonicalSourceBasis | null,
   stableSourceRecordId: string,
+  sourceSequencePrimary: boolean,
 ): string {
   const rank = type === "meta" ? "0" : "1";
   // Never derive order from record_timestamp: it can be synthesized from array
   // position and would make source_order_id depend on transport-arrival order.
   const timestamp =
-    type === "meta" ? META_ORDER_TIMESTAMP : (sourceTimestamp ?? MISSING_TIME_SENTINEL);
+    type === "meta"
+      ? META_ORDER_TIMESTAMP
+      : sourceSequencePrimary
+        ? MISSING_TIME_SENTINEL
+        : (sourceTimestamp ?? MISSING_TIME_SENTINEL);
   const sequence =
     basis?.sourceSequence !== undefined
       ? String(basis.sourceSequence).padStart(SEQUENCE_WIDTH, "0")

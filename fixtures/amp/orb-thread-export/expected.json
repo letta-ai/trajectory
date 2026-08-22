@@ -1,0 +1,57 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "amp",
+      "cwd": "/workspace/example",
+      "git_branch": "main",
+      "model": "example/model"
+    },
+    {
+      "role": "user",
+      "content": "Inspect the workspace.",
+      "timestamp": "2026-08-22T10:00:00.000Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "I will inspect it.",
+      "timestamp": "2026-08-22T10:00:00.500Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "tool-1",
+          "name": "shell_command",
+          "args": "{\"command\":\"pwd\"}"
+        }
+      ],
+      "timestamp": "2026-08-22T10:00:01.000Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "tool-1",
+      "content": "{\"output\":\"/workspace/example\",\"exitCode\":0}",
+      "ok": true,
+      "timestamp": "2026-08-22T10:00:02.500Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The workspace is ready.",
+      "timestamp": "2026-08-22T10:00:04.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "noise_record_dropped",
+      "message": "Dropped an Amp info record at message 3.",
+      "count": 1
+    },
+    {
+      "code": "timestamps_interpolated",
+      "message": "Interpolated timestamps for 1 normalized records.",
+      "count": 1
+    }
+  ]
+}

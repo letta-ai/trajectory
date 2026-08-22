@@ -13,6 +13,8 @@ import type { NormalizeResult, TrajectorySource } from "../src/index.js";
 const fixtures = [
   { source: "atif", name: "atif/tool-calls" },
   { source: "atif", name: "atif/cleanup" },
+  { source: "amp", name: "amp/orb-thread-export" },
+  { source: "amp", name: "amp/cleanup" },
   { source: "claude-code", name: "claude-code/tool-call" },
   { source: "claude-code", name: "claude-code/cleanup" },
   { source: "claude-code", name: "claude-code/subagent" },
@@ -59,6 +61,7 @@ describe("golden fixtures", () => {
       const input = fixtureText(
         fixture.name,
         fixture.source === "atif" ||
+          fixture.source === "amp" ||
           fixture.source === "openhands" ||
           fixture.source === "hermes" ||
           fixture.source === "gemini-cli" ||
@@ -402,6 +405,105 @@ describe("public API", () => {
       }),
     ]) {
       expect(() => normalizeTranscript({ source: "atif", transcript })).toThrow(
+        expect.objectContaining({ code: "invalid_input" }),
+      );
+    }
+  });
+
+  test("normalizes a complete Amp orb export without incompleteness", () => {
+    const result = normalizeTranscript({
+      source: "amp",
+      transcript: fixtureText("amp/orb-thread-export", "input.json"),
+    });
+
+    expect(result.records).toEqual(
+      expect.arrayContaining([
+        { role: "meta", source: "amp", cwd: "/workspace/example", git_branch: "main", model: "example/model" },
+        expect.objectContaining({
+          role: "assistant",
+          content: null,
+          tool_calls: [
+            { id: "tool-1", name: "shell_command", args: '{"command":"pwd"}' },
+          ],
+        }),
+        expect.objectContaining({
+          role: "tool",
+          tool_call_id: "tool-1",
+          content: '{"output":"/workspace/example","exitCode":0}',
+          ok: true,
+        }),
+      ]),
+    );
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain(
+      "incomplete_transcript",
+    );
+  });
+
+  test("reports incomplete Amp orb exports without inventing session terminality", () => {
+    const exportDocument = JSON.parse(
+      fixtureText("amp/orb-thread-export", "input.json"),
+    );
+    exportDocument.messages.pop();
+
+    const result = normalizeTranscript({
+      source: "amp",
+      transcript: JSON.stringify(exportDocument),
+    });
+
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: "incomplete_transcript",
+        message: "Amp thread export ends with an unmatched user turn.",
+      }),
+    );
+  });
+
+  test("reports non-terminal and missing Amp tool results", () => {
+    for (const status of ["running", undefined]) {
+      const exportDocument = JSON.parse(
+        fixtureText("amp/orb-thread-export", "input.json"),
+      );
+      if (status) {
+        exportDocument.messages[2].content[0].run.status = status;
+      } else {
+        exportDocument.messages.splice(2, 1);
+      }
+
+      const result = normalizeTranscript({
+        source: "amp",
+        transcript: JSON.stringify(exportDocument),
+      });
+
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+        "incomplete_transcript",
+      );
+      expect(result.records.some((record) => record.role === "tool")).toBe(false);
+    }
+  });
+
+  test("rejects structurally ambiguous Amp exports", () => {
+    const valid = JSON.parse(fixtureText("amp/orb-thread-export", "input.json"));
+    const duplicateMessageId = structuredClone(valid);
+    duplicateMessageId.messages[1].messageId = duplicateMessageId.messages[0].messageId;
+    const duplicateProtocolId = structuredClone(valid);
+    duplicateProtocolId.messages[1].protocolMessageID =
+      duplicateProtocolId.messages[0].protocolMessageID;
+    const unknownRole = structuredClone(valid);
+    unknownRole.messages[0].role = "system";
+    const unknownBlock = structuredClone(valid);
+    unknownBlock.messages[1].content[0].type = "stream_delta";
+
+    for (const transcript of [
+      "{",
+      "[]",
+      "{}",
+      JSON.stringify({ id: "T-missing-messages" }),
+      JSON.stringify(duplicateMessageId),
+      JSON.stringify(duplicateProtocolId),
+      JSON.stringify(unknownRole),
+      JSON.stringify(unknownBlock),
+    ]) {
+      expect(() => normalizeTranscript({ source: "amp", transcript })).toThrow(
         expect.objectContaining({ code: "invalid_input" }),
       );
     }

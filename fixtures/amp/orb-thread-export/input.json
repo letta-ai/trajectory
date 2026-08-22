@@ -1,0 +1,112 @@
+{
+  "v": 8,
+  "id": "T-sanitized-orb-thread",
+  "created": 1787392800000,
+  "updatedAt": "2026-08-22T10:00:05.000Z",
+  "env": {
+    "initial": {
+      "workingDirectory": "/workspace/example",
+      "platform": {
+        "client": "CLI Execute Mode",
+        "clientType": "cli",
+        "webBrowser": false
+      },
+      "trees": [
+        {
+          "displayName": "example",
+          "repository": {
+            "type": "git",
+            "ref": "main"
+          },
+          "uri": "file:///workspace/example"
+        }
+      ]
+    }
+  },
+  "meta": {
+    "executorType": "sandbox",
+    "createdOnServer": false,
+    "usesThreadActors": true
+  },
+  "messages": [
+    {
+      "role": "user",
+      "messageId": 0,
+      "protocolMessageID": "msg-user-1",
+      "protocolMessageVersion": 0,
+      "meta": { "sentAt": 1787392800000 },
+      "content": [{ "type": "text", "text": "Inspect the workspace." }]
+    },
+    {
+      "role": "assistant",
+      "messageId": 1,
+      "protocolMessageID": "msg-assistant-1",
+      "protocolMessageVersion": 0,
+      "state": { "type": "complete", "stopReason": "tool_use" },
+      "usage": {
+        "model": "example/model",
+        "timestamp": "2026-08-22T10:00:01.000Z"
+      },
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "I will inspect it.",
+          "blockState": "complete",
+          "startTime": 1787392800500,
+          "finalTime": 1787392800750
+        },
+        {
+          "type": "tool_use",
+          "id": "tool-1",
+          "name": "shell_command",
+          "input": { "command": "pwd" },
+          "complete": true,
+          "blockState": "complete"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "messageId": 2,
+      "protocolMessageID": "msg-user-2",
+      "protocolMessageVersion": 0,
+      "content": [
+        {
+          "type": "tool_result",
+          "toolUseID": "tool-1",
+          "run": {
+            "status": "done",
+            "result": { "output": "/workspace/example", "exitCode": 0 }
+          }
+        }
+      ]
+    },
+    {
+      "role": "info",
+      "messageId": 3,
+      "protocolMessageID": "msg-info-1",
+      "protocolMessageVersion": 0,
+      "content": [{ "type": "summary", "summary": "Compaction summary." }]
+    },
+    {
+      "role": "assistant",
+      "messageId": 4,
+      "protocolMessageID": "msg-assistant-2",
+      "protocolMessageVersion": 0,
+      "state": { "type": "complete", "stopReason": "end_turn" },
+      "usage": {
+        "model": "example/model",
+        "timestamp": "2026-08-22T10:00:05.000Z"
+      },
+      "content": [
+        {
+          "type": "text",
+          "text": "The workspace is ready.",
+          "blockState": "complete",
+          "startTime": 1787392804000,
+          "finalTime": 1787392805000
+        }
+      ]
+    }
+  ]
+}

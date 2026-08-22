@@ -3,6 +3,7 @@ import type { ResolvedNormalizationFilters } from "./filters.js";
 
 export type TrajectorySource =
   | "atif"
+  | "amp"
   | "claude-code"
   | "codex"
   | "copilot-cli"
@@ -96,6 +97,7 @@ export interface NormalizeInput {
 export type DiagnosticCode =
   | "invalid_json_line"
   | "non_object_json_line"
+  | "incomplete_transcript"
   | "injected_context_dropped"
   | "noise_record_dropped"
   | "sidechain_record_dropped"

@@ -1,0 +1,81 @@
+{
+  "id": "T-sanitized-cleanup",
+  "created": 1787396400000,
+  "env": {
+    "initial": {
+      "workingDirectory": "/workspace/cleanup",
+      "trees": [
+        { "repository": { "ref": "main" } },
+        { "repository": { "ref": "docs" } }
+      ]
+    }
+  },
+  "meta": { "executorType": "sandbox" },
+  "messages": [
+    {
+      "role": "user",
+      "messageId": 0,
+      "protocolMessageID": "cleanup-user-1",
+      "content": [{ "type": "text", "text": "Run the check." }]
+    },
+    {
+      "role": "assistant",
+      "messageId": 1,
+      "protocolMessageID": "cleanup-assistant-1",
+      "state": { "type": "complete", "stopReason": "tool_use" },
+      "usage": { "timestamp": "2026-08-22T11:00:01.000Z" },
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "cleanup-tool",
+          "name": "check",
+          "input": { "target": "workspace" },
+          "complete": true,
+          "blockState": "complete"
+        },
+        {
+          "type": "text",
+          "text": "unfinished text",
+          "blockState": "pending"
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "messageId": 2,
+      "protocolMessageID": "cleanup-user-2",
+      "content": [
+        {
+          "type": "tool_result",
+          "toolUseID": "cleanup-tool",
+          "run": { "status": "error", "result": "check failed" }
+        },
+        {
+          "type": "tool_result",
+          "toolUseID": "cleanup-tool",
+          "run": { "status": "error", "result": "duplicate terminal" }
+        }
+      ]
+    },
+    {
+      "role": "info",
+      "messageId": 3,
+      "protocolMessageID": "cleanup-info-1",
+      "content": [{ "type": "summary", "summary": "Compaction summary." }]
+    },
+    {
+      "role": "assistant",
+      "messageId": 4,
+      "protocolMessageID": "cleanup-assistant-2",
+      "state": { "type": "complete", "stopReason": "end_turn" },
+      "usage": { "timestamp": "2026-08-22T11:00:04.000Z" },
+      "content": [
+        {
+          "type": "text",
+          "text": "The check failed.",
+          "blockState": "complete"
+        }
+      ]
+    }
+  ]
+}

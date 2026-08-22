@@ -112,6 +112,7 @@ export async function listTrajectories(
 function isKnownNormalizationOnlySource(source: AnyTrajectorySource): boolean {
   return (
     source === "atif" ||
+    source === "amp" ||
     source === "copilot-cli" ||
     source === "cursor" ||
     source === "gemini-cli" ||

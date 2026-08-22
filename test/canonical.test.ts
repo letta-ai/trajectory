@@ -26,6 +26,7 @@ const validateCanonical = new Ajv2020().compile(canonicalSchema);
 const HEX_64 = /^[0-9a-f]{64}$/;
 
 const goldenFixtures = [
+  { source: "amp", name: "amp/orb-thread-export", golden: "amp__orb-thread-export" },
   { source: "claude-code", name: "claude-code/tool-call", golden: "claude-code__tool-call" },
   { source: "codex", name: "codex/tool-calls", golden: "codex__tool-calls" },
   { source: "hermes", name: "hermes/tool-calls", golden: "hermes__tool-calls" },
@@ -55,7 +56,9 @@ describe("canonical golden fixtures", () => {
   for (const fixture of goldenFixtures) {
     test(fixture.name, () => {
       const inputFile =
-        fixture.source === "openhands" || fixture.source === "hermes"
+        fixture.source === "amp" ||
+        fixture.source === "openhands" ||
+        fixture.source === "hermes"
           ? "input.json"
           : "input.jsonl";
       const transcript = fixtureText(fixture.name, inputFile);
@@ -81,6 +84,7 @@ describe("canonical invariants", () => {
     test(fixture.name, () => {
       const inputFile =
         fixture.source === "atif" ||
+        fixture.source === "amp" ||
         fixture.source === "openhands" ||
         fixture.source === "hermes" ||
         fixture.source === "gemini-cli" ||

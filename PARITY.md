@@ -49,6 +49,36 @@ default bounds. Intentional target-schema differences are documented beside
 the adapter: embedded subagent timelines, metrics, and custom metadata have no
 equivalent in trajectory-v1.
 
+## Amp whole-thread export
+
+The Amp adapter was checked on 2026-08-22 against two actual whole-thread JSON
+documents emitted by `amp threads export` from installed Amp
+`0.0.1787378726-g9570e9`. Both threads used the thread-actor representation and
+reported the sandbox executor used by Amp orbs. The audit inspected aggregate
+keys, types, statuses, and counts only; no real transcript prose, reasoning,
+tool payload, path, repository, account, device, or thread identifier was
+printed or retained in this repository.
+
+The complete orb export had 126 messages (63 user, 62 assistant, one info), 134
+uniquely linked complete tool calls/results, and a final complete assistant
+turn. It normalized to 421 canonical records: one meta, two user, 138
+reasoning, 12 assistant prose, 134 assistant tool-call, and 134 tool-result
+records. All 420 body records used native protocol-message identity and were
+ordered by the source message array plus numeric component index. Diagnostics
+were one dropped compaction info record, 78 default-bound tool-result
+truncations, and 134 timestamp interpolations for result messages whose native
+export had no timestamp. No incompleteness, orphan, duplicate, or synthesized
+identity diagnostic occurred.
+
+The actively written orb export normalized to 36 records with exactly one
+`incomplete_transcript` diagnostic for its unmatched final user turn. This
+preserves the observable prefix without inventing the session-end event that
+Amp does not expose. Sanitized fixtures cover the sandbox/orb envelope,
+reasoning, structured linked tools, source-native status, sparse timestamps,
+compaction info, multiple repository trees, incomplete blocks, duplicate
+terminal results, malformed/truncated JSON, duplicate identity, unsupported
+semantic blocks, non-terminal results, and unmatched tails.
+
 ## Production TypeScript reference
 
 Reference: `letta-agent-sdk` `dream-pipeline` commit `3d3e3e0`.

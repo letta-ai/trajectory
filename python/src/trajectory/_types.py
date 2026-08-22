@@ -3,11 +3,11 @@
 from typing import Literal, TypedDict, Union
 
 TrajectorySource = Literal[
-    "atif", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi"
+    "atif", "amp", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi"
 ]
 CheckpointTrajectorySource = Literal["deepagents"]
 AnyTrajectorySource = Literal[
-    "atif", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi", "deepagents"
+    "atif", "amp", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi", "deepagents"
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 ToolResultPolicy = Literal["include", "omit"]
@@ -15,6 +15,7 @@ SystemMessagePolicy = Literal["include", "omit"]
 DiagnosticCode = Literal[
     "invalid_json_line",
     "non_object_json_line",
+    "incomplete_transcript",
     "injected_context_dropped",
     "noise_record_dropped",
     "sidechain_record_dropped",

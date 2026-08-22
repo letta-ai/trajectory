@@ -4,7 +4,7 @@ import type {
   SourceAdapter,
 } from "../../internal.js";
 import type { Diagnostic } from "../../types.js";
-import { blocksText, isObject, jsonString, parseJsonLines } from "../shared.js";
+import { blocksText, isObject, jsonString, parseJsonLines, parseTimestamp } from "../shared.js";
 
 const TRANSPORT_TYPES = new Set([
   "todo_state",
@@ -21,6 +21,7 @@ export const droidAdapter: SourceAdapter = {
     const events: DecodedEvent[] = [];
     let cwd: string | undefined;
     let sourceGroupId: string | undefined;
+    let createdAt: Date | undefined;
 
     for (const { value: record, line, byteOffset } of parseJsonLines(
       transcript,
@@ -42,6 +43,8 @@ export const droidAdapter: SourceAdapter = {
         continue;
       }
       if (recordType !== "message" || !isObject(record.message)) continue;
+      const timestamp = parseTimestamp(record.timestamp);
+      createdAt ??= timestamp;
 
       const role = record.message.role;
       if (role !== "user" && role !== "assistant") continue;
@@ -55,6 +58,7 @@ export const droidAdapter: SourceAdapter = {
           sourceOffset: byteOffset,
           sourceAnchorKind: "byte",
           componentIndex: componentIndex++,
+          ...(timestamp ? { timestamp } : {}),
         });
       };
 
@@ -102,6 +106,7 @@ export const droidAdapter: SourceAdapter = {
         source: "droid",
         ...(cwd ? { cwd } : {}),
         ...(sourceGroupId ? { sourceGroupId } : {}),
+        ...(createdAt ? { createdAt } : {}),
       },
       diagnostics,
     };

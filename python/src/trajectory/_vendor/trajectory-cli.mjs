@@ -923,6 +923,7 @@ var droidAdapter = {
     const events = [];
     let cwd;
     let sourceGroupId;
+    let createdAt;
     for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
       const recordType = record.type;
       if (recordType === "session_start") {
@@ -939,6 +940,8 @@ var droidAdapter = {
       }
       if (recordType !== "message" || !isObject(record.message))
         continue;
+      const timestamp = parseTimestamp(record.timestamp);
+      createdAt ??= timestamp;
       const role = record.message.role;
       if (role !== "user" && role !== "assistant")
         continue;
@@ -951,7 +954,8 @@ var droidAdapter = {
           ...event,
           sourceOffset: byteOffset,
           sourceAnchorKind: "byte",
-          componentIndex: componentIndex++
+          componentIndex: componentIndex++,
+          ...timestamp ? { timestamp } : {}
         });
       };
       for (const block of blocks) {
@@ -993,7 +997,8 @@ var droidAdapter = {
       context: {
         source: "droid",
         ...cwd ? { cwd } : {},
-        ...sourceGroupId ? { sourceGroupId } : {}
+        ...sourceGroupId ? { sourceGroupId } : {},
+        ...createdAt ? { createdAt } : {}
       },
       diagnostics
     };

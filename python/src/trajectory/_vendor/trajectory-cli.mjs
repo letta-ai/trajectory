@@ -1,5 +1,5 @@
 // src/python-cli.ts
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
 
 // src/types.ts
 class NormalizationError extends Error {
@@ -3413,23 +3413,99 @@ function defaultStateDir() {
 }
 
 // src/adapters/openhands/list.ts
+import { readFileSync, readdirSync as readdirSync2 } from "node:fs";
 import { homedir as homedir9 } from "node:os";
 import { join as join10 } from "node:path";
+var EVENT_FILE_PREFIX = "event-";
+var EVENT_FILE_SUFFIX = ".json";
+var EVENT_FILE_PATTERN = /^event-(\d{5,})-(.+)\.json$/u;
 async function listOpenHandsTrajectories(root) {
-  const base = root ?? join10(homedir9(), ".openhands", "sessions");
+  const base = root ?? resolveOpenHandsConversationsPath();
   const items = [];
   for (const entry of safeReadDir(base)) {
     if (!entry.isDirectory)
       continue;
-    const path = join10(base, entry.name);
-    const facts = safeStat(path);
+    const conversationPath = join10(base, entry.name);
+    const hasEventsDirectory = safeReadDir(conversationPath).some((child) => child.name === "events" && child.isDirectory);
+    if (!hasEventsDirectory)
+      continue;
+    const eventsPath = join10(conversationPath, "events");
+    const facts = safeStat(eventsPath);
     items.push({
       id: entry.name,
-      path,
+      path: eventsPath,
       ...facts ? { updatedAt: new Date(facts.mtimeMs).toISOString() } : {}
     });
   }
   return sortListings(items);
+}
+function assembleOpenHandsEventFolder(eventsPath) {
+  let entries;
+  try {
+    entries = readdirSync2(eventsPath, { withFileTypes: true });
+  } catch (error) {
+    throw invalidEventFolder(`Could not read OpenHands event directory ${JSON.stringify(eventsPath)}: ${errorMessage(error)}`);
+  }
+  const eventFiles = [];
+  for (const entry of entries) {
+    if (!entry.name.startsWith(EVENT_FILE_PREFIX) || !entry.name.endsWith(EVENT_FILE_SUFFIX)) {
+      continue;
+    }
+    const match = EVENT_FILE_PATTERN.exec(entry.name);
+    if (!match || !entry.isFile()) {
+      throw invalidEventFolder(`Invalid OpenHands event file ${JSON.stringify(join10(eventsPath, entry.name))}: expected a regular file named event-<index with 5+ digits>-<event-id>.json.`);
+    }
+    eventFiles.push({ name: entry.name, index: BigInt(match[1]) });
+  }
+  eventFiles.sort((left, right) => {
+    if (left.index !== right.index)
+      return left.index < right.index ? -1 : 1;
+    return left.name < right.name ? -1 : left.name > right.name ? 1 : 0;
+  });
+  for (let index = 1;index < eventFiles.length; index += 1) {
+    const previous = eventFiles[index - 1];
+    const current = eventFiles[index];
+    if (previous && current && previous.index === current.index) {
+      throw invalidEventFolder(`Duplicate OpenHands event index ${current.index} in ${JSON.stringify(eventsPath)} (${JSON.stringify(previous.name)} and ${JSON.stringify(current.name)}).`);
+    }
+  }
+  const events = [];
+  for (const eventFile of eventFiles) {
+    const eventPath = join10(eventsPath, eventFile.name);
+    let contents;
+    try {
+      contents = readFileSync(eventPath, "utf8");
+    } catch (error) {
+      throw invalidEventFolder(`Could not read OpenHands event file ${JSON.stringify(eventPath)}: ${errorMessage(error)}`);
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(contents);
+    } catch (error) {
+      throw invalidEventFolder(`Invalid JSON in OpenHands event file ${JSON.stringify(eventPath)}: ${errorMessage(error)}`);
+    }
+    if (!isRecord(parsed)) {
+      throw invalidEventFolder(`OpenHands event file ${JSON.stringify(eventPath)} must contain one JSON object.`);
+    }
+    events.push(parsed);
+  }
+  return JSON.stringify(events);
+}
+function resolveOpenHandsConversationsPath(env = process.env, homeDir = homedir9()) {
+  const conversationsPath = env.OPENHANDS_CONVERSATIONS_DIR;
+  if (conversationsPath)
+    return conversationsPath;
+  const persistencePath = env.OPENHANDS_PERSISTENCE_DIR || join10(homeDir, ".openhands");
+  return join10(persistencePath, "conversations");
+}
+function invalidEventFolder(message) {
+  return new NormalizationError("invalid_input", message);
+}
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 // src/adapters/pi/list.ts
@@ -3639,11 +3715,11 @@ function isPartialTranscript(input) {
 // src/python-cli.ts
 var PROTOCOL_VERSION = 1;
 async function main() {
-  const request = parseRequest(readFileSync(0, "utf8"));
+  const request = parseRequest(readFileSync2(0, "utf8"));
   const results = [];
   for (const input of request.requests) {
     try {
-      const result = input !== null && typeof input === "object" && "list" in input ? await listTrajectories(input.list) : input !== null && typeof input === "object" && ("source" in input) && input.source === "deepagents" ? await normalizeCheckpoint(input) : normalizeTranscript(input);
+      const result = await executeRequest(input);
       results.push({
         ok: true,
         result
@@ -3671,6 +3747,22 @@ async function main() {
     }
   }
   writeFileSync(1, JSON.stringify({ version: PROTOCOL_VERSION, results }));
+}
+async function executeRequest(input) {
+  if (input !== null && typeof input === "object") {
+    if ("assembleOpenHandsEventFolder" in input) {
+      return {
+        transcript: assembleOpenHandsEventFolder(input.assembleOpenHandsEventFolder)
+      };
+    }
+    if ("list" in input) {
+      return listTrajectories(input.list);
+    }
+    if ("source" in input && input.source === "deepagents") {
+      return normalizeCheckpoint(input);
+    }
+  }
+  return normalizeTranscript(input);
 }
 function parseRequest(raw) {
   let value;

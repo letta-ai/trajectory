@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import {
+  assembleOpenHandsEventFolder,
   listTrajectories,
   normalizeCheckpoint,
   normalizeTranscript,
@@ -21,8 +22,13 @@ interface WireError {
   message: string;
 }
 
+type WireSuccessResult =
+  | NormalizeResult
+  | ListTrajectoriesResult
+  | { transcript: string };
+
 type WireResult =
-  | { ok: true; result: NormalizeResult | ListTrajectoriesResult }
+  | { ok: true; result: WireSuccessResult }
   | { ok: false; error: WireError };
 
 async function main(): Promise<void> {
@@ -30,21 +36,7 @@ async function main(): Promise<void> {
   const results: WireResult[] = [];
   for (const input of request.requests) {
     try {
-      const result =
-        input !== null && typeof input === "object" && "list" in input
-          ? await listTrajectories(
-              (input as { list: Parameters<typeof listTrajectories>[0] }).list,
-            )
-          : input !== null &&
-              typeof input === "object" &&
-              "source" in input &&
-              input.source === "deepagents"
-            ? await normalizeCheckpoint(
-                input as Parameters<typeof normalizeCheckpoint>[0],
-              )
-            : normalizeTranscript(
-                input as Parameters<typeof normalizeTranscript>[0],
-              );
+      const result = await executeRequest(input);
       results.push({
         ok: true,
         result,
@@ -73,6 +65,30 @@ async function main(): Promise<void> {
   }
 
   writeFileSync(1, JSON.stringify({ version: PROTOCOL_VERSION, results }));
+}
+
+async function executeRequest(input: unknown): Promise<WireSuccessResult> {
+  if (input !== null && typeof input === "object") {
+    if ("assembleOpenHandsEventFolder" in input) {
+      return {
+        transcript: assembleOpenHandsEventFolder(
+          (input as { assembleOpenHandsEventFolder: string })
+            .assembleOpenHandsEventFolder,
+        ),
+      };
+    }
+    if ("list" in input) {
+      return listTrajectories(
+        (input as { list: Parameters<typeof listTrajectories>[0] }).list,
+      );
+    }
+    if ("source" in input && input.source === "deepagents") {
+      return normalizeCheckpoint(
+        input as Parameters<typeof normalizeCheckpoint>[0],
+      );
+    }
+  }
+  return normalizeTranscript(input as Parameters<typeof normalizeTranscript>[0]);
 }
 
 function parseRequest(raw: string): WireRequest {

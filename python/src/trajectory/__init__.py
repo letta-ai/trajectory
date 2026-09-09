@@ -1,6 +1,7 @@
 """Normalize native agent transcripts using the canonical trajectory runtime."""
 
 from ._client import (
+    assemble_openhands_event_folder,
     list_trajectories,
     normalize_checkpoint,
     normalize_many,
@@ -76,6 +77,7 @@ __all__ = [
     "TrajectoryRuntimeError",
     "TrajectorySource",
     "UserRecord",
+    "assemble_openhands_event_folder",
     "list_trajectories",
     "normalize_many",
     "normalize_checkpoint",

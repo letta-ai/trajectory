@@ -103,9 +103,13 @@ beforeAll(() => {
     `{"type":"session"}\n`,
   );
 
-  // openhands: one directory per session.
-  mkdirSync(join(base, "openhands", "sess-1"), { recursive: true });
-  mkdirSync(join(base, "openhands", "sess-2"), { recursive: true });
+  // openhands: one events directory per conversation; unrelated directories
+  // and an events sidecar that is not a directory are not trajectories.
+  mkdirSync(join(base, "openhands", "sess-1", "events"), { recursive: true });
+  mkdirSync(join(base, "openhands", "sess-2", "events"), { recursive: true });
+  mkdirSync(join(base, "openhands", "no-events"), { recursive: true });
+  mkdirSync(join(base, "openhands", "events-is-file"), { recursive: true });
+  writeFileSync(join(base, "openhands", "events-is-file", "events"), "not a directory");
 
   // hermes: a sessions table matching the state.db schema subset we read.
   // WAL mode mirrors live agent stores and exercises the read-only fallback.
@@ -231,12 +235,13 @@ describe("listTrajectories", () => {
     expect(result.items[0]?.path.endsWith(".jsonl")).toBe(true);
   });
 
-  test("lists openhands session directories", async () => {
+  test("lists only openhands conversation event directories", async () => {
     const result = await listTrajectories({
       source: "openhands",
       root: join(base, "openhands"),
     });
     expect(result.items.map((item) => item.id).sort()).toEqual(["sess-1", "sess-2"]);
+    expect(result.items.every((item) => item.path.endsWith("/events"))).toBe(true);
   });
 
   test("lists hermes sessions from the SQLite store with titles", async () => {

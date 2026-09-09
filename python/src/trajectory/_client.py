@@ -31,6 +31,21 @@ _MINIMUM_NODE_MAJOR = 20
 _CLI_PATH = Path(__file__).parent / "_vendor" / "trajectory-cli.mjs"
 
 
+def assemble_openhands_event_folder(path: str | Path) -> str:
+    """Assemble a native OpenHands ``events/`` directory for normalization."""
+
+    request = cast(
+        NormalizeRequest, {"assembleOpenHandsEventFolder": str(path)}
+    )
+    result = cast(dict[str, object], normalize_many([request])[0])
+    transcript = result.get("transcript")
+    if not isinstance(transcript, str):
+        raise TrajectoryRuntimeError(
+            "The trajectory runtime returned an invalid OpenHands transcript."
+        )
+    return transcript
+
+
 def normalize_transcript(
     *,
     source: TrajectorySource,

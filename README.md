@@ -129,6 +129,32 @@ do {
 } while (cursor);
 ```
 
+OpenHands listings point to native
+`~/.openhands/conversations/<conversation-id>/events` directories. Assemble a
+listing into the serialized array accepted by the normalizer with the exported
+filesystem helper. `OPENHANDS_CONVERSATIONS_DIR` and
+`OPENHANDS_PERSISTENCE_DIR` are honored when no explicit listing `root` is
+provided.
+
+```ts
+import {
+  assembleOpenHandsEventFolder,
+  listTrajectories,
+  normalizeTranscript,
+} from "@letta-ai/trajectory";
+
+const { items } = await listTrajectories({ source: "openhands" });
+const openHandsListing = items[0];
+if (!openHandsListing) throw new Error("No OpenHands conversations found.");
+const transcript = assembleOpenHandsEventFolder(openHandsListing.path);
+const result = normalizeTranscript({ source: "openhands", transcript });
+```
+
+`normalizeTranscript()` itself remains filesystem-free.
+
+The Python wrapper exposes the same operation as
+`assemble_openhands_event_folder(path)`.
+
 ## Normalized records
 
 A trajectory is an ordered array containing:
@@ -149,7 +175,7 @@ Every conversational record has an ISO timestamp. The complete contract is
 available as both runtime validation and
 [`schema/trajectory-v1.schema.json`](schema/trajectory-v1.schema.json).
 
-The public function is:
+The primary normalization function is:
 
 ```ts
 normalizeTranscript(input: NormalizeInput): NormalizeResult

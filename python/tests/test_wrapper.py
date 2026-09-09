@@ -11,6 +11,7 @@ from trajectory import (
     NodeUnavailableError,
     NormalizationError,
     SourceContext,
+    assemble_openhands_event_folder,
     list_trajectories,
     normalize_checkpoint,
     normalize_many,
@@ -267,6 +268,28 @@ class WrapperTests(unittest.TestCase):
             self.assertNotIn("nextCursor", second)
             ids = {item["id"] for item in first["items"] + second["items"]}
             self.assertEqual(ids, {"s1", "s2", "s3", "direct", "workflow"})
+
+    def test_assembles_openhands_event_folder_with_runtime_parity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            events = Path(directory) / "events"
+            events.mkdir()
+            (events / "event-100000-later.json").write_text(
+                json.dumps({"id": "later"}), encoding="utf-8"
+            )
+            (events / "event-99999-earlier.json").write_text(
+                json.dumps({"id": "earlier"}), encoding="utf-8"
+            )
+            (events / ".eventlog-len-2.marker").write_text("", encoding="utf-8")
+
+            transcript = assemble_openhands_event_folder(events)
+
+            self.assertEqual(
+                json.loads(transcript), [{"id": "earlier"}, {"id": "later"}]
+            )
+            (events / "event-00001-malformed.json").write_text("{", encoding="utf-8")
+            with self.assertRaises(NormalizationError) as raised:
+                assemble_openhands_event_folder(events)
+            self.assertEqual(raised.exception.code, "invalid_input")
 
     @unittest.skipUnless(HAS_LANGGRAPH_SQLITE, "LangGraph SQLite extra not installed")
     def test_normalizes_deepagents_checkpoint_with_current_python(self) -> None:

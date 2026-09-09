@@ -193,6 +193,7 @@ export {
   type ListTrajectoriesResult,
   type TrajectoryListing,
 } from "./listing.js";
+export { assembleOpenHandsEventFolder } from "./adapters/openhands/list.js";
 
 export { DEFAULT_NORMALIZATION_BOUNDS } from "./bounds.js";
 export { DEFAULT_NORMALIZATION_FILTERS } from "./filters.js";

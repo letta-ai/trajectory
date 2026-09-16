@@ -39,6 +39,8 @@ const fixtures = [
   { source: "openhands", name: "openhands/cleanup" },
   { source: "pi", name: "pi/tool-calls" },
   { source: "pi", name: "pi/cleanup" },
+  { source: "prime", name: "prime/tool-calls" },
+  { source: "prime", name: "prime/cleanup" },
 ] as const satisfies ReadonlyArray<{ source: TrajectorySource; name: string }>;
 
 const toolFixtures = fixtures.filter(
@@ -493,6 +495,15 @@ describe("public API", () => {
     expect(() =>
       normalizeTranscript({
         source: "pi",
+        transcript: "{}",
+      }),
+    ).toThrow(expect.objectContaining({ code: "invalid_input" }));
+  });
+
+  test("rejects an invalid Prime Agent document shape", () => {
+    expect(() =>
+      normalizeTranscript({
+        source: "prime",
         transcript: "{}",
       }),
     ).toThrow(expect.objectContaining({ code: "invalid_input" }));

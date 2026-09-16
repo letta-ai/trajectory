@@ -15,7 +15,8 @@ export type TrajectorySource =
   | "openclaw"
   | "opencode"
   | "openhands"
-  | "pi";
+  | "pi"
+  | "prime";
 
 export type TranscriptTrajectorySource = TrajectorySource;
 

@@ -2010,6 +2010,17 @@ var piAdapter = {
   }
 };
 
+// src/adapters/prime/index.ts
+var primeAdapter = {
+  source: "prime",
+  decode(transcript) {
+    return decodePiSessionTranscript(transcript, {
+      source: "prime",
+      sourceLabel: "Prime Agent"
+    });
+  }
+};
+
 // src/bounds.ts
 var DEFAULT_NORMALIZATION_BOUNDS = Object.freeze({
   toolArguments: Object.freeze({ maxCharacters: 20000 }),
@@ -3461,14 +3472,42 @@ function defaultAgentDir() {
   return join11(homedir10(), ".pi", "agent");
 }
 
-// src/adapters/omp/list.ts
-import { existsSync as existsSync2 } from "node:fs";
+// src/adapters/prime/list.ts
 import { homedir as homedir11 } from "node:os";
 import { basename as basename6, join as join12 } from "node:path";
+async function listPrimeTrajectories(root) {
+  const sessionsPath = root ? join12(root, "sessions") : resolvePrimeSessionsPath({
+    home: homedir11(),
+    env: process.env
+  });
+  const items = [];
+  for (const entry of safeReadDir(sessionsPath)) {
+    if (!entry.isFile || !entry.name.endsWith(".jsonl"))
+      continue;
+    const path = join12(sessionsPath, entry.name);
+    const listing = listingFromFile(basename6(entry.name, ".jsonl"), path);
+    if (listing)
+      items.push(listing);
+  }
+  return sortListings(items);
+}
+function resolvePrimeSessionsPath(options) {
+  const sessionOverride = options.env.PRIME_AGENT_SESSION_DIR?.trim() || options.env.PRIME_AGENT_CODING_AGENT_SESSION_DIR?.trim();
+  if (sessionOverride)
+    return sessionOverride;
+  const agentOverride = options.env.PRIME_AGENT_CODING_AGENT_DIR?.trim();
+  const agentDir = agentOverride || join12(options.home, ".prime", "agent");
+  return join12(agentDir, "sessions");
+}
+
+// src/adapters/omp/list.ts
+import { existsSync as existsSync2 } from "node:fs";
+import { homedir as homedir12 } from "node:os";
+import { basename as basename7, join as join13 } from "node:path";
 async function listOmpTrajectories(root) {
   const items = [];
-  const sessionsPath = root ? join12(root, "sessions") : resolveOmpSessionsPath({
-    home: homedir11(),
+  const sessionsPath = root ? join13(root, "sessions") : resolveOmpSessionsPath({
+    home: homedir12(),
     platform: process.platform,
     env: process.env,
     exists: existsSync2
@@ -3476,12 +3515,12 @@ async function listOmpTrajectories(root) {
   for (const project of safeReadDir(sessionsPath)) {
     if (!project.isDirectory)
       continue;
-    const projectPath = join12(sessionsPath, project.name);
+    const projectPath = join13(sessionsPath, project.name);
     for (const entry of safeReadDir(projectPath)) {
       if (!entry.isFile || !entry.name.endsWith(".jsonl"))
         continue;
-      const path = join12(projectPath, entry.name);
-      const listing = listingFromFile(basename6(entry.name, ".jsonl"), path);
+      const path = join13(projectPath, entry.name);
+      const listing = listingFromFile(basename7(entry.name, ".jsonl"), path);
       if (listing)
         items.push(listing);
     }
@@ -3490,18 +3529,18 @@ async function listOmpTrajectories(root) {
 }
 function resolveOmpSessionsPath(options) {
   const profile = resolveProfile(options.env.OMP_PROFILE, options.env.PI_PROFILE);
-  const configRoot = join12(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
+  const configRoot = join13(options.home, options.env.PI_CONFIG_DIR || ".omp", ...profile ? ["profiles", profile] : []);
   const agentOverride = profile ? undefined : options.env.PI_CODING_AGENT_DIR?.trim() || undefined;
-  const agentDir = agentOverride ?? join12(configRoot, "agent");
+  const agentDir = agentOverride ?? join13(configRoot, "agent");
   if (agentOverride === undefined && (options.platform === "linux" || options.platform === "darwin")) {
     const xdgData = options.env.XDG_DATA_HOME?.trim();
     if (xdgData) {
-      const xdgRoot = join12(xdgData, "omp", ...profile ? ["profiles", profile] : []);
+      const xdgRoot = join13(xdgData, "omp", ...profile ? ["profiles", profile] : []);
       if (options.exists(xdgRoot))
-        return join12(xdgRoot, "sessions");
+        return join13(xdgRoot, "sessions");
     }
   }
-  return join12(agentDir, "sessions");
+  return join13(agentDir, "sessions");
 }
 function resolveProfile(ompProfile, piProfile) {
   const value = (ompProfile !== undefined ? ompProfile : piProfile)?.trim();
@@ -3526,6 +3565,7 @@ var LISTERS = {
   openclaw: listOpenClawTrajectories,
   openhands: listOpenHandsTrajectories,
   pi: listPiTrajectories,
+  prime: listPrimeTrajectories,
   omp: listOmpTrajectories
 };
 async function listTrajectories(input) {
@@ -3606,6 +3646,7 @@ var ADAPTERS = {
   opencode: openCodeAdapter,
   openhands: openHandsAdapter,
   pi: piAdapter,
+  prime: primeAdapter,
   omp: ompAdapter
 };
 function decodeTranscript(input) {

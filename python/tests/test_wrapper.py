@@ -50,6 +50,8 @@ FIXTURES = (
     ("openhands", "openhands/cleanup", "input.json"),
     ("pi", "pi/tool-calls", "input.jsonl"),
     ("pi", "pi/cleanup", "input.jsonl"),
+    ("prime", "prime/tool-calls", "input.jsonl"),
+    ("prime", "prime/cleanup", "input.jsonl"),
 )
 
 

@@ -13,7 +13,8 @@
       "role": "message",
       "id": "1700000000.000001",
       "speaker": {
-        "id": "URELAY"
+        "id": "URELAY",
+        "name": "Example Relay"
       },
       "content": "*User*\nWhere is the guide?",
       "timestamp": "2023-11-14T22:13:20.000Z"
@@ -22,7 +23,8 @@
       "role": "message",
       "id": "1700000000.000002",
       "speaker": {
-        "id": "URELAY"
+        "id": "URELAY",
+        "name": "Example Relay"
       },
       "content": "*Agent*\nI will investigate.",
       "timestamp": "2023-11-14T22:13:20.000Z"

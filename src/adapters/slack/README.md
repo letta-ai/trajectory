@@ -17,6 +17,7 @@ normalizeConversation({
     team: "TEXAMPLE",
     channel: "CEXAMPLE",
     thread_ts: "1700000000.000001",
+    users: [{ id: "UONE", profile: { display_name: "Alice" } }],
     messages: [
       { type: "message", user: "UONE", ts: "1700000000.000001", text: "Hello" },
       {
@@ -56,7 +57,7 @@ service-owned organization mirror as permission to disclose all its channels.
   {
     "role": "message",
     "id": "1700000000.000001",
-    "speaker": { "id": "UONE" },
+    "speaker": { "id": "UONE", "name": "Alice" },
     "content": "Hello",
     "timestamp": "2023-11-14T22:13:20.000Z"
   }
@@ -65,13 +66,26 @@ service-owned organization mirror as permission to disclose all its channels.
 
 `speaker.id` is the raw `user` ID, falling back to `bot_id` only when no user ID
 is available. At least one is required. A bot relaying `*User*` and `*Agent*`
-sections stays the same speaker; those labels remain ordinary text. Names,
-app identity, and bot profiles are not retained in this minimal V0.
+sections stays the same speaker; those labels remain ordinary text.
+
+To resolve human names, callers may include `users`, an array of raw Slack
+`users.list` objects (for example, loaded from the mirror's `users.jsonl`).
+`speaker.name` prefers an inline `user_profile` display/real name, then the
+user directory's display name, real name, or account name. For bot messages,
+`bot_profile.name` and the legacy `username` are fallbacks. Blank names are
+ignored; unknown names remain absent. No API lookup is performed, and IDs never
+change because a display name changed. Conflicting named directory entries fail.
+
+When the source message has `reactions`, it becomes `metadata.reactions`, keeping
+`name`, `count`, and `users`. Slack [may return only some reactor IDs](https://docs.slack.dev/reference/methods/reactions.get/),
+so `count` is preserved, not recomputed from `users.length`. Reaction names and reactor IDs
+are sorted deterministically, and invalid/duplicate names or IDs are rejected.
+Absent reactions are not the same as an explicitly empty reaction snapshot.
 
 `conversation_id` retains `thread_ts`; `source_metadata` retains the native
 `team` and `channel` field names. These shared fields are not repeated on each
 message. The record format is source-neutral; only Slack ingestion is implemented.
-Reactions, recipients, and per-message metadata are intentionally deferred.
+Recipients, attachments, and other per-message metadata are still deferred.
 
 Records are sorted by exact Slack `ts`, including microseconds. ISO timestamps
 use millisecond precision; the exact six-digit fractional `ts` is retained
@@ -83,7 +97,8 @@ retains the same thread metadata and does not synthesize a missing root.
 Exact semantic duplicates are collapsed with diagnostics (including a reply
 seen both through history and thread replies). A `thread_broadcast`'s nested
 `root` is ignored: it is context, not a new post. Conflicting versions of one
-message in a single envelope fail; the importer must choose an authoritative
+message in a single envelope fail, including conflicting names/reaction snapshots;
+the importer must choose an authoritative
 snapshot rather than relying on transport arrival order. Edits and deletions
 are not applied from event streams by this adapter.
 
@@ -92,8 +107,10 @@ are not applied from event streams by this adapter.
 - Handles ordinary messages plus `bot_message`, `thread_broadcast`, `file_share`,
   and `me_message` text. Raw `text` is preserved, including Unicode, Slack
   mentions, links, markup, and quoted instructions. Treat it as untrusted data.
-- Blocks, link unfurls, attachments, reactions, and file contents are not copied
-  into prose. They often repeat `text`. Posts without nonempty `text` are skipped
+- Blocks, link unfurls, attachments, and file contents are not copied into prose.
+  Blocks can contain more than the top-level fallback text; this is not a lossless
+  conversion. Emoji shortcodes in `text` are preserved, and reactions stay in
+  metadata instead of being appended to prose. Posts without nonempty `text` are skipped
   with `slack_message_dropped`, **including blocks-only or file-only posts**.
 - Unsupported subtypes (including join/leave, edit/delete event wrappers) and
   non-message events are skipped with the same diagnostic. This is a text

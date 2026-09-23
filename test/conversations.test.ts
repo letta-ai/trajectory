@@ -44,7 +44,7 @@ describe("independent conversation contract", () => {
       { ...message, speaker: { id: "a", extra: true } },
       { ...message, content: " " },
       { ...message, timestamp: "bad" },
-      { ...message, metadata: { reactions: [] } },
+      { ...message, metadata: { recipients: [] } },
       { ...message, role: "assistant" },
     ]) {
       expect(() => validateConversation([meta, invalid])).toThrow();

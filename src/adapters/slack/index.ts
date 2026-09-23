@@ -6,6 +6,7 @@ import type {
 import { NormalizationError } from "../../types.js";
 import { isObject, nonemptyString } from "../shared.js";
 import { compareSlackTimestamps, parseSlackTimestamp } from "./timestamp.js";
+import { buildUserNames, readReactions, resolveSpeaker } from "./metadata.js";
 
 const MESSAGE_SUBTYPES = new Set([
   "bot_message",
@@ -33,6 +34,7 @@ export function normalizeSlackThread(transcript: string): NormalizeConversationR
       "Slack input requires team, channel, and a valid thread_ts.",
     );
   }
+  const userNames = buildUserNames(input.users);
   const diagnostics: ConversationDiagnostic[] = [];
   const messages = new Map<string, ConversationMessageRecord>();
   for (const raw of input.messages) {
@@ -84,13 +86,14 @@ export function normalizeSlackThread(transcript: string): NormalizeConversationR
     const message: ConversationMessageRecord = {
       role: "message",
       id: time.ts,
-      speaker: { id: speakerId },
+      speaker: resolveSpeaker(raw, speakerId, userNames),
+      ...("reactions" in raw ? { metadata: { reactions: readReactions(raw.reactions) } } : {}),
       content: raw.text,
       timestamp: time.date.toISOString(),
     };
     const existing = messages.get(time.ts);
     if (existing) {
-      if (existing.content !== message.content || existing.speaker.id !== message.speaker.id) {
+      if (JSON.stringify(existing) !== JSON.stringify(message)) {
         throw invalid(
           "Conflicting versions of a Slack message; supply one authoritative snapshot.",
         );

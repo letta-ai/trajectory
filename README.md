@@ -176,7 +176,8 @@ records. It does not extend `NormalizedRecord`, `normalizeTranscript`, or
 
 See [CONVERSATIONS.md](CONVERSATIONS.md) for the contract and
 [Slack](src/adapters/slack/) for thread assembly and supported content. Slack is
-the only conversation adapter in V0. Reactions and message-level metadata are deferred.
+the only conversation adapter in V0. Optional speaker names and reaction snapshots
+are supported; recipients, attachments, and other message metadata remain deferred.
 
 ## Adding a source
 

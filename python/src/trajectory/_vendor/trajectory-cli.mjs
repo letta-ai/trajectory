@@ -3656,103 +3656,12 @@ function compareSlackTimestamps(left, right) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// src/adapters/slack/index.ts
-var MESSAGE_SUBTYPES = new Set([
-  "bot_message",
-  "thread_broadcast",
-  "file_share",
-  "me_message"
-]);
-function normalizeSlackThread(transcript) {
-  let input;
-  try {
-    input = JSON.parse(transcript);
-  } catch {
-    throw invalid("Expected a Slack thread JSON envelope, not bare JSONL.");
-  }
-  if (!isObject(input) || !Array.isArray(input.messages)) {
-    throw invalid("Slack input must contain a messages array.");
-  }
-  const workspaceId = nonemptyString(input.team);
-  const channelId = nonemptyString(input.channel);
-  const thread = parseSlackTimestamp(input.thread_ts);
-  if (!workspaceId || !channelId || !thread) {
-    throw invalid("Slack input requires team, channel, and a valid thread_ts.");
-  }
-  const diagnostics = [];
-  const messages = new Map;
-  for (const raw of input.messages) {
-    if (!isObject(raw))
-      throw invalid("Slack messages must be objects.");
-    if (raw.type !== "message" || raw.subtype !== undefined && !MESSAGE_SUBTYPES.has(String(raw.subtype))) {
-      diagnostics.push({
-        code: "slack_message_dropped",
-        message: "Skipped an unsupported Slack event or message subtype."
-      });
-      continue;
-    }
-    const time = parseSlackTimestamp(raw.ts);
-    const threadTs = raw.thread_ts ?? raw.ts;
-    if (!time || !parseSlackTimestamp(threadTs))
-      throw invalid("Invalid Slack message timestamp.");
-    if (threadTs !== thread.ts || compareSlackTimestamps(time.ts, thread.ts) < 0) {
-      throw invalid("Slack input contains a message from a different thread or preceding its root.");
-    }
-    if (raw.team !== undefined && raw.team !== workspaceId || raw.channel !== undefined && raw.channel !== channelId) {
-      throw invalid("Slack message workspace/channel disagrees with the envelope.");
-    }
-    const speakerId = nonemptyString(raw.user) ?? nonemptyString(raw.bot_id);
-    if (!speakerId)
-      throw invalid("Slack message has no source speaker identity.");
-    if (typeof raw.text !== "string" || !raw.text.trim()) {
-      diagnostics.push({
-        code: "slack_message_dropped",
-        message: "Skipped a Slack post without nonempty text (blocks/files are not extracted)."
-      });
-      continue;
-    }
-    const message = {
-      role: "message",
-      id: time.ts,
-      speaker: { id: speakerId },
-      content: raw.text,
-      timestamp: time.date.toISOString()
-    };
-    const existing = messages.get(time.ts);
-    if (existing) {
-      if (existing.content !== message.content || existing.speaker.id !== message.speaker.id) {
-        throw invalid("Conflicting versions of a Slack message; supply one authoritative snapshot.");
-      }
-      diagnostics.push({
-        code: "slack_duplicate_message",
-        message: "Removed a duplicate Slack message."
-      });
-    } else {
-      messages.set(time.ts, message);
-    }
-  }
-  if (messages.size === 0)
-    throw invalid("Slack thread contains no supported text messages.");
-  return {
-    records: [
-      {
-        role: "meta",
-        source: "slack",
-        conversation_id: thread.ts,
-        source_metadata: { team: workspaceId, channel: channelId }
-      },
-      ...[...messages.values()].sort((a, b) => compareSlackTimestamps(a.id, b.id))
-    ],
-    diagnostics
-  };
-}
-function invalid(message) {
-  return new NormalizationError("invalid_input", message);
-}
-
 // src/conversations/validate.ts
 var META_KEYS2 = new Set(["role", "source", "conversation_id", "source_metadata"]);
-var MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp"]);
+var MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp", "metadata"]);
+var SPEAKER_KEYS = new Set(["id", "name"]);
+var METADATA_KEYS = new Set(["reactions"]);
+var REACTION_KEYS = new Set(["name", "count", "users"]);
 var ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 function validateConversation(value) {
   if (!Array.isArray(value) || value.length < 2) {
@@ -3776,13 +3685,44 @@ function validateConversation(value) {
       fail2("Message IDs must be non-empty and unique within the conversation.");
     }
     ids.add(record.id);
-    if (!isObject(record.speaker) || !nonempty(record.speaker.id) || Object.keys(record.speaker).length !== 1) {
+    if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
       fail2("Message speaker must contain a non-empty id.");
+    }
+    exactKeys2(record.speaker, SPEAKER_KEYS);
+    if ("name" in record.speaker && !nonempty(record.speaker.name)) {
+      fail2("Speaker name must be non-empty when present.");
+    }
+    if ("metadata" in record) {
+      if (!isObject(record.metadata))
+        fail2("Message metadata must be an object.");
+      exactKeys2(record.metadata, METADATA_KEYS);
+      if ("reactions" in record.metadata)
+        validateReactions(record.metadata.reactions);
     }
     if (!nonempty(record.content))
       fail2("Message content must be non-empty text.");
     if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) || Number.isNaN(Date.parse(record.timestamp))) {
       fail2("Message timestamp must be a valid ISO timestamp.");
+    }
+  }
+}
+function validateReactions(value) {
+  if (!Array.isArray(value))
+    fail2("Reactions must be an array.");
+  const names = new Set;
+  for (const reaction of value) {
+    if (!isObject(reaction))
+      fail2("Reaction must be an object.");
+    exactKeys2(reaction, REACTION_KEYS);
+    if (!nonempty(reaction.name) || names.has(reaction.name)) {
+      fail2("Reaction names must be non-empty and unique per message.");
+    }
+    names.add(reaction.name);
+    if (typeof reaction.count !== "number" || !Number.isSafeInteger(reaction.count) || reaction.count < 0) {
+      fail2("Reaction count must be a non-negative safe integer.");
+    }
+    if (!Array.isArray(reaction.users) || !reaction.users.every(nonempty) || new Set(reaction.users).size !== reaction.users.length || reaction.users.length > reaction.count) {
+      fail2("Reaction users must be unique IDs and cannot exceed the source-reported count.");
     }
   }
 }
@@ -3797,6 +3737,163 @@ function exactKeys2(record, allowed) {
 }
 function fail2(message) {
   throw new NormalizationError("invalid_input", message);
+}
+
+// src/adapters/slack/metadata.ts
+function buildUserNames(value) {
+  const names = new Map;
+  if (value === undefined)
+    return names;
+  if (!Array.isArray(value))
+    throw invalid("Slack users must be an array.");
+  for (const user of value) {
+    if (!isObject(user) || typeof user.id !== "string" || !user.id.trim()) {
+      throw invalid("Slack users require a source user id.");
+    }
+    const name = profileName(user.profile) ?? label(user.real_name) ?? label(user.name);
+    if (name === undefined)
+      continue;
+    if (names.has(user.id) && names.get(user.id) !== name) {
+      throw invalid("Conflicting names for a Slack user; supply one authoritative user snapshot.");
+    }
+    names.set(user.id, name);
+  }
+  return names;
+}
+function resolveSpeaker(raw, id, names) {
+  let name = profileName(raw.user_profile) ?? names.get(id);
+  if (!name && typeof raw.bot_id === "string" && raw.bot_id.trim()) {
+    if (isObject(raw.bot_profile))
+      name = label(raw.bot_profile.name);
+    name ??= label(raw.username);
+  }
+  return { id, ...name ? { name } : {} };
+}
+function readReactions(value) {
+  if (!Array.isArray(value))
+    throw invalid("Slack reactions must be an array.");
+  const reactions = value.map((reaction) => {
+    if (!isObject(reaction))
+      throw invalid("Slack reactions must be objects.");
+    return { name: reaction.name, count: reaction.count, users: reaction.users };
+  });
+  validateReactions(reactions);
+  return reactions.map((reaction) => ({ ...reaction, users: [...reaction.users].sort() })).sort((a, b) => {
+    if (a.name < b.name)
+      return -1;
+    if (a.name > b.name)
+      return 1;
+    return 0;
+  });
+}
+function profileName(value) {
+  if (!isObject(value))
+    return;
+  return label(value.display_name) ?? label(value.real_name);
+}
+function label(value) {
+  if (typeof value !== "string")
+    return;
+  return value.trim() || undefined;
+}
+function invalid(message) {
+  return new NormalizationError("invalid_input", message);
+}
+
+// src/adapters/slack/index.ts
+var MESSAGE_SUBTYPES = new Set([
+  "bot_message",
+  "thread_broadcast",
+  "file_share",
+  "me_message"
+]);
+function normalizeSlackThread(transcript) {
+  let input;
+  try {
+    input = JSON.parse(transcript);
+  } catch {
+    throw invalid2("Expected a Slack thread JSON envelope, not bare JSONL.");
+  }
+  if (!isObject(input) || !Array.isArray(input.messages)) {
+    throw invalid2("Slack input must contain a messages array.");
+  }
+  const workspaceId = nonemptyString(input.team);
+  const channelId = nonemptyString(input.channel);
+  const thread = parseSlackTimestamp(input.thread_ts);
+  if (!workspaceId || !channelId || !thread) {
+    throw invalid2("Slack input requires team, channel, and a valid thread_ts.");
+  }
+  const userNames = buildUserNames(input.users);
+  const diagnostics = [];
+  const messages = new Map;
+  for (const raw of input.messages) {
+    if (!isObject(raw))
+      throw invalid2("Slack messages must be objects.");
+    if (raw.type !== "message" || raw.subtype !== undefined && !MESSAGE_SUBTYPES.has(String(raw.subtype))) {
+      diagnostics.push({
+        code: "slack_message_dropped",
+        message: "Skipped an unsupported Slack event or message subtype."
+      });
+      continue;
+    }
+    const time = parseSlackTimestamp(raw.ts);
+    const threadTs = raw.thread_ts ?? raw.ts;
+    if (!time || !parseSlackTimestamp(threadTs))
+      throw invalid2("Invalid Slack message timestamp.");
+    if (threadTs !== thread.ts || compareSlackTimestamps(time.ts, thread.ts) < 0) {
+      throw invalid2("Slack input contains a message from a different thread or preceding its root.");
+    }
+    if (raw.team !== undefined && raw.team !== workspaceId || raw.channel !== undefined && raw.channel !== channelId) {
+      throw invalid2("Slack message workspace/channel disagrees with the envelope.");
+    }
+    const speakerId = nonemptyString(raw.user) ?? nonemptyString(raw.bot_id);
+    if (!speakerId)
+      throw invalid2("Slack message has no source speaker identity.");
+    if (typeof raw.text !== "string" || !raw.text.trim()) {
+      diagnostics.push({
+        code: "slack_message_dropped",
+        message: "Skipped a Slack post without nonempty text (blocks/files are not extracted)."
+      });
+      continue;
+    }
+    const message = {
+      role: "message",
+      id: time.ts,
+      speaker: resolveSpeaker(raw, speakerId, userNames),
+      ..."reactions" in raw ? { metadata: { reactions: readReactions(raw.reactions) } } : {},
+      content: raw.text,
+      timestamp: time.date.toISOString()
+    };
+    const existing = messages.get(time.ts);
+    if (existing) {
+      if (JSON.stringify(existing) !== JSON.stringify(message)) {
+        throw invalid2("Conflicting versions of a Slack message; supply one authoritative snapshot.");
+      }
+      diagnostics.push({
+        code: "slack_duplicate_message",
+        message: "Removed a duplicate Slack message."
+      });
+    } else {
+      messages.set(time.ts, message);
+    }
+  }
+  if (messages.size === 0)
+    throw invalid2("Slack thread contains no supported text messages.");
+  return {
+    records: [
+      {
+        role: "meta",
+        source: "slack",
+        conversation_id: thread.ts,
+        source_metadata: { team: workspaceId, channel: channelId }
+      },
+      ...[...messages.values()].sort((a, b) => compareSlackTimestamps(a.id, b.id))
+    ],
+    diagnostics
+  };
+}
+function invalid2(message) {
+  return new NormalizationError("invalid_input", message);
 }
 
 // src/conversations/index.ts

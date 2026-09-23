@@ -7,6 +7,20 @@
   "prefixItems": [{ "$ref": "#/$defs/meta" }],
   "items": { "$ref": "#/$defs/message" },
   "$defs": {
+    "reaction": {
+      "type": "object",
+      "required": ["name", "count", "users"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "pattern": "\\S" },
+        "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "users": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "\\S" }
+        }
+      }
+    },
     "meta": {
       "type": "object",
       "required": ["role", "source", "conversation_id"],
@@ -38,7 +52,18 @@
           "required": ["id"],
           "additionalProperties": false,
           "properties": {
-            "id": { "type": "string", "pattern": "\\S" }
+            "id": { "type": "string", "pattern": "\\S" },
+            "name": { "type": "string", "pattern": "\\S" }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reactions": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/reaction" }
+            }
           }
         }
       }

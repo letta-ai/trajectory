@@ -14,7 +14,9 @@
       "reply_count": 1,
       "reply_users_count": 1,
       "latest_reply": "1700000001.000001",
-      "reply_users": ["UBOB"],
+      "reply_users": [
+        "UBOB"
+      ],
       "is_locked": false,
       "subscribed": false,
       "blocks": [
@@ -25,16 +27,35 @@
             {
               "type": "rich_text_section",
               "elements": [
-                { "type": "text", "text": "Please read the " },
-                { "type": "text", "text": "updated", "style": { "italic": true } },
-                { "type": "text", "text": " guide before publishing." }
+                {
+                  "type": "text",
+                  "text": "Please read the "
+                },
+                {
+                  "type": "text",
+                  "text": "updated",
+                  "style": {
+                    "italic": true
+                  }
+                },
+                {
+                  "type": "text",
+                  "text": " guide before publishing."
+                }
               ]
             }
           ]
         }
       ],
       "reactions": [
-        { "name": "nod", "users": ["UBOB", "UCAROL"], "count": 2 }
+        {
+          "name": "nod",
+          "users": [
+            "UBOB",
+            "UCAROL"
+          ],
+          "count": 2
+        }
       ]
     },
     {
@@ -54,12 +75,33 @@
             {
               "type": "rich_text_section",
               "elements": [
-                { "type": "text", "text": "I'll read it before publishing." }
+                {
+                  "type": "text",
+                  "text": "I'll read it before publishing."
+                }
               ]
             }
           ]
         }
       ]
+    }
+  ],
+  "users": [
+    {
+      "id": "UALICE",
+      "name": "alice",
+      "profile": {
+        "display_name": "Alice",
+        "real_name": "Alice Example"
+      }
+    },
+    {
+      "id": "UBOB",
+      "name": "bob",
+      "profile": {
+        "display_name": "",
+        "real_name": "Bob Example"
+      }
     }
   ]
 }

@@ -5,13 +5,14 @@
 Implemented against raw Slack message shapes supplied during mirror integration
 work (September 2026). No private transcripts were copied into this repository.
 Three synthetic fixtures cover a three-post relay/human thread, a rich-text
-thread with intentionally omitted reaction metadata, and a six-row cleanup case (duplicate roots, broadcast reply copies, a service event, and a
+thread with user-directory names and reaction snapshots, and a six-row cleanup case (duplicate roots, broadcast reply copies, a service event, and a
 file-only post). Both outputs are checked against runtime and JSON Schema
 validation and the separate Python conversation API. Additional tests cover
 microsecond ordering, scope isolation, retry/edit identity, reply-only threads,
 conflicting duplicates, missing identity, and malformed inputs. Generic format
 validation tests use synthetic Teams/Gmail/Google Chat metadata without adding
-adapters for those sources. Cross-contract tests verify that agent APIs and schemas
+adapters for those sources. Additional cases cover incomplete reactor lists,
+name fallbacks, and snapshot conflicts independent of reaction ordering. Cross-contract tests verify that agent APIs and schemas
 reject conversation records and vice versa; agent contracts are unchanged.
 
 No full production mirror corpus or live Dream run has been exercised. Blocks-

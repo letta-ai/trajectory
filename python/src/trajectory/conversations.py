@@ -21,11 +21,29 @@ class ConversationMetaRecord(_ConversationMetaOptional):
     conversation_id: str
 
 
-class ConversationSpeaker(TypedDict):
+class _ConversationSpeakerOptional(TypedDict, total=False):
+    name: str
+
+
+class ConversationSpeaker(_ConversationSpeakerOptional):
     id: str
 
 
-class ConversationMessageRecord(TypedDict):
+class ConversationReaction(TypedDict):
+    name: str
+    count: int
+    users: list[str]
+
+
+class ConversationMessageMetadata(TypedDict, total=False):
+    reactions: list[ConversationReaction]
+
+
+class _ConversationMessageOptional(TypedDict, total=False):
+    metadata: ConversationMessageMetadata
+
+
+class ConversationMessageRecord(_ConversationMessageOptional):
     role: Literal["message"]
     id: str
     speaker: ConversationSpeaker

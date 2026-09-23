@@ -24,6 +24,8 @@ export type {
   ConversationMetaRecord,
   ConversationMessageRecord,
   ConversationSpeaker,
+  ConversationReaction,
+  ConversationMessageMetadata,
   ConversationSource,
   ConversationDiagnostic,
   NormalizeConversationInput,

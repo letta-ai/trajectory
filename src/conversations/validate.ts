@@ -1,9 +1,12 @@
 import { isObject } from "../adapters/shared.js";
 import { NormalizationError } from "../types.js";
-import type { Conversation } from "./types.js";
+import type { Conversation, ConversationReaction } from "./types.js";
 
 const META_KEYS = new Set(["role", "source", "conversation_id", "source_metadata"]);
-const MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp"]);
+const MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp", "metadata"]);
+const SPEAKER_KEYS = new Set(["id", "name"]);
+const METADATA_KEYS = new Set(["reactions"]);
+const REACTION_KEYS = new Set(["name", "count", "users"]);
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 
 /** Each conversation includes shared context and at least one attributed message. */
@@ -32,14 +35,43 @@ export function validateConversation(value: unknown): asserts value is Conversat
       fail("Message IDs must be non-empty and unique within the conversation.");
     }
     ids.add(record.id);
-    if (!isObject(record.speaker) || !nonempty(record.speaker.id) ||
-        Object.keys(record.speaker).length !== 1) {
+    if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
       fail("Message speaker must contain a non-empty id.");
+    }
+    exactKeys(record.speaker, SPEAKER_KEYS);
+    if ("name" in record.speaker && !nonempty(record.speaker.name)) {
+      fail("Speaker name must be non-empty when present.");
+    }
+    if ("metadata" in record) {
+      if (!isObject(record.metadata)) fail("Message metadata must be an object.");
+      exactKeys(record.metadata, METADATA_KEYS);
+      if ("reactions" in record.metadata) validateReactions(record.metadata.reactions);
     }
     if (!nonempty(record.content)) fail("Message content must be non-empty text.");
     if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) ||
         Number.isNaN(Date.parse(record.timestamp))) {
       fail("Message timestamp must be a valid ISO timestamp.");
+    }
+  }
+}
+
+/** Also used by source adapters before normalizing reaction ordering. */
+export function validateReactions(value: unknown): asserts value is ConversationReaction[] {
+  if (!Array.isArray(value)) fail("Reactions must be an array.");
+  const names = new Set<string>();
+  for (const reaction of value) {
+    if (!isObject(reaction)) fail("Reaction must be an object.");
+    exactKeys(reaction, REACTION_KEYS);
+    if (!nonempty(reaction.name) || names.has(reaction.name)) {
+      fail("Reaction names must be non-empty and unique per message.");
+    }
+    names.add(reaction.name);
+    if (typeof reaction.count !== "number" || !Number.isSafeInteger(reaction.count) || reaction.count < 0) {
+      fail("Reaction count must be a non-negative safe integer.");
+    }
+    if (!Array.isArray(reaction.users) || !reaction.users.every(nonempty) ||
+        new Set(reaction.users).size !== reaction.users.length || reaction.users.length > reaction.count) {
+      fail("Reaction users must be unique IDs and cannot exceed the source-reported count.");
     }
   }
 }

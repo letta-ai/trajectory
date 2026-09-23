@@ -16,6 +16,19 @@ export interface ConversationMetaRecord {
 
 export interface ConversationSpeaker {
   id: string;
+  /** Optional display label, never a replacement for source identity. */
+  name?: string;
+}
+
+export interface ConversationReaction {
+  name: string;
+  /** Total source-reported count; users may be a partial list. */
+  count: number;
+  users: string[];
+}
+
+export interface ConversationMessageMetadata {
+  reactions?: ConversationReaction[];
 }
 
 export interface ConversationMessageRecord {
@@ -23,6 +36,7 @@ export interface ConversationMessageRecord {
   /** Source-native message ID, unique within this conversation. */
   id: string;
   speaker: ConversationSpeaker;
+  metadata?: ConversationMessageMetadata;
   content: string;
   timestamp: string;
 }

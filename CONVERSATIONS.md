@@ -50,7 +50,8 @@ and thread structure is nesting rather than repeated IDs.
   { "role": "meta", "source": "slack", "channel": "C0AB…" },
   { "id": "1790028870.001200", "speaker": { "id": "U0BRK…", "name": "Titan" },
     "timestamp": "2026-09-20T17:47:50.001Z", "content": "deploy is stuck",
-    "reactions": [{ "name": "eyes", "count": 2, "users": ["U079…", "U084…"] }],
+    "reactions": [{ "name": "eyes", "count": 2,
+      "users": [{ "id": "U079…", "name": "Charles" }, { "id": "U084…" }] }],
     "replies": [
       { "id": "1790028881.776679", "speaker": { "id": "U079…" },
         "timestamp": "2026-09-20T17:48:01.776Z", "content": "looking" }
@@ -78,7 +79,8 @@ are attributed to their source identity, not an assistant role. Optional
 `speaker.id`; mentions inside `content` are left as source text.
 
 `reactions` contains `{ name, count, users }` snapshots. `count` is the total
-reported by the source; `users` lists known reactor IDs and may be incomplete.
+reported by the source; `users` lists known reactors as `{ id, name? }`, the
+same shape as `speaker`, and may be incomplete.
 Missing `reactions` means no snapshot was provided; an explicit empty array
 means the provided snapshot has no reactions.
 

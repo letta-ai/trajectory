@@ -61,8 +61,21 @@ test("preserves authoritative counts with partial reactor lists and inline emoji
   const result = normalize([{ ...root, reactions }]);
   expect<unknown>(post(result)).toMatchObject({
     content: ":eyes:",
-    reactions: [{ name: "nod", count: 5, users: ["UBOB", "UCAROL"] }],
+    reactions: [{ name: "nod", count: 5, users: [{ id: "UBOB" }, { id: "UCAROL" }] }],
   });
+  validateConversation(result.records);
+  expect(schema(result.records)).toBe(true);
+});
+
+test("reactors resolve names from the same user list as speakers", () => {
+  const result = normalize([{ ...root, reactions }], [
+    { id: "UBOB", profile: { display_name: "Bob" } },
+    { id: "UALICE", real_name: "Alice Example" },
+  ]);
+  expect(post(result).speaker).toEqual({ id: "UALICE", name: "Alice Example" });
+  expect(post(result).reactions).toEqual([
+    { name: "nod", count: 5, users: [{ id: "UBOB", name: "Bob" }, { id: "UCAROL" }] },
+  ]);
   validateConversation(result.records);
   expect(schema(result.records)).toBe(true);
 });
@@ -110,8 +123,11 @@ test("conversation schema validates optional names and reactions", () => {
     { ...record, reactions: null },
     { ...record, reactions: [{ name: "nod", count: 0.5, users: [] }] },
     { ...record, reactions: [{ name: "nod", count: -1, users: [] }] },
-    { ...record, reactions: [{ name: "nod", count: 2, users: ["U1", "U1"] }] },
-    { ...record, reactions: [{ name: "nod", count: 2, users: [1] }] },
+    { ...record, reactions: [{ name: "nod", count: 2, users: [{ id: "U1" }, { id: "U1" }] }] },
+    { ...record, reactions: [{ name: "nod", count: 2, users: [{ id: 1 }] }] },
+    { ...record, reactions: [{ name: "nod", count: 2, users: ["U1"] }] },
+    { ...record, reactions: [{ name: "nod", count: 2, users: [{ id: "U1", name: " " }] }] },
+    { ...record, reactions: [{ name: "nod", count: 2, users: [{ id: "U1", extra: true }] }] },
     { ...record, reactions: [{ name: "nod", count: Number.MAX_SAFE_INTEGER + 1, users: [] }] },
     { ...record, metadata: { reactions: [] } },
   ]) {

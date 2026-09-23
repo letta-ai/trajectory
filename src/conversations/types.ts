@@ -27,7 +27,7 @@ export interface ConversationReaction {
   name: string;
   /** Total source-reported count; users may be a partial list. */
   count: number;
-  users: string[];
+  users: ConversationSpeaker[];
 }
 
 export interface ConversationMessage {

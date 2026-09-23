@@ -32,8 +32,13 @@
           "name": "eyes",
           "count": 2,
           "users": [
-            "UBOB",
-            "UCAROL"
+            {
+              "id": "UBOB",
+              "name": "Bob Example"
+            },
+            {
+              "id": "UCAROL"
+            }
           ]
         }
       ],
@@ -61,7 +66,10 @@
           "name": "eyes",
           "count": 1,
           "users": [
-            "UALICE"
+            {
+              "id": "UALICE",
+              "name": "Alice"
+            }
           ]
         }
       ]

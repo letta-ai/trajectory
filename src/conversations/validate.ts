@@ -47,19 +47,19 @@ export function validateConversation(value: unknown): asserts value is Conversat
 
 function validateMessage(record: Record<string, unknown>, ids: Set<string>): void {
   claimId(record.id, ids);
-  if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
-    fail("Message speaker must contain a non-empty id.");
-  }
-  exactKeys(record.speaker, SPEAKER_KEYS);
-  if ("name" in record.speaker && !nonempty(record.speaker.name)) {
-    fail("Speaker name must be non-empty when present.");
-  }
+  validateSpeaker(record.speaker);
   if ("reactions" in record) validateReactions(record.reactions);
   if (!nonempty(record.content)) fail("Message content must be non-empty text.");
   if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) ||
       Number.isNaN(Date.parse(record.timestamp))) {
     fail("Message timestamp must be a valid ISO timestamp.");
   }
+}
+
+function validateSpeaker(value: unknown): void {
+  if (!isObject(value) || !nonempty(value.id)) fail("Speaker must contain a non-empty id.");
+  exactKeys(value, SPEAKER_KEYS);
+  if ("name" in value && !nonempty(value.name)) fail("Speaker name must be non-empty when present.");
 }
 
 function claimId(id: unknown, ids: Set<string>): void {
@@ -83,9 +83,16 @@ export function validateReactions(value: unknown): asserts value is Conversation
     if (typeof reaction.count !== "number" || !Number.isSafeInteger(reaction.count) || reaction.count < 0) {
       fail("Reaction count must be a non-negative safe integer.");
     }
-    if (!Array.isArray(reaction.users) || !reaction.users.every(nonempty) ||
-        new Set(reaction.users).size !== reaction.users.length || reaction.users.length > reaction.count) {
-      fail("Reaction users must be unique IDs and cannot exceed the source-reported count.");
+    if (!Array.isArray(reaction.users) || reaction.users.length > reaction.count) {
+      fail("Reaction users cannot exceed the source-reported count.");
+    }
+    const ids = new Set<string>();
+    for (const user of reaction.users) {
+      validateSpeaker(user);
+      if (!isObject(user) || typeof user.id !== "string" || ids.has(user.id)) {
+        fail("Reaction users must be unique per reaction.");
+      }
+      ids.add(user.id);
     }
   }
 }

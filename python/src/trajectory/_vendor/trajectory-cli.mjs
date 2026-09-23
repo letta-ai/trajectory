@@ -3700,13 +3700,7 @@ function validateConversation(value) {
 }
 function validateMessage(record, ids) {
   claimId(record.id, ids);
-  if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
-    fail2("Message speaker must contain a non-empty id.");
-  }
-  exactKeys2(record.speaker, SPEAKER_KEYS);
-  if ("name" in record.speaker && !nonempty(record.speaker.name)) {
-    fail2("Speaker name must be non-empty when present.");
-  }
+  validateSpeaker(record.speaker);
   if ("reactions" in record)
     validateReactions(record.reactions);
   if (!nonempty(record.content))
@@ -3714,6 +3708,13 @@ function validateMessage(record, ids) {
   if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) || Number.isNaN(Date.parse(record.timestamp))) {
     fail2("Message timestamp must be a valid ISO timestamp.");
   }
+}
+function validateSpeaker(value) {
+  if (!isObject(value) || !nonempty(value.id))
+    fail2("Speaker must contain a non-empty id.");
+  exactKeys2(value, SPEAKER_KEYS);
+  if ("name" in value && !nonempty(value.name))
+    fail2("Speaker name must be non-empty when present.");
 }
 function claimId(id, ids) {
   if (!nonempty(id) || ids.has(id)) {
@@ -3736,8 +3737,16 @@ function validateReactions(value) {
     if (typeof reaction.count !== "number" || !Number.isSafeInteger(reaction.count) || reaction.count < 0) {
       fail2("Reaction count must be a non-negative safe integer.");
     }
-    if (!Array.isArray(reaction.users) || !reaction.users.every(nonempty) || new Set(reaction.users).size !== reaction.users.length || reaction.users.length > reaction.count) {
-      fail2("Reaction users must be unique IDs and cannot exceed the source-reported count.");
+    if (!Array.isArray(reaction.users) || reaction.users.length > reaction.count) {
+      fail2("Reaction users cannot exceed the source-reported count.");
+    }
+    const ids = new Set;
+    for (const user of reaction.users) {
+      validateSpeaker(user);
+      if (!isObject(user) || typeof user.id !== "string" || ids.has(user.id)) {
+        fail2("Reaction users must be unique per reaction.");
+      }
+      ids.add(user.id);
     }
   }
 }
@@ -3784,16 +3793,26 @@ function resolveSpeaker(raw, id, names) {
   }
   return { id, ...name ? { name } : {} };
 }
-function readReactions(value) {
+function readReactions(value, names) {
   if (!Array.isArray(value))
     throw invalid("Slack reactions must be an array.");
   const reactions = value.map((reaction) => {
     if (!isObject(reaction))
       throw invalid("Slack reactions must be objects.");
-    return { name: reaction.name, count: reaction.count, users: reaction.users };
+    if (!Array.isArray(reaction.users))
+      throw invalid("Slack reaction users must be an array of IDs.");
+    const users = reaction.users.map((id) => {
+      if (typeof id !== "string" || !id.trim())
+        throw invalid("Slack reaction users must be non-empty IDs.");
+      return id;
+    }).sort().map((id) => {
+      const name = names.get(id);
+      return { id, ...name ? { name } : {} };
+    });
+    return { name: reaction.name, count: reaction.count, users };
   });
   validateReactions(reactions);
-  return reactions.map((reaction) => ({ ...reaction, users: [...reaction.users].sort() })).sort((a, b) => {
+  return [...reactions].sort((a, b) => {
     if (a.name < b.name)
       return -1;
     if (a.name > b.name)
@@ -3865,7 +3884,7 @@ function normalizeSlackChannel(input) {
       speaker: resolveSpeaker(raw, speakerId, userNames),
       content: raw.text,
       timestamp: time.date.toISOString(),
-      ..."reactions" in raw ? { reactions: readReactions(raw.reactions) } : {}
+      ..."reactions" in raw ? { reactions: readReactions(raw.reactions, userNames) } : {}
     };
     const existing = messages.get(time.ts);
     if (existing) {

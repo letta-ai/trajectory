@@ -60,7 +60,7 @@ service-owned organization mirror as permission to disclose all its channels.
     "speaker": { "id": "UONE", "name": "Alice" },
     "content": "Hello",
     "timestamp": "2023-11-14T22:13:20.000Z",
-    "reactions": [{ "name": "eyes", "count": 1, "users": ["UTWO"] }],
+    "reactions": [{ "name": "eyes", "count": 1, "users": [{ "id": "UTWO" }] }],
     "replies": [
       {
         "id": "1700000001.000001",
@@ -103,8 +103,9 @@ change because a display name changed. Conflicting named directory entries fail.
 Mentions inside `content` are left as source text.
 
 When the source message has `reactions`, it is kept as `reactions` with
-`name`, `count`, and `users`. Slack [may return only some reactor IDs](https://docs.slack.dev/reference/methods/reactions.get/),
-so `count` is preserved, not recomputed from `users.length`. Reaction names and reactor IDs
+`name`, `count`, and `users`. Each reactor is `{ id, name? }`, resolved from the
+same `users` list as speakers. Slack [may return only some reactor IDs](https://docs.slack.dev/reference/methods/reactions.get/),
+so `count` is preserved, not recomputed from `users.length`. Reaction names and reactors
 are sorted deterministically, and invalid/duplicate names or IDs are rejected.
 Absent reactions are not the same as an explicitly empty reaction snapshot.
 

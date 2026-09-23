@@ -28,7 +28,7 @@ class ConversationSpeaker(_ConversationSpeakerOptional):
 class ConversationReaction(TypedDict):
     name: str
     count: int
-    users: list[str]
+    users: list[ConversationSpeaker]
 
 
 class _ConversationMessageOptional(TypedDict, total=False):

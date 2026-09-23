@@ -18,8 +18,13 @@
           "name": "nod",
           "count": 2,
           "users": [
-            "UBOB",
-            "UCAROL"
+            {
+              "id": "UBOB",
+              "name": "Bob Example"
+            },
+            {
+              "id": "UCAROL"
+            }
           ]
         }
       ],

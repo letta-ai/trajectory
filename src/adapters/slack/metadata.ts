@@ -35,20 +35,27 @@ export function resolveSpeaker(
   return { id, ...(name ? { name } : {}) };
 }
 
-export function readReactions(value: unknown): ConversationReaction[] {
+export function readReactions(value: unknown, names: Map<string, string>): ConversationReaction[] {
   if (!Array.isArray(value)) throw invalid("Slack reactions must be an array.");
   const reactions: unknown = value.map((reaction) => {
     if (!isObject(reaction)) throw invalid("Slack reactions must be objects.");
-    return { name: reaction.name, count: reaction.count, users: reaction.users };
+    if (!Array.isArray(reaction.users)) throw invalid("Slack reaction users must be an array of IDs.");
+    // These arrays describe sets, not arrival order. Canonicalize before deduplication.
+    const users = reaction.users.map((id) => {
+      if (typeof id !== "string" || !id.trim()) throw invalid("Slack reaction users must be non-empty IDs.");
+      return id;
+    }).sort().map((id) => {
+      const name = names.get(id);
+      return { id, ...(name ? { name } : {}) };
+    });
+    return { name: reaction.name, count: reaction.count, users };
   });
   validateReactions(reactions);
-  // These arrays describe sets, not arrival order. Canonicalize before deduplication.
-  return reactions.map((reaction) => ({ ...reaction, users: [...reaction.users].sort() }))
-    .sort((a, b) => {
-      if (a.name < b.name) return -1;
-      if (a.name > b.name) return 1;
-      return 0;
-    });
+  return [...reactions].sort((a, b) => {
+    if (a.name < b.name) return -1;
+    if (a.name > b.name) return 1;
+    return 0;
+  });
 }
 
 function profileName(value: unknown): string | undefined {

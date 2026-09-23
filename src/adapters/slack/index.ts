@@ -69,7 +69,7 @@ export function normalizeSlackChannel(input: SlackChannelInput): NormalizeConver
       speaker: resolveSpeaker(raw, speakerId, userNames),
       content: raw.text,
       timestamp: time.date.toISOString(),
-      ...("reactions" in raw ? { reactions: readReactions(raw.reactions) } : {}),
+      ...("reactions" in raw ? { reactions: readReactions(raw.reactions, userNames) } : {}),
     };
     const existing = messages.get(time.ts);
     if (existing) {

@@ -1,14 +1,7 @@
+import type { SlackChannelContext } from "../../conversations/types.js";
 import { NormalizationError } from "../../types.js";
 import { isObject } from "../shared.js";
 import { compareSlackTimestamps, parseSlackTimestamp } from "./timestamp.js";
-
-/** Context the caller already holds: Slack requires `channel` to fetch messages. */
-export interface SlackChannelContext {
-  team: string;
-  channel: string;
-  /** Raw `users.list` objects, used only to resolve display names. */
-  users?: unknown[];
-}
 
 /** One thread envelope, accepted by `normalizeConversation` once JSON-stringified. */
 export interface SlackThreadInput extends SlackChannelContext {
@@ -38,6 +31,31 @@ export function groupSlackMessages(
   return [...threads.entries()]
     .sort(([a], [b]) => compareSlackTimestamps(a, b))
     .map(([thread_ts, group]) => ({ ...context, thread_ts, messages: group }));
+}
+
+/** Accept the shapes a Slack dump actually comes in; never a pre-built envelope. */
+export function parseSlackMessages(transcript: string): unknown[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(transcript);
+  } catch {
+    const lines = transcript.split(/\r?\n/).filter((line) => line.trim());
+    if (lines.length === 0) throw invalid("Slack transcript is empty.");
+    return lines.map((line, index) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        throw invalid(`Slack transcript line ${index + 1} is not valid JSON.`);
+      }
+    });
+  }
+  if (Array.isArray(parsed)) return parsed;
+  if (isObject(parsed) && Array.isArray(parsed.messages) && !("thread_ts" in parsed)) {
+    return parsed.messages;
+  }
+  throw invalid(
+    "Slack transcript must be JSONL rows, a JSON array, or a conversations.history response.",
+  );
 }
 
 function invalid(message: string): NormalizationError {

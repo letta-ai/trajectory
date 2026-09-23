@@ -12,22 +12,32 @@ conversation input; no conversion into agent canonical rows is provided.
 ## API
 
 ```ts
-import {
-  normalizeConversation,
-  validateConversation,
-} from "@letta-ai/trajectory/conversations";
+import { normalizeConversations } from "@letta-ai/trajectory/conversations";
 
-const result = normalizeConversation({ source: "slack", transcript });
-validateConversation(result.records);
+const { conversations } = normalizeConversations({
+  source: "slack",
+  transcript: rawJsonl, // one channel's messages, as fetched
+  context: { team, channel, users },
+});
 ```
 
 ```python
-from trajectory.conversations import normalize_conversation
+from trajectory.conversations import normalize_conversations
 
-result = normalize_conversation(source="slack", transcript=transcript)
+result = normalize_conversations(
+    source="slack", transcript=raw_jsonl, context={"team": team, "channel": channel, "users": users}
+)
 ```
 
-Both return `{ records, diagnostics }`. The records array is validated by
+`transcript` is the raw dump: JSONL rows, a JSON array, or a `conversations.history`
+response. `context` is what Slack required you to know to fetch it (`team`,
+`channel`) plus optional `users.list` rows for display names. The result is one
+`{ records, diagnostics }` per thread, in thread order. An empty dump yields no
+conversations. `normalizeConversation` (singular) normalizes one pre-built thread
+envelope and `validateConversation` checks a records array; both are exported for
+callers that already hold threads in memory.
+
+Each conversation is `{ records, diagnostics }`. The records array is validated by
 [`conversation-v1.schema.json`](schema/conversation-v1.schema.json), available
 to npm consumers as `@letta-ai/trajectory/schema/conversation`. Runtime validation
 additionally checks message-ID/reaction-name uniqueness, timestamp parseability,

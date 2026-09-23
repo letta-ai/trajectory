@@ -93,11 +93,30 @@ def group_slack_messages(
     ]
 
 
+class SlackChannelContext(TypedDict, total=False):
+    team: str
+    channel: str
+    users: list[object]
+
+
+class NormalizeConversationsResult(TypedDict):
+    conversations: list[NormalizeConversationResult]
+
+
 def normalize_conversation(*, source: ConversationSource, transcript: str) -> NormalizeConversationResult:
     """Normalize one thread envelope; does not change normalize_transcript."""
-    payload = json.dumps({"version": 1, "requests": [{"conversation": {
-        "source": source, "transcript": transcript,
-    }}]}, ensure_ascii=False)
+    return _bridge_request({"conversation": {"source": source, "transcript": transcript}})
+
+
+def normalize_conversations(
+    *, source: ConversationSource, transcript: str, context: SlackChannelContext
+) -> NormalizeConversationsResult:
+    """Normalize one channel's raw Slack dump (JSONL, JSON array, or history response) into one conversation per thread."""
+    return _bridge_request({"conversations": {"source": source, "transcript": transcript, "context": dict(context)}})
+
+
+def _bridge_request(request: dict[str, object]) -> dict:
+    payload = json.dumps({"version": 1, "requests": [request]}, ensure_ascii=False)
     completed = _run_bridge(payload)
     try:
         response = json.loads(completed.stdout)

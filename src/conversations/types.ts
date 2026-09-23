@@ -3,7 +3,28 @@ export type ConversationSource = "slack";
 
 export interface NormalizeConversationInput {
   source: ConversationSource;
+  /** One thread envelope as JSON. */
   transcript: string;
+}
+
+/** Context the caller already holds: Slack requires `channel` to fetch messages. */
+export interface SlackChannelContext {
+  team: string;
+  channel: string;
+  /** Raw `users.list` objects, used only to resolve display names. */
+  users?: unknown[];
+}
+
+export interface NormalizeConversationsInput {
+  source: ConversationSource;
+  /** One channel's raw messages: JSONL rows, a JSON array, or a `conversations.history` response. */
+  transcript: string;
+  context: SlackChannelContext;
+}
+
+export interface NormalizeConversationsResult {
+  /** One entry per thread, in thread order; each carries its own diagnostics. */
+  conversations: NormalizeConversationResult[];
 }
 
 export interface ConversationMetaRecord {

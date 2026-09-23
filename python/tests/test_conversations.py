@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from trajectory import NormalizationError, normalize_transcript
-from trajectory.conversations import group_slack_messages, normalize_conversation
+from trajectory.conversations import group_slack_messages, normalize_conversation, normalize_conversations
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -44,3 +44,19 @@ class ConversationTests(unittest.TestCase):
         self.assertEqual(len(result["records"]), 3)
         with self.assertRaises(NormalizationError):
             group_slack_messages([{"type": "message", "text": "no ts"}], team="T", channel="C")
+
+    def test_normalize_conversations_takes_a_raw_dump(self):
+        root = {"type": "message", "user": "UALICE", "ts": "1700000000.000001", "text": "root"}
+        reply = {"type": "message", "user": "UBOB", "ts": "1700000001.000001",
+                 "thread_ts": "1700000000.000001", "text": "reply"}
+        standalone = {"type": "message", "user": "UCAROL", "ts": "1700000002.000001", "text": ":eyes:"}
+        jsonl = "".join(json.dumps(r) + "\n" for r in (reply, standalone, root))
+        context = {"team": "TEXAMPLE", "channel": "CEXAMPLE",
+                   "users": [{"id": "UALICE", "profile": {"display_name": "Alice"}}]}
+        result = normalize_conversations(source="slack", transcript=jsonl, context=context)
+        self.assertEqual([c["records"][0]["conversation_id"] for c in result["conversations"]],
+                         ["1700000000.000001", "1700000002.000001"])
+        self.assertEqual(result["conversations"][0]["records"][1]["speaker"], {"id": "UALICE", "name": "Alice"})
+        self.assertEqual(result["conversations"][1]["records"][1]["content"], ":eyes:")
+        with self.assertRaises(NormalizationError):
+            normalize_conversations(source="slack", transcript=jsonl, context={"team": "T", "channel": ""})

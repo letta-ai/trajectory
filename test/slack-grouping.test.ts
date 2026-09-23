@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { groupSlackMessages, normalizeConversation } from "../src/conversations/index.js";
+import { groupSlackMessages, normalizeConversation, normalizeConversations } from "../src/conversations/index.js";
 
 const context = { team: "TEXAMPLE", channel: "CEXAMPLE" };
 const root = { type: "message", user: "UALICE", ts: "1700000000.000001", thread_ts: "1700000000.000001", text: "root", reply_count: 1 };
@@ -42,4 +42,42 @@ test("does not guess channel or team and rejects rows it cannot place", () => {
     source: "slack",
     transcript: JSON.stringify({ ...groupSlackMessages([root], context)[0], channel: "" }),
   })).toThrow("channel");
+});
+
+test("normalizeConversations takes a raw dump and returns one conversation per thread", () => {
+  const rows = [reply, standalone, root];
+  const jsonl = rows.map((r) => JSON.stringify(r)).join("\n") + "\n";
+  const fromJsonl = normalizeConversations({ source: "slack", transcript: jsonl, context });
+  const fromArray = normalizeConversations({ source: "slack", transcript: JSON.stringify(rows), context });
+  const fromHistory = normalizeConversations({
+    source: "slack", transcript: JSON.stringify({ ok: true, messages: rows, has_more: false }), context,
+  });
+  expect(fromArray).toEqual(fromJsonl);
+  expect(fromHistory).toEqual(fromJsonl);
+  expect(fromJsonl.conversations.map((c) => c.records[0])).toMatchObject([
+    { conversation_id: "1700000000.000001", source_metadata: context },
+    { conversation_id: "1700000002.000001", source_metadata: context },
+  ]);
+  expect(fromJsonl.conversations[0]?.records).toHaveLength(3);
+  expect(fromJsonl.conversations.every((c) => c.diagnostics.length === 0)).toBe(true);
+});
+
+test("normalizeConversations keeps diagnostics per thread and requires real context", () => {
+  const fileOnly = { type: "message", user: "UBOB", ts: "1700000001.000002", thread_ts: "1700000000.000001", text: "", files: [{}] };
+  const { conversations } = normalizeConversations({
+    source: "slack", transcript: JSON.stringify([root, fileOnly, standalone]),
+    context: { ...context, users: [{ id: "UCAROL", profile: { display_name: "Carol" } }] },
+  });
+  expect(conversations[0]?.diagnostics).toMatchObject([{ code: "slack_message_dropped" }]);
+  expect(conversations[1]?.diagnostics).toEqual([]);
+  expect(conversations[1]?.records[1]).toMatchObject({ speaker: { id: "UCAROL", name: "Carol" } });
+  expect(normalizeConversations({ source: "slack", transcript: "[]", context })).toEqual({ conversations: [] });
+  expect(() => normalizeConversations({ source: "slack", transcript: "{}", context })).toThrow("JSONL");
+  expect(() => normalizeConversations({ source: "slack", transcript: "not json\n", context })).toThrow("line 1");
+  expect(() => normalizeConversations({
+    source: "slack", transcript: JSON.stringify([root]), context: { team: "T", channel: " " },
+  })).toThrow("channel");
+  expect(() => normalizeConversations({
+    source: "slack", transcript: JSON.stringify({ ...context, thread_ts: root.ts, messages: [root] }), context,
+  })).toThrow("JSONL");
 });

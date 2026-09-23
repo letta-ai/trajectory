@@ -161,15 +161,17 @@ Slack threads are multi-party conversations, not agent execution traces. They us
 an independent [conversation schema](schema/conversation-v1.schema.json) and API:
 
 ```ts
-import { normalizeConversation } from "@letta-ai/trajectory/conversations";
+import { normalizeConversations } from "@letta-ai/trajectory/conversations";
 
-const result = normalizeConversation({
+const { conversations } = normalizeConversations({
   source: "slack",
-  transcript: JSON.stringify({ team, channel, thread_ts, messages }),
+  transcript: rawJsonl, // one channel's messages, as fetched
+  context: { team, channel, users },
 });
 ```
 
-Python exposes `normalize_conversation` from `trajectory.conversations`.
+Each conversation is `{ records, diagnostics }`, one per thread. Python exposes
+`normalize_conversations` from `trajectory.conversations`.
 The conversation format has shared `meta` context and attributed `message`
 records. It does not extend `NormalizedRecord`, `normalizeTranscript`, or
 `normalizeToCanonical`; agent schemas and canonical schema version remain unchanged.

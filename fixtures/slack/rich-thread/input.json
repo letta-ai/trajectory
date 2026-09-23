@@ -1,7 +1,23 @@
 {
-  "team": "TEXAMPLE",
   "channel": "CEXAMPLE",
-  "thread_ts": "1700000000.000001",
+  "users": [
+    {
+      "id": "UALICE",
+      "name": "alice",
+      "profile": {
+        "display_name": "Alice",
+        "real_name": "Alice Example"
+      }
+    },
+    {
+      "id": "UBOB",
+      "name": "bob",
+      "profile": {
+        "display_name": "",
+        "real_name": "Bob Example"
+      }
+    }
+  ],
   "messages": [
     {
       "user": "UALICE",
@@ -84,24 +100,6 @@
           ]
         }
       ]
-    }
-  ],
-  "users": [
-    {
-      "id": "UALICE",
-      "name": "alice",
-      "profile": {
-        "display_name": "Alice",
-        "real_name": "Alice Example"
-      }
-    },
-    {
-      "id": "UBOB",
-      "name": "bob",
-      "profile": {
-        "display_name": "",
-        "real_name": "Bob Example"
-      }
     }
   ]
 }

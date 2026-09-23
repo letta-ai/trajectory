@@ -8,13 +8,11 @@ const schema = new Ajv2020({ strictTuples: false }).compile(JSON.parse(readFileS
   new URL("../schema/conversation-v1.schema.json", import.meta.url), "utf8",
 )));
 const message = {
-  role: "message", id: "message-1", speaker: { id: "person-1" },
+  id: "message-1", speaker: { id: "person-1" },
   content: "Can we ship today?", timestamp: "2026-09-22T12:00:00.000Z",
 };
-const meta = {
-  role: "meta", source: "teams", conversation_id: "thread-1",
-  source_metadata: { tenant: "tenant-1", channel: "channel-1" },
-};
+const reply = { ...message, id: "message-2", speaker: { id: "person-2" }, content: "Yes." };
+const meta = { role: "meta", source: "teams", channel: "channel-1" };
 
 describe("independent conversation contract", () => {
   test("accepts source-native context without requiring Slack fields", () => {
@@ -24,12 +22,35 @@ describe("independent conversation contract", () => {
       expect(() => validateConversation(records)).not.toThrow();
       expect(schema(records)).toBe(true);
     }
-    const { source_metadata: _, ...minimalMeta } = meta;
-    expect(() => validateConversation([minimalMeta, message])).not.toThrow();
   });
 
-  test("requires shared metadata even for a reply-only fragment", () => {
-    for (const invalid of [[], [meta], [message], [{ role: "meta", source: "slack" }, message]]) {
+  test("threads nest once: posts may carry replies, replies may not", () => {
+    for (const valid of [
+      [meta, { ...message, replies: [reply] }],
+      [meta, { id: "root-elsewhere", replies: [reply] }],
+      [meta, message, { ...reply, replies: [{ ...message, id: "message-3" }] }],
+    ]) {
+      expect(() => validateConversation(valid)).not.toThrow();
+      expect(schema(valid)).toBe(true);
+    }
+    for (const invalid of [
+      [meta, { ...message, replies: [] }],
+      [meta, { id: "root-elsewhere", replies: [] }],
+      [meta, { id: "root-elsewhere" }],
+      [meta, { ...message, replies: [{ ...reply, replies: [] }] }],
+      [meta, { ...message, replies: [{ id: "x", replies: [reply] }] }],
+    ]) {
+      expect(() => validateConversation(invalid)).toThrow();
+      expect(schema(invalid)).toBe(false);
+    }
+    // IDs must be unique across roots and replies; JSON Schema cannot express this.
+    expect(() => validateConversation([meta, { ...message, replies: [{ ...reply, id: "message-1" }] }]))
+      .toThrow("unique");
+  });
+
+  test("requires shared metadata even for a thread fragment", () => {
+    for (const invalid of [[], [meta], [message], [{ role: "meta", source: "slack" }, message],
+      [{ ...meta, team: "T1" }, message]]) {
       expect(() => validateConversation(invalid)).toThrow();
       expect(schema(invalid)).toBe(false);
     }
@@ -44,24 +65,19 @@ describe("independent conversation contract", () => {
       { ...message, speaker: { id: "a", extra: true } },
       { ...message, content: " " },
       { ...message, timestamp: "bad" },
-      { ...message, metadata: { recipients: [] } },
+      { ...message, metadata: { reactions: [] } },
+      { ...message, thread_ts: "1" },
+      { ...message, role: "message" },
       { ...message, role: "assistant" },
     ]) {
       expect(() => validateConversation([meta, invalid])).toThrow();
       expect(schema([meta, invalid])).toBe(false);
     }
-    for (const source_metadata of [null, [], { team: null }, { team: { nested: "value" } }]) {
-      expect(() => validateConversation([{ ...meta, source_metadata }, message])).toThrow();
-      expect(schema([{ ...meta, source_metadata }, message])).toBe(false);
-    }
   });
 
   test("agent APIs reject Slack while the separate API accepts it", () => {
-    const transcript = JSON.stringify({
-      team: "T1", channel: "C1", thread_ts: "1700000000.000001",
-      messages: [{ type: "message", user: "U1", ts: "1700000000.000001", text: "Hello" }],
-    });
-    const conversation = normalizeConversation({ source: "slack", transcript });
+    const transcript = JSON.stringify([{ type: "message", user: "U1", ts: "1700000000.000001", text: "Hello" }]);
+    const conversation = normalizeConversation({ source: "slack", transcript, channel: "C1" });
     expect(() => validateConversation(conversation.records)).not.toThrow();
     expect(() => validateTranscript(conversation.records)).toThrow();
     expect(() => normalizeTranscript({
@@ -84,7 +100,7 @@ describe("independent conversation contract", () => {
     expect(schema(result.records)).toBe(false);
     expect(() => normalizeConversation({
       // @ts-expect-error Agent sources must use the agent API.
-      source: "atif", transcript,
+      source: "atif", transcript, channel: "C1",
     })).toThrow();
   });
 });

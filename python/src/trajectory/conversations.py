@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Literal, TypedDict, Union
 
 from ._client import _run_bridge
@@ -12,14 +11,10 @@ from ._errors import NormalizationError, TrajectoryRuntimeError
 ConversationSource = Literal["slack"]
 
 
-class _ConversationMetaOptional(TypedDict, total=False):
-    source_metadata: dict[str, str]
-
-
-class ConversationMetaRecord(_ConversationMetaOptional):
+class ConversationMetaRecord(TypedDict):
     role: Literal["meta"]
     source: str
-    conversation_id: str
+    channel: str
 
 
 class _ConversationSpeakerOptional(TypedDict, total=False):
@@ -36,27 +31,35 @@ class ConversationReaction(TypedDict):
     users: list[str]
 
 
-class ConversationMessageMetadata(TypedDict, total=False):
+class _ConversationMessageOptional(TypedDict, total=False):
     reactions: list[ConversationReaction]
 
 
-class _ConversationMessageOptional(TypedDict, total=False):
-    metadata: ConversationMessageMetadata
-
-
-class ConversationMessageRecord(_ConversationMessageOptional):
-    role: Literal["message"]
+class ConversationMessage(_ConversationMessageOptional):
     id: str
     speaker: ConversationSpeaker
     content: str
     timestamp: str
 
 
-ConversationRecord = Union[ConversationMetaRecord, ConversationMessageRecord]
+class ConversationPost(ConversationMessage, total=False):
+    """A top-level post; ``replies`` is present only when the thread has replies."""
+
+    replies: list[ConversationMessage]
+
+
+class ConversationThreadFragment(TypedDict):
+    """Replies whose root was not in the input; ``id`` is the root's source ID."""
+
+    id: str
+    replies: list[ConversationMessage]
+
+
+ConversationRecord = Union[ConversationMetaRecord, ConversationPost, ConversationThreadFragment]
 
 
 class ConversationDiagnostic(TypedDict):
-    code: Literal["slack_message_dropped", "slack_duplicate_message"]
+    code: Literal["slack_message_dropped", "slack_duplicate_message", "slack_missing_root"]
     message: str
 
 
@@ -65,54 +68,18 @@ class NormalizeConversationResult(TypedDict):
     diagnostics: list[ConversationDiagnostic]
 
 
-_SLACK_TS = re.compile(r"^(?!0\d)\d{1,12}\.\d{6}$")
-
-
-def group_slack_messages(
-    messages: list[object], *, team: str, channel: str, users: list[object] | None = None
-) -> list[dict[str, object]]:
-    """Group one channel's raw Slack messages into thread envelopes for normalize_conversation.
+def normalize_conversation(
+    *, source: ConversationSource, transcript: str, channel: str, users: list[object] | None = None
+) -> NormalizeConversationResult:
+    """Normalize one channel's raw messages (JSONL, JSON array, or history response) into one conversation.
 
     Slack requires ``channel`` to fetch messages and does not echo it back, so the
-    caller supplies it. Messages pass through untouched; the adapter validates them.
+    caller supplies it. ``users`` are raw ``users.list`` rows used only for display names.
     """
-    threads: dict[str, list[object]] = {}
-    for raw in messages:
-        if not isinstance(raw, dict):
-            raise NormalizationError("invalid_input", "Slack messages must be objects.", input_index=0)
-        key = raw.get("thread_ts", raw.get("ts"))
-        if not isinstance(key, str) or not _SLACK_TS.match(key):
-            raise NormalizationError("invalid_input", "Invalid Slack message timestamp.", input_index=0)
-        threads.setdefault(key, []).append(raw)
-    context: dict[str, object] = {"team": team, "channel": channel}
+    request: dict[str, object] = {"source": source, "transcript": transcript, "channel": channel}
     if users is not None:
-        context["users"] = users
-    return [
-        {**context, "thread_ts": thread_ts, "messages": group}
-        for thread_ts, group in sorted(threads.items(), key=lambda item: int(item[0].replace(".", "")))
-    ]
-
-
-class SlackChannelContext(TypedDict, total=False):
-    team: str
-    channel: str
-    users: list[object]
-
-
-class NormalizeConversationsResult(TypedDict):
-    conversations: list[NormalizeConversationResult]
-
-
-def normalize_conversation(*, source: ConversationSource, transcript: str) -> NormalizeConversationResult:
-    """Normalize one thread envelope; does not change normalize_transcript."""
-    return _bridge_request({"conversation": {"source": source, "transcript": transcript}})
-
-
-def normalize_conversations(
-    *, source: ConversationSource, transcript: str, context: SlackChannelContext
-) -> NormalizeConversationsResult:
-    """Normalize one channel's raw Slack dump (JSONL, JSON array, or history response) into one conversation per thread."""
-    return _bridge_request({"conversations": {"source": source, "transcript": transcript, "context": dict(context)}})
+        request["users"] = users
+    return _bridge_request({"conversation": request})
 
 
 def _bridge_request(request: dict[str, object]) -> dict:

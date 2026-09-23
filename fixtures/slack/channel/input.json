@@ -1,0 +1,86 @@
+{
+  "channel": "CEXAMPLE",
+  "users": [
+    {
+      "id": "UALICE",
+      "profile": {
+        "display_name": "Alice"
+      }
+    },
+    {
+      "id": "UBOB",
+      "real_name": "Bob Example"
+    }
+  ],
+  "messages": [
+    {
+      "type": "message",
+      "user": "UBOB",
+      "ts": "1700000001.000001",
+      "thread_ts": "1700000000.000001",
+      "text": "Yes, it was the lock."
+    },
+    {
+      "type": "message",
+      "user": "UCAROL",
+      "ts": "1700000002.000001",
+      "text": ":hype_pepe:",
+      "reactions": [
+        {
+          "name": "eyes",
+          "count": 1,
+          "users": [
+            "UALICE"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "user": "UALICE",
+      "ts": "1700000000.000001",
+      "thread_ts": "1700000000.000001",
+      "text": "Is the deploy stuck on the migration step?",
+      "reply_count": 1,
+      "reply_users": [
+        "UBOB"
+      ],
+      "reactions": [
+        {
+          "name": "eyes",
+          "count": 2,
+          "users": [
+            "UBOB",
+            "UCAROL"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "user": "UBOB",
+      "ts": "1700000003.000001",
+      "text": "Standalone post with no replies."
+    },
+    {
+      "type": "message",
+      "user": "UALICE",
+      "ts": "1700000004.000001",
+      "thread_ts": "1699999000.000001",
+      "text": "Reply to a thread whose root is before this export."
+    },
+    {
+      "type": "message",
+      "user": "UBOB",
+      "ts": "1700000001.500000",
+      "thread_ts": "1700000000.000001",
+      "text": "",
+      "files": [
+        {
+          "id": "FEXAMPLE"
+        }
+      ],
+      "subtype": "file_share"
+    }
+  ]
+}

@@ -3,36 +3,18 @@ export type ConversationSource = "slack";
 
 export interface NormalizeConversationInput {
   source: ConversationSource;
-  /** One thread envelope as JSON. */
+  /** One channel's raw messages: JSONL rows, a JSON array, or a `conversations.history` response. */
   transcript: string;
-}
-
-/** Context the caller already holds: Slack requires `channel` to fetch messages. */
-export interface SlackChannelContext {
-  team: string;
+  /** The channel the messages were fetched from; Slack does not echo it on messages. */
   channel: string;
   /** Raw `users.list` objects, used only to resolve display names. */
   users?: unknown[];
 }
 
-export interface NormalizeConversationsInput {
-  source: ConversationSource;
-  /** One channel's raw messages: JSONL rows, a JSON array, or a `conversations.history` response. */
-  transcript: string;
-  context: SlackChannelContext;
-}
-
-export interface NormalizeConversationsResult {
-  /** One entry per thread, in thread order; each carries its own diagnostics. */
-  conversations: NormalizeConversationResult[];
-}
-
 export interface ConversationMetaRecord {
   role: "meta";
   source: string;
-  /** Source-native thread ID, scoped by source_metadata. */
-  conversation_id: string;
-  source_metadata?: Record<string, string>;
+  channel: string;
 }
 
 export interface ConversationSpeaker {
@@ -48,25 +30,37 @@ export interface ConversationReaction {
   users: string[];
 }
 
-export interface ConversationMessageMetadata {
+export interface ConversationMessage {
+  /** Source-native message ID, unique within the conversation. */
+  id: string;
+  speaker: ConversationSpeaker;
+  content: string;
+  timestamp: string;
   reactions?: ConversationReaction[];
 }
 
-export interface ConversationMessageRecord {
-  role: "message";
-  /** Source-native message ID, unique within this conversation. */
-  id: string;
-  speaker: ConversationSpeaker;
-  metadata?: ConversationMessageMetadata;
-  content: string;
-  timestamp: string;
+/** A top-level post; `replies` is present only when the thread has replies. */
+export interface ConversationPost extends ConversationMessage {
+  replies?: ConversationMessage[];
 }
 
-export type ConversationRecord = ConversationMetaRecord | ConversationMessageRecord;
-export type Conversation = [ConversationMetaRecord, ...ConversationMessageRecord[]];
+/** Replies whose root was not in the input. `id` is the root's source ID. */
+export interface ConversationThreadFragment {
+  id: string;
+  replies: ConversationMessage[];
+}
+
+export type ConversationRecord =
+  | ConversationMetaRecord
+  | ConversationPost
+  | ConversationThreadFragment;
+export type Conversation = [
+  ConversationMetaRecord,
+  ...(ConversationPost | ConversationThreadFragment)[],
+];
 
 export interface ConversationDiagnostic {
-  code: "slack_message_dropped" | "slack_duplicate_message";
+  code: "slack_message_dropped" | "slack_duplicate_message" | "slack_missing_root";
   message: string;
 }
 

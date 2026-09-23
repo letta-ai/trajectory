@@ -3,16 +3,20 @@ import unittest
 from pathlib import Path
 
 from trajectory import NormalizationError, normalize_transcript
-from trajectory.conversations import group_slack_messages, normalize_conversation, normalize_conversations
+from trajectory.conversations import normalize_conversation
 
 ROOT = Path(__file__).resolve().parents[2]
 
 
 class ConversationTests(unittest.TestCase):
     def test_slack_fixtures_match_separate_api(self):
-        for name in ("thread", "cleanup", "rich-thread"):
+        for name in ("thread", "cleanup", "rich-thread", "channel"):
             directory = ROOT / "fixtures" / "slack" / name
-            result = normalize_conversation(source="slack", transcript=(directory / "input.json").read_text())
+            fixture = json.loads((directory / "input.json").read_text())
+            result = normalize_conversation(
+                source="slack", transcript=json.dumps(fixture["messages"]),
+                channel=fixture["channel"], users=fixture.get("users"),
+            )
             self.assertEqual(result, json.loads((directory / "expected.json").read_text()))
 
     def test_agent_api_does_not_accept_slack(self):
@@ -22,41 +26,30 @@ class ConversationTests(unittest.TestCase):
 
     def test_bad_conversation_reports_input_error(self):
         with self.assertRaises(NormalizationError) as caught:
-            normalize_conversation(source="slack", transcript="{}")
+            normalize_conversation(source="slack", transcript="{}", channel="C")
         self.assertEqual(caught.exception.code, "invalid_input")
 
     def test_conversation_api_does_not_accept_agent_sources(self):
         with self.assertRaises(NormalizationError) as caught:
-            normalize_conversation(source="codex", transcript="{}")
+            normalize_conversation(source="codex", transcript="{}", channel="C")
         self.assertEqual(caught.exception.code, "unknown_source")
 
-    def test_group_slack_messages_feeds_normalize_conversation(self):
+    def test_channel_dump_becomes_one_nested_conversation(self):
         root = {"type": "message", "user": "UALICE", "ts": "1700000000.000001", "text": "root"}
         reply = {"type": "message", "user": "UBOB", "ts": "1700000001.000001",
                  "thread_ts": "1700000000.000001", "text": "reply"}
         standalone = {"type": "message", "user": "UCAROL", "ts": "1700000002.000001", "text": ":eyes:"}
         users = [{"id": "UALICE", "profile": {"display_name": "Alice"}}]
-        threads = group_slack_messages([reply, standalone, root], team="TEXAMPLE", channel="CEXAMPLE", users=users)
-        self.assertEqual([t["thread_ts"] for t in threads], ["1700000000.000001", "1700000002.000001"])
-        self.assertIs(threads[0]["messages"][1], root)
-        result = normalize_conversation(source="slack", transcript=json.dumps(threads[0]))
-        self.assertEqual(result["records"][1]["speaker"], {"id": "UALICE", "name": "Alice"})
-        self.assertEqual(len(result["records"]), 3)
-        with self.assertRaises(NormalizationError):
-            group_slack_messages([{"type": "message", "text": "no ts"}], team="T", channel="C")
-
-    def test_normalize_conversations_takes_a_raw_dump(self):
-        root = {"type": "message", "user": "UALICE", "ts": "1700000000.000001", "text": "root"}
-        reply = {"type": "message", "user": "UBOB", "ts": "1700000001.000001",
-                 "thread_ts": "1700000000.000001", "text": "reply"}
-        standalone = {"type": "message", "user": "UCAROL", "ts": "1700000002.000001", "text": ":eyes:"}
         jsonl = "".join(json.dumps(r) + "\n" for r in (reply, standalone, root))
-        context = {"team": "TEXAMPLE", "channel": "CEXAMPLE",
-                   "users": [{"id": "UALICE", "profile": {"display_name": "Alice"}}]}
-        result = normalize_conversations(source="slack", transcript=jsonl, context=context)
-        self.assertEqual([c["records"][0]["conversation_id"] for c in result["conversations"]],
-                         ["1700000000.000001", "1700000002.000001"])
-        self.assertEqual(result["conversations"][0]["records"][1]["speaker"], {"id": "UALICE", "name": "Alice"})
-        self.assertEqual(result["conversations"][1]["records"][1]["content"], ":eyes:")
+        result = normalize_conversation(source="slack", transcript=jsonl, channel="CEXAMPLE", users=users)
+        self.assertEqual(result["records"][0], {"role": "meta", "source": "slack", "channel": "CEXAMPLE"})
+        self.assertEqual([r["id"] for r in result["records"][1:]], ["1700000000.000001", "1700000002.000001"])
+        self.assertEqual(result["records"][1]["speaker"], {"id": "UALICE", "name": "Alice"})
+        self.assertEqual([r["id"] for r in result["records"][1]["replies"]], ["1700000001.000001"])
+        self.assertNotIn("replies", result["records"][2])
+        self.assertEqual(result, normalize_conversation(
+            source="slack", transcript=json.dumps({"ok": True, "messages": [root, reply, standalone]}),
+            channel="CEXAMPLE", users=users,
+        ))
         with self.assertRaises(NormalizationError):
-            normalize_conversations(source="slack", transcript=jsonl, context={"team": "T", "channel": ""})
+            normalize_conversation(source="slack", transcript=jsonl, channel="")

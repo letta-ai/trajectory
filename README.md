@@ -157,24 +157,25 @@ normalizeTranscript(input: NormalizeInput): NormalizeResult
 
 ## Imported conversations (separate API)
 
-Slack threads are multi-party conversations, not agent execution traces. They use
+Slack channels are multi-party conversations, not agent execution traces. They use
 an independent [conversation schema](schema/conversation-v1.schema.json) and API:
 
 ```ts
-import { normalizeConversations } from "@letta-ai/trajectory/conversations";
+import { normalizeConversation } from "@letta-ai/trajectory/conversations";
 
-const { conversations } = normalizeConversations({
+const { records, diagnostics } = normalizeConversation({
   source: "slack",
   transcript: rawJsonl, // one channel's messages, as fetched
-  context: { team, channel, users },
+  channel: "C0AB…",
+  users, // optional users.list rows, for display names
 });
 ```
 
-Each conversation is `{ records, diagnostics }`, one per thread. Python exposes
-`normalize_conversations` from `trajectory.conversations`.
-The conversation format has shared `meta` context and attributed `message`
-records. It does not extend `NormalizedRecord`, `normalizeTranscript`, or
-`normalizeToCanonical`; agent schemas and canonical schema version remain unchanged.
+One channel is one conversation: a leading `meta`, then top-level posts in time
+order with thread replies nested once under their root. Python exposes
+`normalize_conversation` from `trajectory.conversations`. The format does not
+extend `NormalizedRecord`, `normalizeTranscript`, or `normalizeToCanonical`;
+agent schemas and canonical schema version remain unchanged.
 
 See [CONVERSATIONS.md](CONVERSATIONS.md) for the contract and
 [Slack](src/adapters/slack/) for thread assembly and supported content. Slack is

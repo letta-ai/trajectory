@@ -2,57 +2,71 @@ import { isObject } from "../adapters/shared.js";
 import { NormalizationError } from "../types.js";
 import type { Conversation, ConversationReaction } from "./types.js";
 
-const META_KEYS = new Set(["role", "source", "conversation_id", "source_metadata"]);
-const MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp", "metadata"]);
+const META_KEYS = new Set(["role", "source", "channel"]);
+const MESSAGE_KEYS = new Set(["id", "speaker", "content", "timestamp", "reactions"]);
+const POST_KEYS = new Set([...MESSAGE_KEYS, "replies"]);
+const FRAGMENT_KEYS = new Set(["id", "replies"]);
 const SPEAKER_KEYS = new Set(["id", "name"]);
-const METADATA_KEYS = new Set(["reactions"]);
 const REACTION_KEYS = new Set(["name", "count", "users"]);
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 
-/** Each conversation includes shared context and at least one attributed message. */
+/** One channel: shared context, then top-level posts with replies nested once. */
 export function validateConversation(value: unknown): asserts value is Conversation {
   if (!Array.isArray(value) || value.length < 2) {
-    fail("Conversation requires metadata and at least one message.");
+    fail("Conversation requires metadata and at least one post.");
   }
   const meta = value[0];
-  if (!isObject(meta) || meta.role !== "meta" ||
-      !nonempty(meta.source) || !nonempty(meta.conversation_id)) {
-    fail("Conversation requires leading meta with source and conversation_id.");
+  if (!isObject(meta) || meta.role !== "meta" || !nonempty(meta.source) || !nonempty(meta.channel)) {
+    fail("Conversation requires leading meta with source and channel.");
   }
   exactKeys(meta, META_KEYS);
-  if ("source_metadata" in meta &&
-      (!isObject(meta.source_metadata) ||
-       !Object.values(meta.source_metadata).every((field) => typeof field === "string"))) {
-    fail("source_metadata must be an object with string values.");
-  }
   const ids = new Set<string>();
   for (const record of value.slice(1)) {
-    if (!isObject(record) || record.role !== "message") {
-      fail("Conversation body must contain only attributed messages, not agent roles.");
+    if (!isObject(record) || "role" in record) {
+      fail("Conversation body must contain only posts, not agent roles.");
     }
-    exactKeys(record, MESSAGE_KEYS);
-    if (!nonempty(record.id) || ids.has(record.id)) {
-      fail("Message IDs must be non-empty and unique within the conversation.");
+    if (!("speaker" in record) && "replies" in record) {
+      exactKeys(record, FRAGMENT_KEYS);
+      claimId(record.id, ids);
+    } else {
+      exactKeys(record, POST_KEYS);
+      validateMessage(record, ids);
     }
-    ids.add(record.id);
-    if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
-      fail("Message speaker must contain a non-empty id.");
-    }
-    exactKeys(record.speaker, SPEAKER_KEYS);
-    if ("name" in record.speaker && !nonempty(record.speaker.name)) {
-      fail("Speaker name must be non-empty when present.");
-    }
-    if ("metadata" in record) {
-      if (!isObject(record.metadata)) fail("Message metadata must be an object.");
-      exactKeys(record.metadata, METADATA_KEYS);
-      if ("reactions" in record.metadata) validateReactions(record.metadata.reactions);
-    }
-    if (!nonempty(record.content)) fail("Message content must be non-empty text.");
-    if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) ||
-        Number.isNaN(Date.parse(record.timestamp))) {
-      fail("Message timestamp must be a valid ISO timestamp.");
+    if ("replies" in record) {
+      if (!Array.isArray(record.replies) || record.replies.length === 0) {
+        fail("Replies must be a non-empty array; omit the field for posts without replies.");
+      }
+      for (const reply of record.replies) {
+        if (!isObject(reply)) fail("Replies must be objects.");
+        exactKeys(reply, MESSAGE_KEYS);
+        validateMessage(reply, ids);
+      }
     }
   }
+}
+
+function validateMessage(record: Record<string, unknown>, ids: Set<string>): void {
+  claimId(record.id, ids);
+  if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
+    fail("Message speaker must contain a non-empty id.");
+  }
+  exactKeys(record.speaker, SPEAKER_KEYS);
+  if ("name" in record.speaker && !nonempty(record.speaker.name)) {
+    fail("Speaker name must be non-empty when present.");
+  }
+  if ("reactions" in record) validateReactions(record.reactions);
+  if (!nonempty(record.content)) fail("Message content must be non-empty text.");
+  if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) ||
+      Number.isNaN(Date.parse(record.timestamp))) {
+    fail("Message timestamp must be a valid ISO timestamp.");
+  }
+}
+
+function claimId(id: unknown, ids: Set<string>): void {
+  if (!nonempty(id) || ids.has(id)) {
+    fail("Message IDs must be non-empty and unique within the conversation.");
+  }
+  ids.add(id);
 }
 
 /** Also used by source adapters before normalizing reaction ordering. */

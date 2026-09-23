@@ -3656,101 +3656,70 @@ function compareSlackTimestamps(left, right) {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
-// src/adapters/slack/group.ts
-function groupSlackMessages(messages, context) {
-  if (!Array.isArray(messages))
-    throw invalid("Slack messages must be an array.");
-  const threads = new Map;
-  for (const raw of messages) {
-    if (!isObject(raw))
-      throw invalid("Slack messages must be objects.");
-    const key = parseSlackTimestamp(raw.thread_ts ?? raw.ts);
-    if (!key)
-      throw invalid("Invalid Slack message timestamp.");
-    const group = threads.get(key.ts);
-    if (group)
-      group.push(raw);
-    else
-      threads.set(key.ts, [raw]);
-  }
-  return [...threads.entries()].sort(([a], [b]) => compareSlackTimestamps(a, b)).map(([thread_ts, group]) => ({ ...context, thread_ts, messages: group }));
-}
-function parseSlackMessages(transcript) {
-  let parsed;
-  try {
-    parsed = JSON.parse(transcript);
-  } catch {
-    const lines = transcript.split(/\r?\n/).filter((line) => line.trim());
-    if (lines.length === 0)
-      throw invalid("Slack transcript is empty.");
-    return lines.map((line, index) => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        throw invalid(`Slack transcript line ${index + 1} is not valid JSON.`);
-      }
-    });
-  }
-  if (Array.isArray(parsed))
-    return parsed;
-  if (isObject(parsed) && Array.isArray(parsed.messages) && !("thread_ts" in parsed)) {
-    return parsed.messages;
-  }
-  throw invalid("Slack transcript must be JSONL rows, a JSON array, or a conversations.history response.");
-}
-function invalid(message) {
-  return new NormalizationError("invalid_input", message);
-}
-
 // src/conversations/validate.ts
-var META_KEYS2 = new Set(["role", "source", "conversation_id", "source_metadata"]);
-var MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp", "metadata"]);
+var META_KEYS2 = new Set(["role", "source", "channel"]);
+var MESSAGE_KEYS = new Set(["id", "speaker", "content", "timestamp", "reactions"]);
+var POST_KEYS = new Set([...MESSAGE_KEYS, "replies"]);
+var FRAGMENT_KEYS = new Set(["id", "replies"]);
 var SPEAKER_KEYS = new Set(["id", "name"]);
-var METADATA_KEYS = new Set(["reactions"]);
 var REACTION_KEYS = new Set(["name", "count", "users"]);
 var ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 function validateConversation(value) {
   if (!Array.isArray(value) || value.length < 2) {
-    fail2("Conversation requires metadata and at least one message.");
+    fail2("Conversation requires metadata and at least one post.");
   }
   const meta = value[0];
-  if (!isObject(meta) || meta.role !== "meta" || !nonempty(meta.source) || !nonempty(meta.conversation_id)) {
-    fail2("Conversation requires leading meta with source and conversation_id.");
+  if (!isObject(meta) || meta.role !== "meta" || !nonempty(meta.source) || !nonempty(meta.channel)) {
+    fail2("Conversation requires leading meta with source and channel.");
   }
   exactKeys2(meta, META_KEYS2);
-  if ("source_metadata" in meta && (!isObject(meta.source_metadata) || !Object.values(meta.source_metadata).every((field) => typeof field === "string"))) {
-    fail2("source_metadata must be an object with string values.");
-  }
   const ids = new Set;
   for (const record of value.slice(1)) {
-    if (!isObject(record) || record.role !== "message") {
-      fail2("Conversation body must contain only attributed messages, not agent roles.");
+    if (!isObject(record) || "role" in record) {
+      fail2("Conversation body must contain only posts, not agent roles.");
     }
-    exactKeys2(record, MESSAGE_KEYS);
-    if (!nonempty(record.id) || ids.has(record.id)) {
-      fail2("Message IDs must be non-empty and unique within the conversation.");
+    if (!("speaker" in record) && "replies" in record) {
+      exactKeys2(record, FRAGMENT_KEYS);
+      claimId(record.id, ids);
+    } else {
+      exactKeys2(record, POST_KEYS);
+      validateMessage(record, ids);
     }
-    ids.add(record.id);
-    if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
-      fail2("Message speaker must contain a non-empty id.");
-    }
-    exactKeys2(record.speaker, SPEAKER_KEYS);
-    if ("name" in record.speaker && !nonempty(record.speaker.name)) {
-      fail2("Speaker name must be non-empty when present.");
-    }
-    if ("metadata" in record) {
-      if (!isObject(record.metadata))
-        fail2("Message metadata must be an object.");
-      exactKeys2(record.metadata, METADATA_KEYS);
-      if ("reactions" in record.metadata)
-        validateReactions(record.metadata.reactions);
-    }
-    if (!nonempty(record.content))
-      fail2("Message content must be non-empty text.");
-    if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) || Number.isNaN(Date.parse(record.timestamp))) {
-      fail2("Message timestamp must be a valid ISO timestamp.");
+    if ("replies" in record) {
+      if (!Array.isArray(record.replies) || record.replies.length === 0) {
+        fail2("Replies must be a non-empty array; omit the field for posts without replies.");
+      }
+      for (const reply of record.replies) {
+        if (!isObject(reply))
+          fail2("Replies must be objects.");
+        exactKeys2(reply, MESSAGE_KEYS);
+        validateMessage(reply, ids);
+      }
     }
   }
+}
+function validateMessage(record, ids) {
+  claimId(record.id, ids);
+  if (!isObject(record.speaker) || !nonempty(record.speaker.id)) {
+    fail2("Message speaker must contain a non-empty id.");
+  }
+  exactKeys2(record.speaker, SPEAKER_KEYS);
+  if ("name" in record.speaker && !nonempty(record.speaker.name)) {
+    fail2("Speaker name must be non-empty when present.");
+  }
+  if ("reactions" in record)
+    validateReactions(record.reactions);
+  if (!nonempty(record.content))
+    fail2("Message content must be non-empty text.");
+  if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) || Number.isNaN(Date.parse(record.timestamp))) {
+    fail2("Message timestamp must be a valid ISO timestamp.");
+  }
+}
+function claimId(id, ids) {
+  if (!nonempty(id) || ids.has(id)) {
+    fail2("Message IDs must be non-empty and unique within the conversation.");
+  }
+  ids.add(id);
 }
 function validateReactions(value) {
   if (!Array.isArray(value))
@@ -3791,16 +3760,16 @@ function buildUserNames(value) {
   if (value === undefined)
     return names;
   if (!Array.isArray(value))
-    throw invalid2("Slack users must be an array.");
+    throw invalid("Slack users must be an array.");
   for (const user of value) {
     if (!isObject(user) || typeof user.id !== "string" || !user.id.trim()) {
-      throw invalid2("Slack users require a source user id.");
+      throw invalid("Slack users require a source user id.");
     }
     const name = profileName(user.profile) ?? label(user.real_name) ?? label(user.name);
     if (name === undefined)
       continue;
     if (names.has(user.id) && names.get(user.id) !== name) {
-      throw invalid2("Conflicting names for a Slack user; supply one authoritative user snapshot.");
+      throw invalid("Conflicting names for a Slack user; supply one authoritative user snapshot.");
     }
     names.set(user.id, name);
   }
@@ -3817,10 +3786,10 @@ function resolveSpeaker(raw, id, names) {
 }
 function readReactions(value) {
   if (!Array.isArray(value))
-    throw invalid2("Slack reactions must be an array.");
+    throw invalid("Slack reactions must be an array.");
   const reactions = value.map((reaction) => {
     if (!isObject(reaction))
-      throw invalid2("Slack reactions must be objects.");
+      throw invalid("Slack reactions must be objects.");
     return { name: reaction.name, count: reaction.count, users: reaction.users };
   });
   validateReactions(reactions);
@@ -3842,7 +3811,7 @@ function label(value) {
     return;
   return value.trim() || undefined;
 }
-function invalid2(message) {
+function invalid(message) {
   return new NormalizationError("invalid_input", message);
 }
 
@@ -3853,28 +3822,17 @@ var MESSAGE_SUBTYPES = new Set([
   "file_share",
   "me_message"
 ]);
-function normalizeSlackThread(transcript) {
-  let input;
-  try {
-    input = JSON.parse(transcript);
-  } catch {
-    throw invalid3("Expected a Slack thread JSON envelope, not bare JSONL.");
-  }
-  if (!isObject(input) || !Array.isArray(input.messages)) {
-    throw invalid3("Slack input must contain a messages array.");
-  }
-  const workspaceId = nonemptyString(input.team);
-  const channelId = nonemptyString(input.channel);
-  const thread = parseSlackTimestamp(input.thread_ts);
-  if (!workspaceId || !channelId || !thread) {
-    throw invalid3("Slack input requires team, channel, and a valid thread_ts.");
-  }
+function normalizeSlackChannel(input) {
+  const channel = nonemptyString(input.channel);
+  if (!channel)
+    throw invalid2("Slack input requires the channel the messages were fetched from.");
   const userNames = buildUserNames(input.users);
   const diagnostics = [];
   const messages = new Map;
-  for (const raw of input.messages) {
+  const threadOf = new Map;
+  for (const raw of parseSlackMessages(input.transcript)) {
     if (!isObject(raw))
-      throw invalid3("Slack messages must be objects.");
+      throw invalid2("Slack messages must be objects.");
     if (raw.type !== "message" || raw.subtype !== undefined && !MESSAGE_SUBTYPES.has(String(raw.subtype))) {
       diagnostics.push({
         code: "slack_message_dropped",
@@ -3883,18 +3841,18 @@ function normalizeSlackThread(transcript) {
       continue;
     }
     const time = parseSlackTimestamp(raw.ts);
-    const threadTs = raw.thread_ts ?? raw.ts;
-    if (!time || !parseSlackTimestamp(threadTs))
-      throw invalid3("Invalid Slack message timestamp.");
-    if (threadTs !== thread.ts || compareSlackTimestamps(time.ts, thread.ts) < 0) {
-      throw invalid3("Slack input contains a message from a different thread or preceding its root.");
+    const thread = parseSlackTimestamp(raw.thread_ts ?? raw.ts);
+    if (!time || !thread)
+      throw invalid2("Invalid Slack message timestamp.");
+    if (compareSlackTimestamps(time.ts, thread.ts) < 0) {
+      throw invalid2("Slack reply precedes its thread root.");
     }
-    if (raw.team !== undefined && raw.team !== workspaceId || raw.channel !== undefined && raw.channel !== channelId) {
-      throw invalid3("Slack message workspace/channel disagrees with the envelope.");
+    if (raw.channel !== undefined && raw.channel !== channel) {
+      throw invalid2("Slack message channel disagrees with the supplied channel.");
     }
     const speakerId = nonemptyString(raw.user) ?? nonemptyString(raw.bot_id);
     if (!speakerId)
-      throw invalid3("Slack message has no source speaker identity.");
+      throw invalid2("Slack message has no source speaker identity.");
     if (typeof raw.text !== "string" || !raw.text.trim()) {
       diagnostics.push({
         code: "slack_message_dropped",
@@ -3903,72 +3861,106 @@ function normalizeSlackThread(transcript) {
       continue;
     }
     const message = {
-      role: "message",
       id: time.ts,
       speaker: resolveSpeaker(raw, speakerId, userNames),
-      ..."reactions" in raw ? { metadata: { reactions: readReactions(raw.reactions) } } : {},
       content: raw.text,
-      timestamp: time.date.toISOString()
+      timestamp: time.date.toISOString(),
+      ..."reactions" in raw ? { reactions: readReactions(raw.reactions) } : {}
     };
     const existing = messages.get(time.ts);
     if (existing) {
-      if (JSON.stringify(existing) !== JSON.stringify(message)) {
-        throw invalid3("Conflicting versions of a Slack message; supply one authoritative snapshot.");
+      if (JSON.stringify(existing) !== JSON.stringify(message) || threadOf.get(time.ts) !== thread.ts) {
+        throw invalid2("Conflicting versions of a Slack message; supply one authoritative snapshot.");
       }
       diagnostics.push({
         code: "slack_duplicate_message",
         message: "Removed a duplicate Slack message."
       });
-    } else {
-      messages.set(time.ts, message);
+      continue;
     }
+    messages.set(time.ts, message);
+    threadOf.set(time.ts, thread.ts);
   }
   if (messages.size === 0)
-    throw invalid3("Slack thread contains no supported text messages.");
+    throw invalid2("Slack channel contains no supported text messages.");
+  const repliesOf = new Map;
+  for (const [ts, thread] of threadOf) {
+    if (ts === thread)
+      continue;
+    const reply = messages.get(ts);
+    if (!reply)
+      continue;
+    const replies = repliesOf.get(thread);
+    if (replies)
+      replies.push(reply);
+    else
+      repliesOf.set(thread, [reply]);
+  }
+  const roots = new Set([...messages.keys()].filter((ts) => threadOf.get(ts) === ts));
+  const posts = [];
+  for (const thread of new Set([...roots, ...repliesOf.keys()])) {
+    const replies = (repliesOf.get(thread) ?? []).sort((a, b) => compareSlackTimestamps(a.id, b.id));
+    const root = roots.has(thread) ? messages.get(thread) : undefined;
+    if (root) {
+      posts.push(replies.length > 0 ? { ...root, replies } : root);
+    } else {
+      diagnostics.push({
+        code: "slack_missing_root",
+        message: "Thread replies were present without their root; the root was not fabricated."
+      });
+      posts.push({ id: thread, replies });
+    }
+  }
+  posts.sort((a, b) => compareSlackTimestamps(a.id, b.id));
   return {
-    records: [
-      {
-        role: "meta",
-        source: "slack",
-        conversation_id: thread.ts,
-        source_metadata: { team: workspaceId, channel: channelId }
-      },
-      ...[...messages.values()].sort((a, b) => compareSlackTimestamps(a.id, b.id))
-    ],
+    records: [{ role: "meta", source: "slack", channel }, ...posts],
     diagnostics
   };
 }
-function invalid3(message) {
+function parseSlackMessages(transcript) {
+  let parsed;
+  try {
+    parsed = JSON.parse(transcript);
+  } catch {
+    const lines = transcript.split(/\r?\n/).filter((line) => line.trim());
+    if (lines.length === 0)
+      throw invalid2("Slack transcript is empty.");
+    return lines.map((line, index) => {
+      try {
+        return JSON.parse(line);
+      } catch {
+        throw invalid2(`Slack transcript line ${index + 1} is not valid JSON.`);
+      }
+    });
+  }
+  if (Array.isArray(parsed))
+    return parsed;
+  if (isObject(parsed) && Array.isArray(parsed.messages))
+    return parsed.messages;
+  throw invalid2("Slack transcript must be JSONL rows, a JSON array, or a conversations.history response.");
+}
+function invalid2(message) {
   return new NormalizationError("invalid_input", message);
 }
 
 // src/conversations/index.ts
 function normalizeConversation(input) {
   if (!input || typeof input !== "object" || typeof input.transcript !== "string") {
-    throw new NormalizationError("invalid_input", "Expected a conversation source and transcript string.");
+    throw new NormalizationError("invalid_input", "Expected a conversation source, transcript string, and channel.");
   }
   if (input.source !== "slack") {
     throw new NormalizationError("unknown_source", `Unsupported conversation source: ${input.source}`);
   }
-  const result = normalizeSlackThread(input.transcript);
+  if (input.users !== undefined && !Array.isArray(input.users)) {
+    throw new NormalizationError("invalid_input", "Slack users must be an array.");
+  }
+  const result = normalizeSlackChannel({
+    transcript: input.transcript,
+    channel: input.channel,
+    ...input.users === undefined ? {} : { users: input.users }
+  });
   validateConversation(result.records);
   return result;
-}
-function normalizeConversations(input) {
-  if (!input || typeof input !== "object" || typeof input.transcript !== "string") {
-    throw new NormalizationError("invalid_input", "Expected a conversation source, transcript string, and context.");
-  }
-  if (input.source !== "slack") {
-    throw new NormalizationError("unknown_source", `Unsupported conversation source: ${input.source}`);
-  }
-  const { team, channel, users } = input.context ?? {};
-  if (typeof team !== "string" || !team.trim() || typeof channel !== "string" || !channel.trim()) {
-    throw new NormalizationError("invalid_input", "Slack context requires the team and channel the messages were fetched from.");
-  }
-  const threads = groupSlackMessages(parseSlackMessages(input.transcript), { team, channel, ...users === undefined ? {} : { users } });
-  return {
-    conversations: threads.map((thread) => normalizeConversation({ source: "slack", transcript: JSON.stringify(thread) }))
-  };
 }
 
 // src/python-cli.ts
@@ -3978,36 +3970,22 @@ async function main() {
   const results = [];
   for (const input of request.requests) {
     try {
-      if (isObject(input) && "conversations" in input) {
-        const request2 = input.conversations;
-        if (!isObject(request2) || typeof request2.transcript !== "string" || !isObject(request2.context)) {
-          throw new NormalizationError("invalid_input", "Expected a conversation source, transcript, and context.");
-        }
-        if (request2.source !== "slack") {
-          throw new NormalizationError("unknown_source", "Unsupported conversation source.");
-        }
-        const { team, channel, users } = request2.context;
-        if (typeof team !== "string" || typeof channel !== "string" || users !== undefined && !Array.isArray(users)) {
-          throw new NormalizationError("invalid_input", "Slack context requires team and channel strings and an optional users array.");
-        }
-        results.push({ ok: true, result: normalizeConversations({
-          source: request2.source,
-          transcript: request2.transcript,
-          context: { team, channel, ...users === undefined ? {} : { users } }
-        }) });
-        continue;
-      }
       if (isObject(input) && "conversation" in input) {
         const request2 = input.conversation;
-        if (!isObject(request2) || typeof request2.transcript !== "string") {
-          throw new NormalizationError("invalid_input", "Expected a conversation source and transcript.");
+        if (!isObject(request2) || typeof request2.transcript !== "string" || typeof request2.channel !== "string") {
+          throw new NormalizationError("invalid_input", "Expected a conversation source, transcript, and channel.");
         }
         if (request2.source !== "slack") {
           throw new NormalizationError("unknown_source", "Unsupported conversation source.");
+        }
+        if (request2.users !== undefined && !Array.isArray(request2.users)) {
+          throw new NormalizationError("invalid_input", "Slack users must be an array.");
         }
         results.push({ ok: true, result: normalizeConversation({
           source: request2.source,
-          transcript: request2.transcript
+          transcript: request2.transcript,
+          channel: request2.channel,
+          ...request2.users === undefined ? {} : { users: request2.users }
         }) });
         continue;
       }

@@ -12,71 +12,84 @@ conversation input; no conversion into agent canonical rows is provided.
 ## API
 
 ```ts
-import { normalizeConversations } from "@letta-ai/trajectory/conversations";
+import { normalizeConversation } from "@letta-ai/trajectory/conversations";
 
-const { conversations } = normalizeConversations({
+const { records, diagnostics } = normalizeConversation({
   source: "slack",
   transcript: rawJsonl, // one channel's messages, as fetched
-  context: { team, channel, users },
+  channel: "C0AB…",
+  users, // optional users.list rows, for display names
 });
 ```
 
 ```python
-from trajectory.conversations import normalize_conversations
+from trajectory.conversations import normalize_conversation
 
-result = normalize_conversations(
-    source="slack", transcript=raw_jsonl, context={"team": team, "channel": channel, "users": users}
-)
+result = normalize_conversation(source="slack", transcript=raw_jsonl, channel="C0AB…", users=users)
 ```
 
-`transcript` is the raw dump: JSONL rows, a JSON array, or a `conversations.history`
-response. `context` is what Slack required you to know to fetch it (`team`,
-`channel`) plus optional `users.list` rows for display names. The result is one
-`{ records, diagnostics }` per thread, in thread order. An empty dump yields no
-conversations. `normalizeConversation` (singular) normalizes one pre-built thread
-envelope and `validateConversation` checks a records array; both are exported for
-callers that already hold threads in memory.
+One channel is one conversation. `transcript` is the raw dump: JSONL rows, a
+JSON array, or a `conversations.history` response, containing both top-level
+posts and thread replies. `channel` is what Slack required you to know to fetch
+it and does not appear on messages. `users` is optional and only resolves names.
 
-Each conversation is `{ records, diagnostics }`. The records array is validated by
+The result is `{ records, diagnostics }`. The records array is validated by
 [`conversation-v1.schema.json`](schema/conversation-v1.schema.json), available
 to npm consumers as `@letta-ai/trajectory/schema/conversation`. Runtime validation
-additionally checks message-ID/reaction-name uniqueness, timestamp parseability,
-and that the listed reactors do not exceed the reported count.
+additionally checks message-ID/reaction-name uniqueness across the whole
+conversation, timestamp parseability, and that listed reactors do not exceed
+the reported count. `validateConversation` is exported for records built elsewhere.
 
 ## Records
 
-One leading `meta` contains:
+The format is designed to be read by a model, so shared context appears once
+and thread structure is nesting rather than repeated IDs.
 
-- `source`: source name.
-- `conversation_id`: source-native thread identity.
-- Optional `source_metadata`: source-native string-valued context shared by the
-  thread, such as Slack's `team` and `channel`.
+```json
+[
+  { "role": "meta", "source": "slack", "channel": "C0AB…" },
+  { "id": "1790028870.001200", "speaker": { "id": "U0BRK…", "name": "Titan" },
+    "timestamp": "2026-09-20T17:47:50.001Z", "content": "deploy is stuck",
+    "reactions": [{ "name": "eyes", "count": 2, "users": ["U079…", "U084…"] }],
+    "replies": [
+      { "id": "1790028881.776679", "speaker": { "id": "U079…" },
+        "timestamp": "2026-09-20T17:48:01.776Z", "content": "looking" }
+    ] },
+  { "id": "1790139575.812159", "speaker": { "id": "U084…" },
+    "timestamp": "2026-09-22T00:32:55.812Z", "content": ":hype_pepe:" }
+]
+```
 
-At least one `message` follows, with `id`, `speaker: { id }`, `content`, and an
-ISO `timestamp`. Message IDs are unique within the scoped conversation;
-participant IDs are interpreted in the source's account/workspace context.
-Bot messages are attributed to their source identity, not an assistant role.
-Optional `speaker.name` is a display label from source profiles, not an identifier.
+One leading `meta` carries `source` and `channel`; it is the only record with a
+`role`. Every following record is a top-level post in time order:
 
-Optional message `metadata.reactions` contains `{ name, count, users }` snapshots.
-`count` is the total reported by the source; `users` lists known reactor IDs and
-may be incomplete. Missing reactions mean no snapshot was provided; an explicit
-empty array means the provided snapshot has no reactions. No timestamps or
-reaction meanings are invented.
+- A **post** has `id`, `speaker: { id, name? }`, `content`, an ISO `timestamp`,
+  and optional `reactions`. If the thread has replies, `replies` holds them in
+  time order with the same message shape; replies never nest further. The
+  thread's identity is the root's `id` (Slack's `thread_ts` is the root's `ts`),
+  so it appears once.
+- A **thread fragment** is `{ id, replies }` with no speaker or content: replies
+  were present but their root was not in the input. The root is not fabricated.
 
-Every envelope includes thread context, including reply-only fragments. A missing
-root is not fabricated. Transport chunk offsets and agent canonical hashing are
-not part of this contract.
+Message IDs are source-native and unique across the whole conversation.
+Participant IDs are interpreted in the source's workspace context. Bot messages
+are attributed to their source identity, not an assistant role. Optional
+`speaker.name` is a display label from source profiles, never a replacement for
+`speaker.id`; mentions inside `content` are left as source text.
+
+`reactions` contains `{ name, count, users }` snapshots. `count` is the total
+reported by the source; `users` lists known reactor IDs and may be incomplete.
+Missing `reactions` means no snapshot was provided; an explicit empty array
+means the provided snapshot has no reactions.
 
 ## V0 scope
 
-Only [Slack thread envelopes](src/adapters/slack/) can currently be normalized.
+Only [Slack channel dumps](src/adapters/slack/) can currently be normalized.
 The record format can represent other messaging sources, but no Teams, Gmail,
 or Google Chat adapter is implemented. Names and reaction snapshots are supported;
 recipients, attachments, and other message-level metadata are deferred.
 Documents are not forced into this format.
 
-Callers own source access, channel/workspace context, snapshot selection, and
-downstream ingestion. `groupSlackMessages` turns one channel's raw messages into
-thread envelopes so callers do not reimplement Slack threading.
-Content remains untrusted source text, including any instructions quoted in it.
+Callers own source access, channel context, `users.list` snapshots, and
+downstream ingestion. Content remains untrusted source text, including any
+instructions quoted in it.

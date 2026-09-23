@@ -8,12 +8,7 @@ import type { ListTrajectoriesResult } from "./listing.js";
 import type { NormalizeResult } from "./types.js";
 import { NormalizationError } from "./types.js";
 
-import {
-  normalizeConversation,
-  normalizeConversations,
-  type NormalizeConversationResult,
-  type NormalizeConversationsResult,
-} from "./conversations/index.js";
+import { normalizeConversation, type NormalizeConversationResult } from "./conversations/index.js";
 import { isObject } from "./adapters/shared.js";
 
 const PROTOCOL_VERSION = 1;
@@ -30,7 +25,7 @@ interface WireError {
 }
 
 type WireResult =
-  | { ok: true; result: NormalizeResult | ListTrajectoriesResult | NormalizeConversationResult | NormalizeConversationsResult }
+  | { ok: true; result: NormalizeResult | ListTrajectoriesResult | NormalizeConversationResult }
   | { ok: false; error: WireError };
 
 async function main(): Promise<void> {
@@ -38,34 +33,20 @@ async function main(): Promise<void> {
   const results: WireResult[] = [];
   for (const input of request.requests) {
     try {
-      if (isObject(input) && "conversations" in input) {
-        const request = input.conversations;
-        if (!isObject(request) || typeof request.transcript !== "string" || !isObject(request.context)) {
-          throw new NormalizationError("invalid_input", "Expected a conversation source, transcript, and context.");
-        }
-        if (request.source !== "slack") {
-          throw new NormalizationError("unknown_source", "Unsupported conversation source.");
-        }
-        const { team, channel, users } = request.context;
-        if (typeof team !== "string" || typeof channel !== "string" || (users !== undefined && !Array.isArray(users))) {
-          throw new NormalizationError("invalid_input", "Slack context requires team and channel strings and an optional users array.");
-        }
-        results.push({ ok: true, result: normalizeConversations({
-          source: request.source, transcript: request.transcript,
-          context: { team, channel, ...(users === undefined ? {} : { users }) },
-        }) });
-        continue;
-      }
       if (isObject(input) && "conversation" in input) {
         const request = input.conversation;
-        if (!isObject(request) || typeof request.transcript !== "string") {
-          throw new NormalizationError("invalid_input", "Expected a conversation source and transcript.");
+        if (!isObject(request) || typeof request.transcript !== "string" || typeof request.channel !== "string") {
+          throw new NormalizationError("invalid_input", "Expected a conversation source, transcript, and channel.");
         }
         if (request.source !== "slack") {
           throw new NormalizationError("unknown_source", "Unsupported conversation source.");
         }
+        if (request.users !== undefined && !Array.isArray(request.users)) {
+          throw new NormalizationError("invalid_input", "Slack users must be an array.");
+        }
         results.push({ ok: true, result: normalizeConversation({
-          source: request.source, transcript: request.transcript,
+          source: request.source, transcript: request.transcript, channel: request.channel,
+          ...(request.users === undefined ? {} : { users: request.users }),
         }) });
         continue;
       }

@@ -1,7 +1,5 @@
 {
-  "team": "TEXAMPLE",
   "channel": "CEXAMPLE",
-  "thread_ts": "1700000000.000001",
   "messages": [
     {
       "type": "message",
@@ -10,12 +8,17 @@
       "user": "URELAY",
       "bot_id": "BRELAY",
       "app_id": "ARELAY",
-      "bot_profile": { "name": "Example Relay" },
+      "bot_profile": {
+        "name": "Example Relay"
+      },
       "text": "*Agent*\nI will investigate.",
       "blocks": [
         {
           "type": "section",
-          "text": { "type": "mrkdwn", "text": "I will investigate." }
+          "text": {
+            "type": "mrkdwn",
+            "text": "I will investigate."
+          }
         }
       ]
     },
@@ -26,7 +29,9 @@
       "user": "URELAY",
       "bot_id": "BRELAY",
       "app_id": "ARELAY",
-      "bot_profile": { "name": "Example Relay" },
+      "bot_profile": {
+        "name": "Example Relay"
+      },
       "text": "*User*\nWhere is the guide?",
       "reply_count": 2
     },

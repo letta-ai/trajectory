@@ -1,24 +1,30 @@
 # Parity report
 
-## Slack mirror threads
+## Slack channels
 
 Implemented against raw Slack message shapes supplied during mirror integration
 work (September 2026). No private transcripts were copied into this repository.
-Three synthetic fixtures cover a three-post relay/human thread, a rich-text
-thread with user-directory names and reaction snapshots, and a six-row cleanup case (duplicate roots, broadcast reply copies, a service event, and a
-file-only post). Both outputs are checked against runtime and JSON Schema
-validation and the separate Python conversation API. Additional tests cover
-microsecond ordering, scope isolation, retry/edit identity, reply-only threads,
-conflicting duplicates, missing identity, and malformed inputs. Generic format
-validation tests use synthetic Teams/Gmail/Google Chat metadata without adding
-adapters for those sources. Additional cases cover incomplete reactor lists,
-name fallbacks, and snapshot conflicts independent of reaction ordering. Cross-contract tests verify that agent APIs and schemas
-reject conversation records and vice versa; agent contracts are unchanged.
+Four synthetic fixtures cover a relay/human thread, a rich-text thread with
+user-directory names and reaction snapshots, a cleanup case (duplicate roots,
+broadcast reply copies, a service event, and a file-only post), and a mixed
+channel dump (a thread, standalone posts, a reply whose root predates the
+export, and a dropped file-only reply). All outputs are checked against runtime
+and JSON Schema validation and the separate Python conversation API. Additional
+tests cover JSONL/array/history-response inputs, nesting and top-level ordering,
+microsecond ordering, retry/edit identity, thread fragments, conflicting
+duplicates and thread membership, missing identity, channel mismatches, and
+malformed inputs. Generic format validation tests use synthetic Teams metadata
+without adding adapters for those sources, and check that replies nest exactly
+once. Cross-contract tests verify that agent APIs and schemas reject
+conversation records and vice versa; agent contracts are unchanged.
 
-No full production mirror corpus or live Dream run has been exercised. Blocks-
-only posts, file contents, and event-stream edits/deletions are explicitly not
-supported; skipped rows produce diagnostics. No existing Slack reference
-normalizer was available for differential parity.
+Two real one-month channel exports (160 and 175 rows) were run locally through
+both the TypeScript and Python entry points with identical output and no
+diagnostics; they are not committed.
+
+No live Dream run has been exercised. Blocks-only posts, file contents, and
+event-stream edits/deletions are explicitly not supported; skipped rows produce
+diagnostics. No existing Slack reference normalizer was available for differential parity.
 
 > This report established parser parity before configurable bounds were added.
 > The current default uses marker-inclusive, head-tail tool-result truncation

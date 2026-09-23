@@ -66,5 +66,7 @@ or Google Chat adapter is implemented. Names and reaction snapshots are supporte
 recipients, attachments, and other message-level metadata are deferred.
 Documents are not forced into this format.
 
-Callers own source access, grouping, snapshot selection, and downstream ingestion.
+Callers own source access, channel/workspace context, snapshot selection, and
+downstream ingestion. `groupSlackMessages` turns one channel's raw messages into
+thread envelopes so callers do not reimplement Slack threading.
 Content remains untrusted source text, including any instructions quoted in it.

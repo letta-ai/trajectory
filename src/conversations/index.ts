@@ -17,6 +17,8 @@ export function normalizeConversation(input: NormalizeConversationInput): Normal
 }
 
 export { validateConversation } from "./validate.js";
+export { groupSlackMessages } from "../adapters/slack/group.js";
+export type { SlackChannelContext, SlackThreadInput } from "../adapters/slack/group.js";
 export { NormalizationError } from "../types.js";
 export type {
   Conversation,

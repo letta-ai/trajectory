@@ -29,16 +29,40 @@ normalizeConversation({
 });
 ```
 
-The caller reads the mirror's monthly message JSONL files and supplies one
-thread envelope per call. Workspace/channel IDs come from the mirror path or
-metadata, **not from guesses or message content**. Group by
-`(team, channel, message.thread_ts ?? message.ts)` across file/month
-boundaries; a standalone unthreaded post is its own thread. Do not discard
-replies whose root is outside the selected history range. The adapter does not
-claim a thread is complete based on Slack's `reply_count` and does not synthesize
-missing roots. Bare monthly JSONL or mixed-thread envelopes are not accepted.
-The same envelope works with `trajectory.conversations.normalize_conversation`
-in Python. It is not accepted by the agent trajectory or canonical APIs.
+## Who does what
+
+Slack requires `channel` to call `conversations.history` / `conversations.replies`
+and does not echo it back on each message, so the caller already holds it. The
+same goes for `team` and any `users.list` data. The package owns everything that
+is Slack message semantics; the caller owns everything about where the data came from.
+
+```
+Caller (importer, mirror, script)        @letta-ai/trajectory
+- fetch pages or read files              - group by thread_ts ?? ts   (groupSlackMessages)
+- team, channel (from the API call       - sort, dedupe, conflict-check
+  or the path the data was keyed by)     - speaker id, name resolution
+- users (users.list, users.jsonl, ...)   - reactions, text-only diagnostics
+- merge rows across month files          - validate against conversation-v1
+```
+
+Given one channel's raw message objects, `groupSlackMessages` returns one envelope
+per thread; a standalone unthreaded post is its own thread. It passes message
+objects through untouched and never guesses `channel` or `team`.
+
+```ts
+import { groupSlackMessages, normalizeConversation } from "@letta-ai/trajectory/conversations";
+
+for (const thread of groupSlackMessages(messages, { team, channel, users })) {
+  normalizeConversation({ source: "slack", transcript: JSON.stringify(thread) });
+}
+```
+
+`trajectory.conversations.group_slack_messages(messages, team=..., channel=..., users=...)`
+does the same in Python. Group across file/month boundaries before calling it, and
+do not discard replies whose root is outside the selected history range. The adapter
+does not claim a thread is complete based on Slack's `reply_count` and does not
+synthesize missing roots. Bare JSONL or mixed-thread envelopes are not accepted by
+`normalizeConversation`. Envelopes are not accepted by the agent trajectory or canonical APIs.
 
 Access filtering, snapshot selection, Slack API calls, mirror reads, and downstream
 submission belong to the importer, not this pure library. Never treat a

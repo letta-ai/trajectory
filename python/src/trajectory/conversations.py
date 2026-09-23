@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Literal, TypedDict, Union
 
 from ._client import _run_bridge
@@ -62,6 +63,34 @@ class ConversationDiagnostic(TypedDict):
 class NormalizeConversationResult(TypedDict):
     records: list[ConversationRecord]
     diagnostics: list[ConversationDiagnostic]
+
+
+_SLACK_TS = re.compile(r"^(?!0\d)\d{1,12}\.\d{6}$")
+
+
+def group_slack_messages(
+    messages: list[object], *, team: str, channel: str, users: list[object] | None = None
+) -> list[dict[str, object]]:
+    """Group one channel's raw Slack messages into thread envelopes for normalize_conversation.
+
+    Slack requires ``channel`` to fetch messages and does not echo it back, so the
+    caller supplies it. Messages pass through untouched; the adapter validates them.
+    """
+    threads: dict[str, list[object]] = {}
+    for raw in messages:
+        if not isinstance(raw, dict):
+            raise NormalizationError("invalid_input", "Slack messages must be objects.", input_index=0)
+        key = raw.get("thread_ts", raw.get("ts"))
+        if not isinstance(key, str) or not _SLACK_TS.match(key):
+            raise NormalizationError("invalid_input", "Invalid Slack message timestamp.", input_index=0)
+        threads.setdefault(key, []).append(raw)
+    context: dict[str, object] = {"team": team, "channel": channel}
+    if users is not None:
+        context["users"] = users
+    return [
+        {**context, "thread_ts": thread_ts, "messages": group}
+        for thread_ts, group in sorted(threads.items(), key=lambda item: int(item[0].replace(".", "")))
+    ]
 
 
 def normalize_conversation(*, source: ConversationSource, transcript: str) -> NormalizeConversationResult:

@@ -1,5 +1,14 @@
 # Canonical records
 
+Canonical schema version 4 adds generic `record_type: "message"`. Message IDs
+and attributed speakers are retained in `record_json`; content and speaker are
+included in semantic hashing. Conversation ID and source-native thread metadata
+live in the leading meta record and contribute to its semantic hash. Flattened
+`content` contains the original message text.
+Slack uses native workspace/channel/message timestamp identity and microsecond
+ordering within a thread. Existing source identities and record contents are
+unchanged. See [Slack](src/adapters/slack/) before upgrading a consumer.
+
 `normalizeToCanonical()` (and `normalizeCheckpointToCanonical()`) return
 ingestion-ready **canonical records** for the Cloud normalizer worker. This is
 an additive view: `normalizeTranscript()` and its trajectory-v1 `records` output

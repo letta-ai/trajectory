@@ -80,6 +80,7 @@ and is empty when the transcript required no recoverable cleanup.
 
 | `source` | Accepted input format | Normalized `meta.source` |
 | --- | --- | --- |
+| [`slack`](src/adapters/slack/) | One thread envelope: `{ team, channel, thread_ts, messages: [...] }` using raw Slack message objects | `slack` |
 | [`atif`](src/adapters/atif/) | ATIF-v1.0 through ATIF-v1.7 whole-trajectory JSON | `atif` |
 | [`claude-code`](src/adapters/claude-code/) | Native Claude Code JSONL | `claude-code` |
 | [`codex`](src/adapters/codex/) | Native Codex rollout JSONL | `codex` |
@@ -148,6 +149,22 @@ A trajectory is an ordered array containing:
 Every conversational record has an ISO timestamp. The complete contract is
 available as both runtime validation and
 [`schema/trajectory-v1.schema.json`](schema/trajectory-v1.schema.json).
+
+Imported multi-party conversations use generic `message` records with `id`,
+`speaker: { id }`, `content`, and `timestamp`, not inferred user/assistant roles.
+Their leading `meta` carries `conversation_id` and optional `source_metadata`
+(string-valued, source-native thread context). Message IDs are scoped to that
+conversation; participant IDs are scoped to the source account/workspace.
+
+Slack is the first adapter for this format: one thread (or standalone post)
+per trajectory, `thread_ts` becomes `meta.conversation_id`, `team` and `channel`
+live in `meta.source_metadata`, and each exact `ts` becomes a message `id`.
+No Teams, Gmail, or Google Chat adapter is implemented yet. V0 is text-only;
+reactions, recipient lists, and message-level metadata are deferred.
+Agent-source roles and validation are unchanged. See the
+[Slack contract](src/adapters/slack/) for mirror assembly and supported variants.
+Downstream consumers must upgrade their schemas/role handling before ingesting
+these records.
 
 The public function is:
 

@@ -12,6 +12,7 @@
     },
     "record": {
       "oneOf": [
+        { "$ref": "#/$defs/message" },
         { "$ref": "#/$defs/meta" },
         { "$ref": "#/$defs/system" },
         { "$ref": "#/$defs/observation" },
@@ -30,7 +31,31 @@
         "source": { "type": "string", "minLength": 1 },
         "cwd": { "type": "string" },
         "git_branch": { "type": "string" },
-        "model": { "type": "string" }
+        "model": { "type": "string" },
+        "conversation_id": { "type": "string", "minLength": 1 },
+        "source_metadata": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "required": ["role", "id", "speaker", "content", "timestamp"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "const": "message" },
+        "id": { "type": "string", "minLength": 1 },
+        "content": { "type": "string", "minLength": 1 },
+        "timestamp": { "$ref": "#/$defs/timestamp" },
+        "speaker": {
+          "type": "object",
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string", "minLength": 1 }
+          }
+        }
       }
     },
     "user": {

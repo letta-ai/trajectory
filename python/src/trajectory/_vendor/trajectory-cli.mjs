@@ -250,6 +250,149 @@ function invalidAtifTranscript() {
   return new NormalizationError("invalid_input", "ATIF transcript must be one ATIF-v1.0 through ATIF-v1.7 JSON trajectory object with agent metadata and sequential steps.");
 }
 
+// src/canonical.ts
+function canonicalJson(value) {
+  return JSON.stringify(sortKeys(value));
+}
+function sortKeys(value) {
+  if (Array.isArray(value))
+    return value.map(sortKeys);
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value).filter(([, item]) => item !== undefined).sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0);
+    const sorted = {};
+    for (const [key, item] of entries)
+      sorted[key] = sortKeys(item);
+    return sorted;
+  }
+  return value;
+}
+
+// src/adapters/slack/timestamp.ts
+function parseSlackTimestamp(value) {
+  if (typeof value !== "string" || !/^\d{1,12}\.\d{6}$/.test(value))
+    return;
+  const [seconds, micros] = value.split(".");
+  if (!seconds || !micros)
+    return;
+  if (seconds.length > 1 && seconds.startsWith("0"))
+    return;
+  const date = new Date(Number(seconds) * 1000 + Number(micros.slice(0, 3)));
+  if (Number.isNaN(date.getTime()) || !/^\d{4}-/.test(date.toISOString()))
+    return;
+  return { ts: value, date, sequence: Number(micros) };
+}
+function compareSlackTimestamps(left, right) {
+  const a = BigInt(left.replace(".", ""));
+  const b = BigInt(right.replace(".", ""));
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+// src/adapters/slack/index.ts
+var MESSAGE_SUBTYPES = new Set([
+  "bot_message",
+  "thread_broadcast",
+  "file_share",
+  "me_message"
+]);
+var slackAdapter = {
+  source: "slack",
+  decode(transcript) {
+    let input;
+    try {
+      input = JSON.parse(transcript);
+    } catch {
+      throw invalid("Expected a Slack thread JSON envelope, not bare JSONL.");
+    }
+    if (!isObject(input) || !Array.isArray(input.messages)) {
+      throw invalid("Slack input must contain a messages array.");
+    }
+    const workspaceId = nonemptyString(input.team);
+    const channelId = nonemptyString(input.channel);
+    const thread = parseSlackTimestamp(input.thread_ts);
+    if (!workspaceId || !channelId || !thread) {
+      throw invalid("Slack input requires team, channel, and a valid thread_ts.");
+    }
+    const diagnostics = [];
+    const messages = new Map;
+    for (const raw of input.messages) {
+      if (!isObject(raw))
+        throw invalid("Slack messages must be objects.");
+      if (raw.type !== "message" || raw.subtype !== undefined && !MESSAGE_SUBTYPES.has(String(raw.subtype))) {
+        diagnostics.push({
+          code: "slack_message_dropped",
+          message: "Skipped an unsupported Slack event or message subtype."
+        });
+        continue;
+      }
+      const time = parseSlackTimestamp(raw.ts);
+      const threadTs = raw.thread_ts ?? raw.ts;
+      if (!time || !parseSlackTimestamp(threadTs))
+        throw invalid("Invalid Slack message timestamp.");
+      if (threadTs !== thread.ts || compareSlackTimestamps(time.ts, thread.ts) < 0) {
+        throw invalid("Slack input contains a message from a different thread or preceding its root.");
+      }
+      if (raw.team !== undefined && raw.team !== workspaceId || raw.channel !== undefined && raw.channel !== channelId) {
+        throw invalid("Slack message workspace/channel disagrees with the envelope.");
+      }
+      const speakerId = nonemptyString(raw.user) ?? nonemptyString(raw.bot_id);
+      if (!speakerId)
+        throw invalid("Slack message has no source speaker identity.");
+      if (typeof raw.text !== "string" || !raw.text.trim()) {
+        diagnostics.push({
+          code: "slack_message_dropped",
+          message: "Skipped a Slack post without nonempty text (blocks/files are not extracted)."
+        });
+        continue;
+      }
+      const message = {
+        role: "message",
+        id: time.ts,
+        speaker: { id: speakerId },
+        content: raw.text
+      };
+      const existing = messages.get(time.ts);
+      if (existing) {
+        if (canonicalJson(existing) !== canonicalJson(message)) {
+          throw invalid("Conflicting versions of a Slack message; supply one authoritative snapshot.");
+        }
+        diagnostics.push({
+          code: "slack_duplicate_message",
+          message: "Removed a duplicate Slack message."
+        });
+      } else {
+        messages.set(time.ts, message);
+      }
+    }
+    if (messages.size === 0)
+      throw invalid("Slack thread contains no supported text messages.");
+    const events = [...messages.values()].sort((a, b) => compareSlackTimestamps(a.id, b.id)).map((message) => {
+      const time = parseSlackTimestamp(message.id);
+      if (!time)
+        throw invalid("Invalid Slack message timestamp.");
+      return {
+        type: "attributed_message",
+        message,
+        timestamp: time.date,
+        sourceRecordId: JSON.stringify([workspaceId, channelId, message.id]),
+        sourceSequence: time.sequence
+      };
+    });
+    return {
+      events,
+      context: {
+        source: "slack",
+        conversationId: thread.ts,
+        sourceMetadata: { team: workspaceId, channel: channelId },
+        sourceGroupId: JSON.stringify([workspaceId, channelId, thread.ts])
+      },
+      diagnostics
+    };
+  }
+};
+function invalid(message) {
+  return new NormalizationError("invalid_input", message);
+}
+
 // src/adapters/claude-code/index.ts
 var TRANSPORT_TYPES = new Set([
   "progress",
@@ -2114,11 +2257,13 @@ function invalidFilters(message) {
 
 // src/validate.ts
 var TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
-var META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model"]);
+var META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model", "conversation_id", "source_metadata"]);
 var CONTENT_KEYS = new Set(["role", "content", "timestamp"]);
 var ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls"]);
 var TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "ok", "timestamp"]);
 var TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
+var MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp"]);
+var SPEAKER_KEYS = new Set(["id"]);
 function validateTranscript(value, options) {
   const partial = options?.partial ?? false;
   if (!Array.isArray(value) || value.length === 0)
@@ -2127,6 +2272,8 @@ function validateTranscript(value, options) {
   const callIds = new Set;
   const roles = new Set;
   let metaSeen = false;
+  const attributed = value.some((record) => isObject2(record) && record.role === "message");
+  const messageIds = new Set;
   for (let index = 0;index < value.length; index += 1) {
     const record = value[index];
     if (!isObject2(record) || typeof record.role !== "string") {
@@ -2144,9 +2291,36 @@ function validateTranscript(value, options) {
       optionalString(record, "cwd", index);
       optionalString(record, "git_branch", index);
       optionalString(record, "model", index);
+      if ("conversation_id" in record && (typeof record.conversation_id !== "string" || !record.conversation_id.trim())) {
+        fail(`Record ${index}: conversation_id must be a non-empty string.`);
+      }
+      if ("source_metadata" in record && (!isObject2(record.source_metadata) || !Object.values(record.source_metadata).every((field) => typeof field === "string"))) {
+        fail(`Record ${index}: source_metadata must be an object with string values.`);
+      }
       continue;
     }
     validateTimestamp(record.timestamp, index);
+    if (attributed && record.role !== "message") {
+      fail(`Record ${index}: attributed conversations cannot mix message and agent roles.`);
+    }
+    if (record.role === "message") {
+      exactKeys(record, MESSAGE_KEYS, index);
+      if (typeof record.id !== "string" || !record.id.trim() || messageIds.has(record.id)) {
+        fail(`Record ${index}: message.id must be non-empty and unique within the conversation.`);
+      }
+      messageIds.add(record.id);
+      if (typeof record.content !== "string" || !record.content.trim()) {
+        fail(`Record ${index}: message.content must be a non-empty string.`);
+      }
+      if (!isObject2(record.speaker)) {
+        fail(`Record ${index}: invalid message speaker.`);
+      }
+      exactKeys(record.speaker, SPEAKER_KEYS, index, "speaker");
+      if (typeof record.speaker.id !== "string" || !record.speaker.id.trim()) {
+        fail(`Record ${index}: speaker.id must be a non-empty string.`);
+      }
+      continue;
+    }
     if (record.role === "system" || record.role === "observation" || record.role === "user" || record.role === "reasoning") {
       exactKeys(record, CONTENT_KEYS, index);
       if (typeof record.content !== "string") {
@@ -2189,6 +2363,13 @@ function validateTranscript(value, options) {
     fail(`Record ${index}: unknown role ${JSON.stringify(record.role)}.`);
   }
   if (!partial) {
+    if (attributed) {
+      const meta = value[0];
+      if (!isObject2(meta) || meta.role !== "meta" || typeof meta.conversation_id !== "string") {
+        fail("Attributed conversations require leading meta with a conversation_id.");
+      }
+      return;
+    }
     if (!roles.has("user"))
       fail("Transcript must contain at least one user record.");
     if (!roles.has("assistant")) {
@@ -2273,6 +2454,8 @@ var NOISE_PREFIXES = [
 ];
 function semanticBucket(event) {
   switch (event.type) {
+    case "attributed_message":
+      return "attributed_message";
     case "message":
       return "message";
     case "observation":
@@ -2377,7 +2560,7 @@ function normalizeDecodedSessionInternal(decoded, bounds, options) {
     });
   }
   const roles = new Set(body.map((record) => record.role));
-  if (!partial) {
+  if (!partial && !roles.has("message")) {
     if (!roles.has("user")) {
       throw new NormalizationError("missing_user_records", "Transcript did not contain any normalizable user records.");
     }
@@ -2412,6 +2595,8 @@ function normalizeDecodedSessionInternal(decoded, bounds, options) {
   };
 }
 function normalizeEvent(event, eventIndex, recordIndex, plan, diagnostics, bounds, filters, partial) {
+  if (event.type === "attributed_message")
+    return event.message;
   if (event.type === "message") {
     if (!event.content.trim()) {
       return;
@@ -2572,6 +2757,8 @@ function buildMeta(context, modelCounts) {
   return {
     role: "meta",
     source: context.source,
+    ...context.conversationId !== undefined ? { conversation_id: context.conversationId } : {},
+    ...context.sourceMetadata !== undefined ? { source_metadata: context.sourceMetadata } : {},
     ...context.cwd ? { cwd: context.cwd } : {},
     ...context.gitBranch ? { git_branch: context.gitBranch } : {},
     ...model ? { model } : {}
@@ -3544,7 +3731,7 @@ async function listTrajectories(input) {
   return paginate(items, input.cursor, limit);
 }
 function isKnownNormalizationOnlySource(source) {
-  return source === "atif" || source === "copilot-cli" || source === "cursor" || source === "gemini-cli" || source === "opencode";
+  return source === "slack" || source === "atif" || source === "copilot-cli" || source === "cursor" || source === "gemini-cli" || source === "opencode";
 }
 function resolveLimit2(limit) {
   if (limit === undefined)
@@ -3593,6 +3780,7 @@ function invalidCursor() {
 
 // src/index.ts
 var ADAPTERS = {
+  slack: slackAdapter,
   atif: atifAdapter,
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,

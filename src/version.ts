@@ -13,4 +13,4 @@
  */
 export const NORMALIZER_VERSION = "0.3.0";
 
-export const CANONICAL_SCHEMA_VERSION = 3;
+export const CANONICAL_SCHEMA_VERSION = 4;

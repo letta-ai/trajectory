@@ -3,6 +3,7 @@ import type { ResolvedNormalizationFilters } from "./filters.js";
 import type {
   Diagnostic,
   NormalizedRecord,
+  AttributedMessageRecord,
   TranscriptTrajectorySource,
 } from "./types.js";
 
@@ -56,6 +57,11 @@ export interface DecodedObservationEvent extends DecodedEventBase {
   content: string;
 }
 
+export interface DecodedAttributedMessageEvent extends DecodedEventBase {
+  type: "attributed_message";
+  message: Omit<AttributedMessageRecord, "timestamp">;
+}
+
 export interface DecodedToolCallEvent extends DecodedEventBase {
   type: "tool_call";
   id?: string;
@@ -72,6 +78,7 @@ export interface DecodedToolResultEvent extends DecodedEventBase {
 }
 
 export type DecodedEvent =
+  | DecodedAttributedMessageEvent
   | DecodedMessageEvent
   | DecodedObservationEvent
   | DecodedReasoningEvent
@@ -80,6 +87,8 @@ export type DecodedEvent =
 
 export interface SessionContext {
   source: string;
+  conversationId?: string;
+  sourceMetadata?: Record<string, string>;
   cwd?: string;
   gitBranch?: string;
   model?: string;

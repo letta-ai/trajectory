@@ -1,5 +1,23 @@
 # Parity report
 
+## Slack mirror threads
+
+Implemented against raw Slack message shapes supplied during mirror integration
+work (September 2026). No private transcripts were copied into this repository.
+Two synthetic fixtures cover a three-post relay/human thread and a six-row
+cleanup case (duplicate roots, broadcast reply copies, a service event, and a
+file-only post). Both outputs are checked against runtime and JSON Schema
+validation, canonical projection, and the Python wrapper. Additional tests cover
+microsecond ordering, scope isolation, retry/edit identity, partial threads,
+conflicting duplicates, missing identity, and malformed inputs. Generic format
+validation tests use synthetic Teams/Gmail/Google Chat metadata without adding
+adapters for those sources. Agent role requirements remain unchanged.
+
+No full production mirror corpus or live Dream run has been exercised. Blocks-
+only posts, file contents, and event-stream edits/deletions are explicitly not
+supported; skipped rows produce diagnostics. No existing Slack reference
+normalizer was available for differential parity.
+
 > This report established parser parity before configurable bounds were added.
 > The current default uses marker-inclusive, head-tail tool-result truncation
 > and the canonical `claude-code` source ID. Oversized tool results and Claude

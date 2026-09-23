@@ -1,0 +1,49 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "slack",
+      "conversation_id": "1700000000.000001",
+      "source_metadata": {
+        "team": "TEXAMPLE",
+        "channel": "CEXAMPLE"
+      }
+    },
+    {
+      "role": "message",
+      "id": "1700000000.000001",
+      "speaker": {
+        "id": "UONE"
+      },
+      "content": "A question",
+      "timestamp": "2023-11-14T22:13:20.000Z"
+    },
+    {
+      "role": "message",
+      "id": "1700000001.000001",
+      "speaker": {
+        "id": "UTWO"
+      },
+      "content": "An answer",
+      "timestamp": "2023-11-14T22:13:21.000Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "slack_duplicate_message",
+      "message": "Removed a duplicate Slack message."
+    },
+    {
+      "code": "slack_duplicate_message",
+      "message": "Removed a duplicate Slack message."
+    },
+    {
+      "code": "slack_message_dropped",
+      "message": "Skipped an unsupported Slack event or message subtype."
+    },
+    {
+      "code": "slack_message_dropped",
+      "message": "Skipped a Slack post without nonempty text (blocks/files are not extracted)."
+    }
+  ]
+}

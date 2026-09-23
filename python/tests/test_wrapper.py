@@ -23,6 +23,8 @@ try:
 except ModuleNotFoundError:
     HAS_LANGGRAPH_SQLITE = False
 FIXTURES = (
+    ("slack", "slack/thread", "input.json"),
+    ("slack", "slack/cleanup", "input.json"),
     ("atif", "atif/tool-calls", "input.json"),
     ("atif", "atif/cleanup", "input.json"),
     ("claude-code", "claude-code/tool-call", "input.jsonl"),

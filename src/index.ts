@@ -1,4 +1,5 @@
 import { atifAdapter } from "./adapters/atif/index.js";
+import { slackAdapter } from "./adapters/slack/index.js";
 import { claudeCodeAdapter } from "./adapters/claude-code/index.js";
 import { codexAdapter } from "./adapters/codex/index.js";
 import { copilotCliAdapter } from "./adapters/copilot-cli/index.js";
@@ -31,6 +32,7 @@ import type {
 import { NormalizationError } from "./types.js";
 
 const ADAPTERS: Record<TranscriptTrajectorySource, SourceAdapter> = {
+  slack: slackAdapter,
   atif: atifAdapter,
   "claude-code": claudeCodeAdapter,
   codex: codexAdapter,
@@ -218,6 +220,8 @@ export {
   type NormalizeInput,
   type NormalizeResult,
   type ReasoningRecord,
+  type AttributedMessageRecord,
+  type Speaker,
   type SourceContext,
   type SourceIdentityKind,
   type SystemMessagePolicy,

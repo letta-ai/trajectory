@@ -173,6 +173,8 @@ function buildOrderId(
 
 function recordType(record: NormalizedRecord): CanonicalRecordType {
   switch (record.role) {
+    case "message":
+      return "message";
     case "meta":
       return "meta";
     case "system":
@@ -205,6 +207,8 @@ function componentKeyFor(
 ): string {
   const ordinal = basis?.componentTypeOrdinal ?? 0;
   switch (type) {
+    case "message":
+      return `message:${ordinal}`;
     case "meta":
       return "meta";
     case "system":
@@ -231,10 +235,18 @@ function semanticContent(
   type: CanonicalRecordType,
 ): unknown {
   switch (type) {
+    case "message":
+      if (record.role !== "message") return {};
+      return {
+        content: record.content,
+        speaker: record.speaker,
+      };
     case "meta":
       return record.role === "meta"
         ? {
             source: record.source,
+            ...(record.conversation_id !== undefined ? { conversation_id: record.conversation_id } : {}),
+            ...(record.source_metadata !== undefined ? { source_metadata: record.source_metadata } : {}),
             ...(record.cwd !== undefined ? { cwd: record.cwd } : {}),
             ...(record.git_branch !== undefined
               ? { git_branch: record.git_branch }
@@ -283,6 +295,7 @@ function flattenFields(
   };
   switch (type) {
     case "system":
+    case "message":
     case "observation":
     case "user":
     case "reasoning":

@@ -1,0 +1,65 @@
+{
+  "team": "TEXAMPLE",
+  "channel": "CEXAMPLE",
+  "thread_ts": "1700000000.000001",
+  "messages": [
+    {
+      "user": "UALICE",
+      "type": "message",
+      "ts": "1700000000.000001",
+      "client_msg_id": "11111111-1111-4111-8111-111111111111",
+      "text": "Please read the _updated_ guide before publishing.",
+      "team": "TEXAMPLE",
+      "thread_ts": "1700000000.000001",
+      "reply_count": 1,
+      "reply_users_count": 1,
+      "latest_reply": "1700000001.000001",
+      "reply_users": ["UBOB"],
+      "is_locked": false,
+      "subscribed": false,
+      "blocks": [
+        {
+          "type": "rich_text",
+          "block_id": "root-block",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                { "type": "text", "text": "Please read the " },
+                { "type": "text", "text": "updated", "style": { "italic": true } },
+                { "type": "text", "text": " guide before publishing." }
+              ]
+            }
+          ]
+        }
+      ],
+      "reactions": [
+        { "name": "nod", "users": ["UBOB", "UCAROL"], "count": 2 }
+      ]
+    },
+    {
+      "user": "UBOB",
+      "type": "message",
+      "ts": "1700000001.000001",
+      "client_msg_id": "22222222-2222-4222-8222-222222222222",
+      "text": "I'll read it before publishing.",
+      "team": "TEXAMPLE",
+      "thread_ts": "1700000000.000001",
+      "parent_user_id": "UALICE",
+      "blocks": [
+        {
+          "type": "rich_text",
+          "block_id": "reply-block",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                { "type": "text", "text": "I'll read it before publishing." }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

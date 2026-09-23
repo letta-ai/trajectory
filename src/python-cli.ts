@@ -8,6 +8,9 @@ import type { ListTrajectoriesResult } from "./listing.js";
 import type { NormalizeResult } from "./types.js";
 import { NormalizationError } from "./types.js";
 
+import { normalizeConversation, type NormalizeConversationResult } from "./conversations/index.js";
+import { isObject } from "./adapters/shared.js";
+
 const PROTOCOL_VERSION = 1;
 
 interface WireRequest {
@@ -22,7 +25,7 @@ interface WireError {
 }
 
 type WireResult =
-  | { ok: true; result: NormalizeResult | ListTrajectoriesResult }
+  | { ok: true; result: NormalizeResult | ListTrajectoriesResult | NormalizeConversationResult }
   | { ok: false; error: WireError };
 
 async function main(): Promise<void> {
@@ -30,6 +33,19 @@ async function main(): Promise<void> {
   const results: WireResult[] = [];
   for (const input of request.requests) {
     try {
+      if (isObject(input) && "conversation" in input) {
+        const request = input.conversation;
+        if (!isObject(request) || typeof request.transcript !== "string") {
+          throw new NormalizationError("invalid_input", "Expected a conversation source and transcript.");
+        }
+        if (request.source !== "slack") {
+          throw new NormalizationError("unknown_source", "Unsupported conversation source.");
+        }
+        results.push({ ok: true, result: normalizeConversation({
+          source: request.source, transcript: request.transcript,
+        }) });
+        continue;
+      }
       const result =
         input !== null && typeof input === "object" && "list" in input
           ? await listTrajectories(

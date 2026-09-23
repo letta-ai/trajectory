@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://letta.ai/schemas/conversation/v1.json",
+  "title": "Imported conversation (v1)",
+  "type": "array",
+  "minItems": 2,
+  "prefixItems": [{ "$ref": "#/$defs/meta" }],
+  "items": { "$ref": "#/$defs/message" },
+  "$defs": {
+    "meta": {
+      "type": "object",
+      "required": ["role", "source", "conversation_id"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "const": "meta" },
+        "source": { "type": "string", "pattern": "\\S" },
+        "conversation_id": { "type": "string", "pattern": "\\S" },
+        "source_metadata": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "required": ["role", "id", "speaker", "content", "timestamp"],
+      "additionalProperties": false,
+      "properties": {
+        "role": { "const": "message" },
+        "id": { "type": "string", "pattern": "\\S" },
+        "content": { "type": "string", "pattern": "\\S" },
+        "timestamp": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:?\\d{2})$"
+        },
+        "speaker": {
+          "type": "object",
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": {
+            "id": { "type": "string", "pattern": "\\S" }
+          }
+        }
+      }
+    }
+  }
+}

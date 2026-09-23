@@ -3,18 +3,16 @@
 from typing import Literal, TypedDict, Union
 
 TrajectorySource = Literal[
-    "atif", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi", "slack"
+    "atif", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi"
 ]
 CheckpointTrajectorySource = Literal["deepagents"]
 AnyTrajectorySource = Literal[
-    "atif", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi", "slack", "deepagents"
+    "atif", "claude-code", "codex", "copilot-cli", "cursor", "droid", "gemini-cli", "hermes", "letta-code", "omp", "openclaw", "opencode", "openhands", "pi", "deepagents"
 ]
 ToolResultTruncationStrategy = Literal["head", "head-tail"]
 ToolResultPolicy = Literal["include", "omit"]
 SystemMessagePolicy = Literal["include", "omit"]
 DiagnosticCode = Literal[
-    "slack_message_dropped",
-    "slack_duplicate_message",
     "invalid_json_line",
     "non_object_json_line",
     "injected_context_dropped",
@@ -140,8 +138,6 @@ class Diagnostic(_DiagnosticOptional):
 
 
 class _MetaOptional(TypedDict, total=False):
-    conversation_id: str
-    source_metadata: dict[str, str]
     cwd: str
     git_branch: str
     model: str
@@ -206,20 +202,7 @@ class ToolResultRecord(_ToolResultOptional):
     timestamp: str
 
 
-class Speaker(TypedDict):
-    id: str
-
-
-class AttributedMessageRecord(TypedDict):
-    role: Literal["message"]
-    id: str
-    speaker: Speaker
-    content: str
-    timestamp: str
-
-
 NormalizedRecord = Union[
-    AttributedMessageRecord,
     MetaRecord,
     SystemRecord,
     ObservationRecord,

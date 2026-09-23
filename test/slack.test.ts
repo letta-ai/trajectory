@@ -1,29 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { readFileSync } from "node:fs";
-import {
-  listTrajectories,
-  normalizeToCanonical,
-  normalizeTranscript,
-  validateTranscript,
-} from "../src/index.js";
+import { normalizeConversation, validateConversation } from "../src/conversations/index.js";
 
-const schema = new Ajv2020().compile(
-  JSON.parse(
-    readFileSync(
-      new URL("../schema/trajectory-v1.schema.json", import.meta.url),
-      "utf8",
-    ),
-  ),
-);
-const canonicalSchema = new Ajv2020().compile(
-  JSON.parse(
-    readFileSync(
-      new URL("../schema/trajectory-canonical-v1.schema.json", import.meta.url),
-      "utf8",
-    ),
-  ),
-);
+const schema = new Ajv2020({ strictTuples: false }).compile(JSON.parse(readFileSync(
+  new URL("../schema/conversation-v1.schema.json", import.meta.url), "utf8",
+)));
 const rootTs = "1700000000.000001";
 const root = { type: "message", user: "UONE", ts: rootTs, text: "Hello" };
 function envelope(
@@ -39,15 +21,12 @@ function envelope(
   });
 }
 function normalize(transcript = envelope()) {
-  return normalizeTranscript({ source: "slack", transcript });
-}
-function canonical(transcript = envelope()) {
-  return normalizeToCanonical({ source: "slack", transcript });
+  return normalizeConversation({ source: "slack", transcript });
 }
 
 describe("Slack thread trajectories", () => {
-  for (const name of ["thread", "cleanup"]) {
-    test(`synthetic ${name} fixture matches golden and both schemas`, () => {
+  for (const name of ["thread", "cleanup", "rich-thread"]) {
+    test(`synthetic ${name} fixture matches golden and the conversation schema`, () => {
       const input = readFileSync(
         new URL(`../fixtures/slack/${name}/input.json`, import.meta.url),
         "utf8",
@@ -60,13 +39,9 @@ describe("Slack thread trajectories", () => {
       );
       const result = normalize(input);
       expect<unknown>(result).toEqual(expected);
-      validateTranscript(result.records);
+      validateConversation(result.records);
       expect(schema(result.records)).toBe(true);
-      const projected = canonical(input);
-      expect(canonicalSchema(projected.records)).toBe(true);
-      expect(
-        projected.records.map((row) => JSON.parse(row.record_json)),
-      ).toEqual(result.records);
+
     });
   }
 
@@ -75,7 +50,7 @@ describe("Slack thread trajectories", () => {
       "meta",
       "message",
     ]);
-    validateTranscript(normalize().records);
+    validateConversation(normalize().records);
   });
 
   test("bot relays do not become assistant turns or inferred people", () => {
@@ -119,73 +94,39 @@ describe("Slack thread trajectories", () => {
     });
   });
 
-  test("canonical identities and microsecond ordering are arrival-independent", () => {
-    const replies = [
+  test("exact message IDs and microsecond ordering are arrival-independent", () => {
+    const messages = [
       { ...root, ts: "1700000000.000099", thread_ts: rootTs },
       { ...root, ts: "1700000000.000010", thread_ts: rootTs },
       root,
     ];
-    const forward = canonical(envelope(replies));
-    const reverse = canonical(envelope([...replies].reverse()));
-    expect(forward).toEqual(reverse);
-    const rows = forward.records.slice(1);
-    expect(rows.map((r) => r.source_order_id)).toEqual(
-      rows.map((r) => r.source_order_id).sort(),
-    );
-    expect(new Set(rows.map((r) => r.record_id)).size).toBe(3);
-    expect(rows.every((r) => r.source_identity_kind === "native")).toBe(true);
-    expect(rows[0]?.source_group_id).toBe(
-      JSON.stringify(["TEXAMPLE", "CEXAMPLE", rootTs]),
-    );
+    const forward = normalize(envelope(messages));
+    expect(forward).toEqual(normalize(envelope([...messages].reverse())));
+    expect(forward.records.slice(1).map((r) => r.role === "message" ? r.id : "")).toEqual([
+      rootTs, "1700000000.000010", "1700000000.000099",
+    ]);
   });
 
-  test("edited snapshots retain identity but change semantic hash", () => {
-    const before = canonical().records[1];
-    const after = canonical(
-      envelope([
-        { ...root, text: "Updated", edited: { ts: "1700000009.000001" } },
-      ]),
-    ).records[1];
-    expect(after?.record_id).toBe(before?.record_id);
-    expect(after?.content_hash).not.toBe(before?.content_hash);
-    expect(after?.source_order_id).toBe(before?.source_order_id);
-    expect(
-      canonical(envelope([{ ...root, user: "UOTHER" }])).records[1]
-        ?.content_hash,
-    ).not.toBe(before?.content_hash);
+  test("edits preserve message identity without discarding the changed text", () => {
+    const before = normalize().records[1];
+    const after = normalize(envelope([{ ...root, text: "Updated" }])).records[1];
+    expect(after?.id).toBe(before?.id);
+    expect(after?.content).toBe("Updated");
   });
 
-  test("different channels/workspaces cannot collide", () => {
-    const id = canonical().records[1]?.record_id;
-    expect(
-      canonical(envelope([root], { channel: "COTHER" })).records[1]
-        ?.record_id,
-    ).not.toBe(id);
-    expect(
-      canonical(envelope([root], { team: "TOTHER" })).records[1]
-        ?.record_id,
-    ).not.toBe(id);
+  test("identical timestamps in different channels/workspaces retain their scope", () => {
+    const first = normalize().records[0];
+    expect(normalize(envelope([root], { channel: "COTHER" })).records[0]).not.toEqual(first);
+    expect(normalize(envelope([root], { team: "TOTHER" })).records[0]).not.toEqual(first);
   });
 
-  test("a cross-file reply fragment preserves the full-thread canonical identity", () => {
+  test("a reply-only fragment keeps thread context without fabricating a root", () => {
     const reply = { ...root, ts: "1700000001.000001", thread_ts: rootTs };
-    const full = canonical(envelope([root, reply]));
-    const partial = normalizeToCanonical({
-      source: "slack",
-      transcript: envelope([reply]),
-      sourceContext: { partial: true, baseByteOffset: 1000 },
-    });
-    expect(partial.records).toEqual(full.records.slice(2));
-  });
-
-  test("explicit source group cannot override Slack identity", () => {
-    expect(() =>
-      normalizeToCanonical({
-        source: "slack",
-        transcript: envelope(),
-        sourceContext: { groupId: "wrong" },
-      }),
-    ).toThrow("conflicts");
+    const full = normalize(envelope([root, reply]));
+    const fragment = normalize(envelope([reply]));
+    const fullReply = full.records[2];
+    if (!fullReply) throw new Error("Expected reply");
+    expect(fragment.records).toEqual([full.records[0], fullReply]);
   });
 
   test("conflicting duplicates fail rather than choosing whichever arrived last", () => {
@@ -229,41 +170,4 @@ describe("Slack thread trajectories", () => {
     }
   });
 
-  test("runtime validator rejects malformed/mixed Slack records and keeps agent invariants", () => {
-    const record = normalize().records[1];
-    if (!record || record.role !== "message")
-      throw new Error("Expected Slack message");
-    const meta = normalize().records[0];
-    for (const bad of [
-      { ...record, speaker: {} },
-      { ...record, speaker: { id: 42 } },
-      { ...record, id: "" },
-      { ...record, timestamp: "bad" },
-      { ...record, extra: true },
-    ])
-      expect(() => validateTranscript([meta, bad])).toThrow();
-    expect(() => validateTranscript([meta, record, record])).toThrow();
-    expect(() =>
-      validateTranscript([
-        meta,
-        { role: "user", content: "Hello", timestamp: record.timestamp },
-      ]),
-    ).toThrow();
-    expect(() =>
-      validateTranscript([{ role: "meta", source: "codex" }, record]),
-    ).toThrow();
-    expect(() =>
-      validateTranscript([
-        { role: "meta", source: "codex" },
-        { role: "user", content: "Hello", timestamp: record.timestamp },
-      ]),
-    ).toThrow("assistant");
-    expect(() => validateTranscript([meta])).toThrow();
-  });
-
-  test("Slack is export-only, not an invented local store", async () => {
-    await expect(listTrajectories({ source: "slack" })).rejects.toMatchObject({
-      code: "listing_unavailable",
-    });
-  });
 });

@@ -2,7 +2,6 @@ import type { ResolvedNormalizationBounds } from "./bounds.js";
 import type { ResolvedNormalizationFilters } from "./filters.js";
 
 export type TrajectorySource =
-  | "slack"
   | "atif"
   | "claude-code"
   | "codex"
@@ -95,8 +94,6 @@ export interface NormalizeInput {
 }
 
 export type DiagnosticCode =
-  | "slack_message_dropped"
-  | "slack_duplicate_message"
   | "invalid_json_line"
   | "non_object_json_line"
   | "injected_context_dropped"
@@ -127,28 +124,10 @@ export interface MetaRecord {
   cwd?: string;
   git_branch?: string;
   model?: string;
-  /** Source-native conversation ID, scoped by source_metadata. */
-  conversation_id?: string;
-  /** Source-native thread context; V0 carries string-valued identifiers. */
-  source_metadata?: Record<string, string>;
 }
 
 export interface UserRecord {
   role: "user";
-  content: string;
-  timestamp: string;
-}
-
-/** Source-native participant identity, not an inferred user/assistant role. */
-export interface Speaker {
-  id: string;
-}
-
-/** A participant's message in an imported multi-party conversation. */
-export interface AttributedMessageRecord {
-  role: "message";
-  id: string;
-  speaker: Speaker;
   content: string;
   timestamp: string;
 }
@@ -201,7 +180,6 @@ export interface ToolResultRecord {
 }
 
 export type NormalizedRecord =
-  | AttributedMessageRecord
   | MetaRecord
   | SystemRecord
   | ObservationRecord
@@ -224,7 +202,6 @@ export interface NormalizeResult {
  * carrying tool calls; `tool` is a tool result.
  */
 export type CanonicalRecordType =
-  | "message"
   | "meta"
   | "system"
   | "observation"

@@ -47,7 +47,6 @@
             "meta",
             "system",
             "observation",
-            "message",
             "user",
             "reasoning",
             "assistant",

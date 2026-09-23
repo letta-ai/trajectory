@@ -4,13 +4,11 @@ import { NormalizationError } from "./types.js";
 const TIMESTAMP_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 
-const META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model", "conversation_id", "source_metadata"]);
+const META_KEYS = new Set(["role", "source", "cwd", "git_branch", "model"]);
 const CONTENT_KEYS = new Set(["role", "content", "timestamp"]);
 const ASSISTANT_TOOL_KEYS = new Set(["role", "content", "timestamp", "tool_calls"]);
 const TOOL_RESULT_KEYS = new Set(["role", "tool_call_id", "content", "ok", "timestamp"]);
 const TOOL_CALL_KEYS = new Set(["id", "name", "args"]);
-const MESSAGE_KEYS = new Set(["role", "id", "speaker", "content", "timestamp"]);
-const SPEAKER_KEYS = new Set(["id"]);
 
 /**
  * Options for {@link validateTranscript}.
@@ -36,8 +34,6 @@ export function validateTranscript(
   const callIds = new Set<string>();
   const roles = new Set<string>();
   let metaSeen = false;
-  const attributed = value.some((record) => isObject(record) && record.role === "message");
-  const messageIds = new Set<string>();
 
   for (let index = 0; index < value.length; index += 1) {
     const record = value[index];
@@ -56,40 +52,10 @@ export function validateTranscript(
       optionalString(record, "cwd", index);
       optionalString(record, "git_branch", index);
       optionalString(record, "model", index);
-      if ("conversation_id" in record &&
-          (typeof record.conversation_id !== "string" || !record.conversation_id.trim())) {
-        fail(`Record ${index}: conversation_id must be a non-empty string.`);
-      }
-      if ("source_metadata" in record &&
-          (!isObject(record.source_metadata) ||
-           !Object.values(record.source_metadata).every((field) => typeof field === "string"))) {
-        fail(`Record ${index}: source_metadata must be an object with string values.`);
-      }
       continue;
     }
 
     validateTimestamp(record.timestamp, index);
-    if (attributed && record.role !== "message") {
-      fail(`Record ${index}: attributed conversations cannot mix message and agent roles.`);
-    }
-    if (record.role === "message") {
-      exactKeys(record, MESSAGE_KEYS, index);
-      if (typeof record.id !== "string" || !record.id.trim() || messageIds.has(record.id)) {
-        fail(`Record ${index}: message.id must be non-empty and unique within the conversation.`);
-      }
-      messageIds.add(record.id);
-      if (typeof record.content !== "string" || !record.content.trim()) {
-        fail(`Record ${index}: message.content must be a non-empty string.`);
-      }
-      if (!isObject(record.speaker)) {
-        fail(`Record ${index}: invalid message speaker.`);
-      }
-      exactKeys(record.speaker, SPEAKER_KEYS, index, "speaker");
-      if (typeof record.speaker.id !== "string" || !record.speaker.id.trim()) {
-        fail(`Record ${index}: speaker.id must be a non-empty string.`);
-      }
-      continue;
-    }
     if (
       record.role === "system" ||
       record.role === "observation" ||
@@ -144,13 +110,6 @@ export function validateTranscript(
   }
 
   if (!partial) {
-    if (attributed) {
-      const meta = value[0];
-      if (!isObject(meta) || meta.role !== "meta" || typeof meta.conversation_id !== "string") {
-        fail("Attributed conversations require leading meta with a conversation_id.");
-      }
-      return;
-    }
     if (!roles.has("user")) fail("Transcript must contain at least one user record.");
     if (!roles.has("assistant")) {
       fail("Transcript must contain at least one assistant record.");

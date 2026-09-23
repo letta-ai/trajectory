@@ -71,8 +71,6 @@ interface EventPlan {
 
 function semanticBucket(event: DecodedEvent): string {
   switch (event.type) {
-    case "attributed_message":
-      return "attributed_message";
     case "message":
       return "message";
     case "observation":
@@ -250,7 +248,7 @@ export function normalizeDecodedSessionInternal(
   }
 
   const roles = new Set(body.map((record) => record.role));
-  if (!partial && !roles.has("message")) {
+  if (!partial) {
     if (!roles.has("user")) {
       throw new NormalizationError(
         "missing_user_records",
@@ -312,7 +310,6 @@ function normalizeEvent(
   filters: ResolvedNormalizationFilters,
   partial: boolean,
 ): UnstampedBodyRecord | undefined {
-  if (event.type === "attributed_message") return event.message;
   if (event.type === "message") {
     if (!event.content.trim()) {
       return undefined;
@@ -499,8 +496,6 @@ function buildMeta(
   return {
     role: "meta",
     source: context.source,
-    ...(context.conversationId !== undefined ? { conversation_id: context.conversationId } : {}),
-    ...(context.sourceMetadata !== undefined ? { source_metadata: context.sourceMetadata } : {}),
     ...(context.cwd ? { cwd: context.cwd } : {}),
     ...(context.gitBranch ? { git_branch: context.gitBranch } : {}),
     ...(model ? { model } : {}),

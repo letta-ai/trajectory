@@ -9,7 +9,9 @@ treat an imported conversation as the consuming agent's own experience.
 ## Input
 
 ```ts
-normalizeTranscript({
+import { normalizeConversation } from "@letta-ai/trajectory/conversations";
+
+normalizeConversation({
   source: "slack",
   transcript: JSON.stringify({
     team: "TEXAMPLE",
@@ -34,9 +36,10 @@ boundaries; a standalone unthreaded post is its own thread. Do not discard
 replies whose root is outside the selected history range. The adapter does not
 claim a thread is complete based on Slack's `reply_count` and does not synthesize
 missing roots. Bare monthly JSONL or mixed-thread envelopes are not accepted.
-The same envelope works with `normalizeToCanonical` and the Python wrapper.
+The same envelope works with `trajectory.conversations.normalize_conversation`
+in Python. It is not accepted by the agent trajectory or canonical APIs.
 
-Access filtering, snapshot selection, Slack API calls, Pierre reads, and Dream
+Access filtering, snapshot selection, Slack API calls, mirror reads, and downstream
 submission belong to the importer, not this pure library. Never treat a
 service-owned organization mirror as permission to disclose all its channels.
 
@@ -70,14 +73,12 @@ app identity, and bot profiles are not retained in this minimal V0.
 message. The record format is source-neutral; only Slack ingestion is implemented.
 Reactions, recipients, and per-message metadata are intentionally deferred.
 
-Records are sorted by exact Slack `ts`. ISO timestamps use millisecond precision;
-the original six-digit fractional `ts` is retained losslessly as `id`, and canonical
-ordering uses that fractional value as the sub-millisecond tie-break.
-Canonical group identity is `JSON.stringify([team, channel, thread_ts])`;
-message identity is `JSON.stringify([team, channel, ts])`. Native IDs
-remain stable across retries, input reordering, file reorganization, and edits.
-An edited snapshot changes semantic/record hashes without changing record ID or
-message order. Speaker changes also change the semantic hash.
+Records are sorted by exact Slack `ts`, including microseconds. ISO timestamps
+use millisecond precision; the exact six-digit fractional `ts` is retained
+losslessly as `id`. Identify a thread by `(source, team, channel, conversation_id)`
+and a message within it by `id`. These source-native IDs are stable across retries,
+input reordering, file reorganization, and edited snapshots. A reply-only envelope
+retains the same thread metadata and does not synthesize a missing root.
 
 Exact semantic duplicates are collapsed with diagnostics (including a reply
 seen both through history and thread replies). A `thread_broadcast`'s nested
@@ -98,15 +99,13 @@ are not applied from event streams by this adapter.
   non-message events are skipped with the same diagnostic. This is a text
   snapshot adapter, not an event replay engine or a multimodal importer.
 - Invalid identity/timestamps, mixed threads, conflicting envelope scope, or no
-  supported text messages fail loudly. `listTrajectories({source: "slack"})`
-  returns `listing_unavailable` because there is no standard local Slack store.
+  supported text messages fail loudly. There is no conversation listing API;
+  `listTrajectories` remains limited to agent sources.
 
 ## Consumer rollout
 
-This adds the `message` record type and canonical schema version **4**.
-Existing agent-source records and their role requirements are unchanged.
-Dream/Cloud consumers pinned to an older trajectory package must upgrade and
-audit exhaustive role switches, batching rules, source allowlists, and schema
-validation before accepting Slack input. Do not map these posts to assistant
-turns to work around an older consumer. This package does not start Dream runs
-or attach the resulting memory.
+This uses the independent `conversation-v1` schema and `normalizeConversation`
+entry point. Existing agent records, validators, canonical projection, and
+canonical schema version are unchanged. Consumers must explicitly accept the
+conversation contract before ingesting this output; it is not a new variant of
+an agent's execution history. No downstream integration is implemented here.

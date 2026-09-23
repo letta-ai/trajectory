@@ -21,7 +21,12 @@
     },
     "./schema": "./schema/trajectory-v1.schema.json",
     "./schema/canonical": "./schema/trajectory-canonical-v1.schema.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./conversations": {
+      "types": "./dist/conversations/index.d.ts",
+      "import": "./dist/conversations/index.js"
+    },
+    "./schema/conversation": "./schema/conversation-v1.schema.json"
   },
   "files": [
     "dist",
@@ -31,7 +36,8 @@
     "README.md",
     "PARITY.md",
     "CANONICAL.md",
-    "SOURCE_VERSION_AUDIT.md"
+    "SOURCE_VERSION_AUDIT.md",
+    "CONVERSATIONS.md"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -3,92 +3,72 @@
     {
       "role": "meta",
       "source": "slack",
-      "channel": "CEXAMPLE"
+      "channel": "CEXAMPLE",
+      "channel_name": "eng-deploys",
+      "participants": {
+        "Alice": {
+          "id": "UALICE"
+        },
+        "Bob Example": {
+          "id": "UBOB"
+        },
+        "UCAROL": {
+          "id": "UCAROL"
+        }
+      }
     },
     {
       "id": "1699999000.000001",
+      "missing_root": true,
       "replies": [
         {
           "id": "1700000004.000001",
-          "speaker": {
-            "id": "UALICE",
-            "name": "Alice"
-          },
+          "speaker": "Alice",
           "content": "Reply to a thread whose root is before this export.",
-          "timestamp": "2023-11-14T22:13:24.000Z"
+          "timestamp": "2023-11-14T22:13:24Z"
         }
       ]
     },
     {
       "id": "1700000000.000001",
-      "speaker": {
-        "id": "UALICE",
-        "name": "Alice"
+      "speaker": "Alice",
+      "content": "@Bob Example is the deploy stuck on the migration step?",
+      "timestamp": "2023-11-14T22:13:20Z",
+      "reactions": {
+        "eyes": 2
       },
-      "content": "Is the deploy stuck on the migration step?",
-      "timestamp": "2023-11-14T22:13:20.000Z",
-      "reactions": [
-        {
-          "name": "eyes",
-          "count": 2,
-          "users": [
-            {
-              "id": "UBOB",
-              "name": "Bob Example"
-            },
-            {
-              "id": "UCAROL"
-            }
-          ]
-        }
-      ],
       "replies": [
         {
           "id": "1700000001.000001",
-          "speaker": {
-            "id": "UBOB",
-            "name": "Bob Example"
-          },
+          "speaker": "Bob Example",
           "content": "Yes, it was the lock.",
-          "timestamp": "2023-11-14T22:13:21.000Z"
+          "timestamp": "2023-11-14T22:13:21Z"
+        },
+        {
+          "id": "1700000001.500000",
+          "speaker": "Bob Example",
+          "content": "[file: deploy.log]",
+          "timestamp": "2023-11-14T22:13:21Z"
         }
       ]
     },
     {
       "id": "1700000002.000001",
-      "speaker": {
-        "id": "UCAROL"
-      },
+      "speaker": "UCAROL",
       "content": ":hype_pepe:",
-      "timestamp": "2023-11-14T22:13:22.000Z",
-      "reactions": [
-        {
-          "name": "eyes",
-          "count": 1,
-          "users": [
-            {
-              "id": "UALICE",
-              "name": "Alice"
-            }
-          ]
-        }
-      ]
+      "timestamp": "2023-11-14T22:13:22Z",
+      "reactions": {
+        "eyes": 1
+      }
     },
     {
       "id": "1700000003.000001",
-      "speaker": {
-        "id": "UBOB",
-        "name": "Bob Example"
-      },
+      "speaker": "Bob Example",
       "content": "Standalone post with no replies.",
-      "timestamp": "2023-11-14T22:13:23.000Z"
+      "timestamp": "2023-11-14T22:13:23Z"
     }
   ],
   "diagnostics": [
-    {
-      "code": "slack_message_dropped",
-      "message": "Skipped a Slack post without nonempty text (blocks/files are not extracted)."
-    },
     {
       "code": "slack_missing_root",
       "message": "Thread replies were present without their root; the root was not fabricated."

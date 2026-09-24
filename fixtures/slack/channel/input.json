@@ -1,5 +1,6 @@
 {
   "channel": "CEXAMPLE",
+  "channel_name": "eng-deploys",
   "users": [
     {
       "id": "UALICE",
@@ -40,7 +41,7 @@
       "user": "UALICE",
       "ts": "1700000000.000001",
       "thread_ts": "1700000000.000001",
-      "text": "Is the deploy stuck on the migration step?",
+      "text": "<@UBOB> is the deploy stuck on the migration step?",
       "reply_count": 1,
       "reply_users": [
         "UBOB"
@@ -77,7 +78,8 @@
       "text": "",
       "files": [
         {
-          "id": "FEXAMPLE"
+          "id": "FEXAMPLE",
+          "name": "deploy.log"
         }
       ],
       "subtype": "file_share"

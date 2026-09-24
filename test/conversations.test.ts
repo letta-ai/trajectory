@@ -8,11 +8,14 @@ const schema = new Ajv2020({ strictTuples: false }).compile(JSON.parse(readFileS
   new URL("../schema/conversation-v1.schema.json", import.meta.url), "utf8",
 )));
 const message = {
-  id: "message-1", speaker: { id: "person-1" },
-  content: "Can we ship today?", timestamp: "2026-09-22T12:00:00.000Z",
+  id: "message-1", speaker: "Person 1",
+  content: "Can we ship today?", timestamp: "2026-09-22T12:00:00Z",
 };
-const reply = { ...message, id: "message-2", speaker: { id: "person-2" }, content: "Yes." };
-const meta = { role: "meta", source: "teams", channel: "channel-1" };
+const reply = { ...message, id: "message-2", speaker: "Person 2", content: "Yes." };
+const meta = {
+  role: "meta", source: "teams", channel: "channel-1",
+  participants: { "Person 1": { id: "person-1" }, "Person 2": { id: "person-2" } },
+};
 
 describe("independent conversation contract", () => {
   test("accepts source-native context without requiring Slack fields", () => {
@@ -27,7 +30,7 @@ describe("independent conversation contract", () => {
   test("threads nest once: posts may carry replies, replies may not", () => {
     for (const valid of [
       [meta, { ...message, replies: [reply] }],
-      [meta, { id: "root-elsewhere", replies: [reply] }],
+      [meta, { id: "root-elsewhere", missing_root: true, replies: [reply] }],
       [meta, message, { ...reply, replies: [{ ...message, id: "message-3" }] }],
     ]) {
       expect(() => validateConversation(valid)).not.toThrow();
@@ -35,10 +38,13 @@ describe("independent conversation contract", () => {
     }
     for (const invalid of [
       [meta, { ...message, replies: [] }],
-      [meta, { id: "root-elsewhere", replies: [] }],
-      [meta, { id: "root-elsewhere" }],
+      [meta, { id: "root-elsewhere", missing_root: true, replies: [] }],
+      [meta, { id: "root-elsewhere", missing_root: true }],
+      [meta, { id: "root-elsewhere", missing_root: false, replies: [reply] }],
+      [meta, { id: "root-elsewhere", replies: [reply] }],
+      [meta, { ...message, missing_root: true, replies: [reply] }],
       [meta, { ...message, replies: [{ ...reply, replies: [] }] }],
-      [meta, { ...message, replies: [{ id: "x", replies: [reply] }] }],
+      [meta, { ...message, replies: [{ id: "x", missing_root: true, replies: [reply] }] }],
     ]) {
       expect(() => validateConversation(invalid)).toThrow();
       expect(schema(invalid)).toBe(false);
@@ -49,8 +55,10 @@ describe("independent conversation contract", () => {
   });
 
   test("requires shared metadata even for a thread fragment", () => {
-    for (const invalid of [[], [meta], [message], [{ role: "meta", source: "slack" }, message],
-      [{ ...meta, team: "T1" }, message]]) {
+    expect(() => validateConversation([meta])).not.toThrow();
+    expect(schema([meta])).toBe(true);
+    for (const invalid of [[], [message], [{ role: "meta", source: "slack", participants: {} }, message],
+      [{ role: "meta", source: "slack", channel: "C1" }], [{ ...meta, team: "T1" }, message]]) {
       expect(() => validateConversation(invalid)).toThrow();
       expect(schema(invalid)).toBe(false);
     }
@@ -61,8 +69,9 @@ describe("independent conversation contract", () => {
     for (const invalid of [
       { ...message, id: " " },
       { ...message, speaker: {} },
-      { ...message, speaker: { id: 1 } },
-      { ...message, speaker: { id: "a", extra: true } },
+      { ...message, speaker: 1 },
+      { ...message, speaker: { id: "person-1" } },
+      { ...message, speaker: " " },
       { ...message, content: " " },
       { ...message, timestamp: "bad" },
       { ...message, metadata: { reactions: [] } },

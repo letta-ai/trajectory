@@ -14,9 +14,13 @@ export function normalizeConversation(input: NormalizeConversationInput): Normal
   if (input.users !== undefined && !Array.isArray(input.users)) {
     throw new NormalizationError("invalid_input", "Slack users must be an array.");
   }
+  if (input.channelName !== undefined && typeof input.channelName !== "string") {
+    throw new NormalizationError("invalid_input", "Channel name must be a string.");
+  }
   const result = normalizeSlackChannel({
     transcript: input.transcript,
     channel: input.channel,
+    ...(input.channelName === undefined ? {} : { channelName: input.channelName }),
     ...(input.users === undefined ? {} : { users: input.users }),
   });
   validateConversation(result.records);
@@ -32,8 +36,7 @@ export type {
   ConversationMessage,
   ConversationPost,
   ConversationThreadFragment,
-  ConversationSpeaker,
-  ConversationReaction,
+  ConversationParticipant,
   ConversationSource,
   ConversationDiagnostic,
   NormalizeConversationInput,

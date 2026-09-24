@@ -167,20 +167,23 @@ const { records, diagnostics } = normalizeConversation({
   source: "slack",
   transcript: rawJsonl, // one channel's messages, as fetched
   channel: "C0AB…",
-  users, // optional users.list rows, for display names
+  channelName: "eng-deploys", // optional
+  users, // optional users.list rows, for display names and bot flags
 });
 ```
 
-One channel is one conversation: a leading `meta`, then top-level posts in time
-order with thread replies nested once under their root. Python exposes
-`normalize_conversation` from `trajectory.conversations`. The format does not
-extend `NormalizedRecord`, `normalizeTranscript`, or `normalizeToCanonical`;
-agent schemas and canonical schema version remain unchanged.
+One channel is one conversation: a leading `meta` with a participants table,
+then top-level posts in time order with thread replies nested once under their
+root. Python exposes `normalize_conversation` from `trajectory.conversations`.
+The format does not extend `NormalizedRecord`, `normalizeTranscript`, or
+`normalizeToCanonical`; agent schemas and canonical schema version remain
+unchanged.
 
 See [CONVERSATIONS.md](CONVERSATIONS.md) for the contract and
 [Slack](src/adapters/slack/) for thread assembly and supported content. Slack is
-the only conversation adapter in V0. Optional speaker names and reaction snapshots
-are supported; recipients, attachments, and other message metadata remain deferred.
+the only conversation adapter in V0. Speaker names, reaction counts, and file
+placeholders are supported; recipients, file contents, and other message metadata
+remain deferred.
 
 ## Adding a source
 

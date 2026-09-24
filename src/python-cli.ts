@@ -44,8 +44,12 @@ async function main(): Promise<void> {
         if (request.users !== undefined && !Array.isArray(request.users)) {
           throw new NormalizationError("invalid_input", "Slack users must be an array.");
         }
+        if (request.channelName !== undefined && typeof request.channelName !== "string") {
+          throw new NormalizationError("invalid_input", "Channel name must be a string.");
+        }
         results.push({ ok: true, result: normalizeConversation({
           source: request.source, transcript: request.transcript, channel: request.channel,
+          ...(request.channelName === undefined ? {} : { channelName: request.channelName }),
           ...(request.users === undefined ? {} : { users: request.users }),
         }) });
         continue;

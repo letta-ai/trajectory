@@ -100,10 +100,11 @@ and is empty when the transcript required no recoverable cleanup.
 | [`opencode`](src/adapters/opencode/) | Native OpenCode `{ "info": ..., "messages": [...] }` session JSON | `opencode` |
 | [`openhands`](src/adapters/openhands/) | JSON event array or an events-API `{ "items": [...] }` envelope | `openhands` |
 | [`pi`](src/adapters/pi/) | Native pi-coding-agent session JSONL | `pi` |
+| [`prime`](src/adapters/prime/) | Native Prime Agent session JSONL (pi-agent session format) | `prime` |
 | [`deepagents`](src/adapters/deepagents/) | Deep Agents CLI LangGraph SQLite store plus `threadId` | `deepagents` |
 
 Tool result records may include `ok: boolean` when the source exposes an
-authoritative structured outcome, such as Pi/OpenClaw `isError`, Claude Code
+authoritative structured outcome, such as Pi/OpenClaw/OMP/Prime `isError`, Claude Code
 `is_error`, Letta Code `resultOk`, OpenHands/Cursor `is_error`,
 OpenCode/Gemini terminal state, or Copilot CLI `success`. The field is omitted
 when the source does not expose a reliable status; result text is never

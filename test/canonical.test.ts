@@ -34,6 +34,7 @@ const goldenFixtures = [
   { source: "openclaw", name: "openclaw/tool-calls", golden: "openclaw__tool-calls" },
   { source: "openhands", name: "openhands/tool-calls", golden: "openhands__tool-calls" },
   { source: "pi", name: "pi/tool-calls", golden: "pi__tool-calls" },
+  { source: "prime", name: "prime/tool-calls", golden: "prime__tool-calls" },
 ] as const satisfies ReadonlyArray<{
   source: TrajectorySource;
   name: string;

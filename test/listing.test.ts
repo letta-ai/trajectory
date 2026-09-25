@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveOmpSessionsPath } from "../src/adapters/omp/list.js";
+import { resolvePrimeSessionsPath } from "../src/adapters/prime/list.js";
 import { listTrajectories } from "../src/index.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
@@ -100,6 +101,20 @@ beforeAll(() => {
   mkdirSync(ompSessions, { recursive: true });
   writeFileSync(
     join(ompSessions, "2026-07-24T06-21-03-508Z_019f92c8.jsonl"),
+    `{"type":"session"}\n`,
+  );
+
+  // prime: flat <agentDir>/sessions/<id>.jsonl. Nested escaped-cwd trees and
+  // session-artifacts are not enumerated.
+  const primeSessions = join(base, "prime", "sessions");
+  mkdirSync(primeSessions, { recursive: true });
+  writeFileSync(join(primeSessions, "prime-1.jsonl"), `{"type":"session"}\n`);
+  const primeLegacy = join(primeSessions, "--home-user-prime-demo--");
+  mkdirSync(primeLegacy, { recursive: true });
+  writeFileSync(join(primeLegacy, "legacy.jsonl"), `{"type":"session"}\n`);
+  mkdirSync(join(base, "prime", "session-artifacts"), { recursive: true });
+  writeFileSync(
+    join(base, "prime", "session-artifacts", "artifact.jsonl"),
     `{"type":"session"}\n`,
   );
 
@@ -228,6 +243,15 @@ describe("listTrajectories", () => {
     expect(result.items.map((item) => item.id)).toEqual([
       "2026-07-24T06-21-03-508Z_019f92c8",
     ]);
+    expect(result.items[0]?.path.endsWith(".jsonl")).toBe(true);
+  });
+
+  test("lists prime sessions and ignores nested legacy trees", async () => {
+    const result = await listTrajectories({
+      source: "prime",
+      root: join(base, "prime"),
+    });
+    expect(result.items.map((item) => item.id)).toEqual(["prime-1"]);
     expect(result.items[0]?.path.endsWith(".jsonl")).toBe(true);
   });
 
@@ -360,5 +384,38 @@ describe("OMP default store resolution", () => {
         ["/xdg/data/omp/profiles/work"],
       ),
     ).toBe("/xdg/data/omp/profiles/work/sessions");
+  });
+});
+
+describe("Prime Agent default store resolution", () => {
+  const resolve = (env: NodeJS.ProcessEnv) =>
+    resolvePrimeSessionsPath({
+      home: "/home/tester",
+      env,
+    });
+
+  test("defaults to ~/.prime/agent/sessions", () => {
+    expect(resolve({})).toBe("/home/tester/.prime/agent/sessions");
+  });
+
+  test("uses the agent-dir override and session-dir overrides", () => {
+    expect(resolve({ PRIME_AGENT_CODING_AGENT_DIR: "/custom/agent" })).toBe(
+      "/custom/agent/sessions",
+    );
+    expect(resolve({ PRIME_AGENT_SESSION_DIR: "/custom/sessions" })).toBe(
+      "/custom/sessions",
+    );
+    expect(
+      resolve({
+        PRIME_AGENT_CODING_AGENT_SESSION_DIR: "/legacy/sessions",
+        PRIME_AGENT_CODING_AGENT_DIR: "/ignored/agent",
+      }),
+    ).toBe("/legacy/sessions");
+    expect(
+      resolve({
+        PRIME_AGENT_SESSION_DIR: "/preferred/sessions",
+        PRIME_AGENT_CODING_AGENT_SESSION_DIR: "/legacy/sessions",
+      }),
+    ).toBe("/preferred/sessions");
   });
 });

@@ -4,8 +4,8 @@
  * cwd, followed by `type: "message"` wrapper rows whose `message` holds
  * `user`, `assistant` (with `text`, `thinking`, and `toolCall` content blocks
  * plus model metadata), and `toolResult` messages. pi writes this format
- * natively; OpenClaw embeds the same SessionManager and adds its own
- * conventions on top.
+ * natively; OpenClaw, OMP, and Prime Agent embed the same SessionManager and
+ * add their own conventions on top.
  *
  * Compaction, custom, and other lifecycle entry types are ignored, matching
  * the format's own transcript readers. Failed tool results (`isError`) gain an

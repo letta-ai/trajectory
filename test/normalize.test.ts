@@ -311,6 +311,31 @@ describe("public API", () => {
     );
   });
 
+  test("preserves native Droid message timestamps", () => {
+    const transcript = [
+      JSON.stringify({ type: "session_start", id: "droid-session", cwd: "/tmp/droid" }),
+      JSON.stringify({
+        type: "message",
+        timestamp: "2026-08-22T00:01:21.608Z",
+        message: { role: "user", content: [{ type: "text", text: "Hello" }] },
+      }),
+      JSON.stringify({
+        type: "message",
+        timestamp: "2026-08-22T00:01:22.309Z",
+        message: { role: "assistant", content: [{ type: "text", text: "Hi" }] },
+      }),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "droid", transcript });
+    expect(result.records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ role: "user", timestamp: "2026-08-22T00:01:21.608Z" }),
+      expect.objectContaining({ role: "assistant", timestamp: "2026-08-22T00:01:22.309Z" }),
+    ]));
+    expect(result.diagnostics).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "timestamps_synthesized" }),
+    ]));
+  });
+
   test("always returns diagnostics", () => {
     const result = normalizeTranscript({
       source: "codex",

@@ -11,33 +11,32 @@ from ._errors import NormalizationError, TrajectoryRuntimeError
 ConversationSource = Literal["slack"]
 
 
-class ConversationMetaRecord(TypedDict):
-    role: Literal["meta"]
-    source: str
-    channel: str
+class _ConversationParticipantOptional(TypedDict, total=False):
+    bot: Literal[True]
 
 
-class _ConversationSpeakerOptional(TypedDict, total=False):
-    name: str
-
-
-class ConversationSpeaker(_ConversationSpeakerOptional):
+class ConversationParticipant(_ConversationParticipantOptional):
     id: str
 
 
-class ConversationReaction(TypedDict):
-    name: str
-    count: int
-    users: list[ConversationSpeaker]
+class _ConversationMetaOptional(TypedDict, total=False):
+    channel_name: str
+
+
+class ConversationMetaRecord(_ConversationMetaOptional):
+    role: Literal["meta"]
+    source: str
+    channel: str
+    participants: dict[str, ConversationParticipant]
 
 
 class _ConversationMessageOptional(TypedDict, total=False):
-    reactions: list[ConversationReaction]
+    reactions: dict[str, int]
 
 
 class ConversationMessage(_ConversationMessageOptional):
     id: str
-    speaker: ConversationSpeaker
+    speaker: str
     content: str
     timestamp: str
 
@@ -52,6 +51,7 @@ class ConversationThreadFragment(TypedDict):
     """Replies whose root was not in the input; ``id`` is the root's source ID."""
 
     id: str
+    missing_root: Literal[True]
     replies: list[ConversationMessage]
 
 
@@ -59,7 +59,9 @@ ConversationRecord = Union[ConversationMetaRecord, ConversationPost, Conversatio
 
 
 class ConversationDiagnostic(TypedDict):
-    code: Literal["slack_message_dropped", "slack_duplicate_message", "slack_missing_root"]
+    code: Literal[
+        "slack_message_dropped", "slack_duplicate_message", "slack_conflicting_message", "slack_missing_root"
+    ]
     message: str
 
 
@@ -69,14 +71,22 @@ class NormalizeConversationResult(TypedDict):
 
 
 def normalize_conversation(
-    *, source: ConversationSource, transcript: str, channel: str, users: list[object] | None = None
+    *,
+    source: ConversationSource,
+    transcript: str,
+    channel: str,
+    channel_name: str | None = None,
+    users: list[object] | None = None,
 ) -> NormalizeConversationResult:
     """Normalize one channel's raw messages (JSONL, JSON array, or history response) into one conversation.
 
     Slack requires ``channel`` to fetch messages and does not echo it back, so the
-    caller supplies it. ``users`` are raw ``users.list`` rows used only for display names.
+    caller supplies it, along with an optional readable ``channel_name``. ``users``
+    are raw ``users.list`` rows used only for display names and bot flags.
     """
     request: dict[str, object] = {"source": source, "transcript": transcript, "channel": channel}
+    if channel_name is not None:
+        request["channelName"] = channel_name
     if users is not None:
         request["users"] = users
     return _bridge_request({"conversation": request})

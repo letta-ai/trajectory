@@ -15,7 +15,7 @@ class ConversationTests(unittest.TestCase):
             fixture = json.loads((directory / "input.json").read_text())
             result = normalize_conversation(
                 source="slack", transcript=json.dumps(fixture["messages"]),
-                channel=fixture["channel"], users=fixture.get("users"),
+                channel=fixture["channel"], channel_name=fixture.get("channel_name"), users=fixture.get("users"),
             )
             self.assertEqual(result, json.loads((directory / "expected.json").read_text()))
 
@@ -42,9 +42,12 @@ class ConversationTests(unittest.TestCase):
         users = [{"id": "UALICE", "profile": {"display_name": "Alice"}}]
         jsonl = "".join(json.dumps(r) + "\n" for r in (reply, standalone, root))
         result = normalize_conversation(source="slack", transcript=jsonl, channel="CEXAMPLE", users=users)
-        self.assertEqual(result["records"][0], {"role": "meta", "source": "slack", "channel": "CEXAMPLE"})
+        self.assertEqual(result["records"][0], {
+            "role": "meta", "source": "slack", "channel": "CEXAMPLE",
+            "participants": {"Alice": {"id": "UALICE"}, "UBOB": {"id": "UBOB"}, "UCAROL": {"id": "UCAROL"}},
+        })
         self.assertEqual([r["id"] for r in result["records"][1:]], ["1700000000.000001", "1700000002.000001"])
-        self.assertEqual(result["records"][1]["speaker"], {"id": "UALICE", "name": "Alice"})
+        self.assertEqual(result["records"][1]["speaker"], "Alice")
         self.assertEqual([r["id"] for r in result["records"][1]["replies"]], ["1700000001.000001"])
         self.assertNotIn("replies", result["records"][2])
         self.assertEqual(result, normalize_conversation(
@@ -53,3 +56,11 @@ class ConversationTests(unittest.TestCase):
         ))
         with self.assertRaises(NormalizationError):
             normalize_conversation(source="slack", transcript=jsonl, channel="")
+
+    def test_channel_name_and_empty_channel(self):
+        result = normalize_conversation(source="slack", transcript="", channel="CEXAMPLE", channel_name="eng-deploys")
+        self.assertEqual(result, {
+            "records": [{"role": "meta", "source": "slack", "channel": "CEXAMPLE",
+                         "channel_name": "eng-deploys", "participants": {}}],
+            "diagnostics": [],
+        })

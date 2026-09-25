@@ -18,27 +18,33 @@ const { records, diagnostics } = normalizeConversation({
   source: "slack",
   transcript: rawJsonl, // one channel's messages, as fetched
   channel: "C0AB…",
-  users, // optional users.list rows, for display names
+  channelName: "eng-deploys", // optional
+  users, // optional users.list rows, for display names and bot flags
 });
 ```
 
 ```python
 from trajectory.conversations import normalize_conversation
 
-result = normalize_conversation(source="slack", transcript=raw_jsonl, channel="C0AB…", users=users)
+result = normalize_conversation(
+    source="slack", transcript=raw_jsonl, channel="C0AB…", channel_name="eng-deploys", users=users
+)
 ```
 
 One channel is one conversation. `transcript` is the raw dump: JSONL rows, a
 JSON array, or a `conversations.history` response, containing both top-level
 posts and thread replies. `channel` is what Slack required you to know to fetch
-it and does not appear on messages. `users` is optional and only resolves names.
+it and does not appear on messages. `channelName` is an optional readable name the
+caller already has (for example from `conversations.info`). `users` is optional and
+only resolves names and bot flags. An empty dump is an empty channel: the result is
+the `meta` record alone.
 
 The result is `{ records, diagnostics }`. The records array is validated by
 [`conversation-v1.schema.json`](schema/conversation-v1.schema.json), available
 to npm consumers as `@letta-ai/trajectory/schema/conversation`. Runtime validation
-additionally checks message-ID/reaction-name uniqueness across the whole
-conversation, timestamp parseability, and that listed reactors do not exceed
-the reported count. `validateConversation` is exported for records built elsewhere.
+additionally checks message-ID uniqueness across the whole conversation, that
+every `speaker` is a `participants` label, that participant IDs are unique, and
+timestamp parseability. `validateConversation` is exported for records built elsewhere.
 
 ## Records
 
@@ -47,49 +53,52 @@ and thread structure is nesting rather than repeated IDs.
 
 ```json
 [
-  { "role": "meta", "source": "slack", "channel": "C0AB…" },
-  { "id": "1790028870.001200", "speaker": { "id": "U0BRK…", "name": "Titan" },
-    "timestamp": "2026-09-20T17:47:50.001Z", "content": "deploy is stuck",
-    "reactions": [{ "name": "eyes", "count": 2,
-      "users": [{ "id": "U079…", "name": "Charles" }, { "id": "U084…" }] }],
+  { "role": "meta", "source": "slack", "channel": "C0AB…", "channel_name": "eng-deploys",
+    "participants": { "Charles": { "id": "U079…" }, "Deploy Bot": { "id": "B08…", "bot": true },
+      "Titan": { "id": "U0BRK…" }, "U084…": { "id": "U084…" } } },
+  { "id": "1790028870.001200", "speaker": "Titan", "timestamp": "2026-09-20T17:47:50Z",
+    "content": "@Charles deploy is stuck", "reactions": { "eyes": 2 },
     "replies": [
-      { "id": "1790028881.776679", "speaker": { "id": "U079…" },
-        "timestamp": "2026-09-20T17:48:01.776Z", "content": "looking" }
+      { "id": "1790028881.776679", "speaker": "Charles",
+        "timestamp": "2026-09-20T17:48:01Z", "content": "looking\n[file: deploy.log]" }
     ] },
-  { "id": "1790139575.812159", "speaker": { "id": "U084…" },
-    "timestamp": "2026-09-22T00:32:55.812Z", "content": ":hype_pepe:" }
+  { "id": "1790139575.812159", "speaker": "U084…",
+    "timestamp": "2026-09-22T00:32:55Z", "content": ":hype_pepe:" }
 ]
 ```
 
-One leading `meta` carries `source` and `channel`; it is the only record with a
-`role`. Every following record is a top-level post in time order:
+One leading `meta` carries `source`, `channel`, an optional `channel_name`, and
+`participants`; it is the only record with a `role`. Every following record is a
+top-level post in time order:
 
-- A **post** has `id`, `speaker: { id, name? }`, `content`, an ISO `timestamp`,
-  and optional `reactions`. If the thread has replies, `replies` holds them in
-  time order with the same message shape; replies never nest further. The
-  thread's identity is the root's `id` (Slack's `thread_ts` is the root's `ts`),
-  so it appears once.
-- A **thread fragment** is `{ id, replies }` with no speaker or content: replies
-  were present but their root was not in the input. The root is not fabricated.
+- A **post** has `id`, `speaker`, `content`, an ISO `timestamp`, and optional
+  `reactions`. If the thread has replies, `replies` holds them in time order with
+  the same message shape; replies never nest further. The thread's identity is
+  the root's `id` (Slack's `thread_ts` is the root's `ts`), so it appears once.
+- A **thread fragment** is `{ id, missing_root: true, replies }` with no speaker
+  or content: replies were present but their root was not in the input. The root
+  is not fabricated.
 
-Message IDs are source-native and unique across the whole conversation.
-Participant IDs are interpreted in the source's workspace context. Bot messages
-are attributed to their source identity, not an assistant role. Optional
-`speaker.name` is a display label from source profiles, never a replacement for
-`speaker.id`; mentions inside `content` are left as source text.
+`participants` maps each label used as a `speaker` or an `@` mention to
+`{ id, bot? }`, once per conversation. A label is the participant's display name,
+suffixed (`Alex (2)`) when two participants share one, or the source ID when no
+name is known. `bot: true` marks bots and apps; bot messages are attributed to
+their source identity, not an assistant role. User mentions in `content` are
+rewritten to `@label`; everything else stays source text.
 
-`reactions` contains `{ name, count, users }` snapshots. `count` is the total
-reported by the source; `users` lists known reactors as `{ id, name? }`, the
-same shape as `speaker`, and may be incomplete.
-Missing `reactions` means no snapshot was provided; an explicit empty array
-means the provided snapshot has no reactions.
+Message IDs are source-native and unique across the whole conversation; for
+Slack the ID is the exact `ts`. `timestamp` has second precision.
+`reactions` maps each reaction name to the count the source reports. Who reacted
+is not kept. Missing `reactions` means no snapshot was provided; an explicit
+empty object means the provided snapshot has no reactions.
 
 ## V0 scope
 
 Only [Slack channel dumps](src/adapters/slack/) can currently be normalized.
 The record format can represent other messaging sources, but no Teams, Gmail,
-or Google Chat adapter is implemented. Names and reaction snapshots are supported;
-recipients, attachments, and other message-level metadata are deferred.
+or Google Chat adapter is implemented. Names, reaction counts, and file
+placeholders are supported; recipients, file contents, and other message-level
+metadata are deferred.
 Documents are not forced into this format.
 
 Callers own source access, channel context, `users.list` snapshots, and

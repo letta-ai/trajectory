@@ -1,36 +1,41 @@
 import { isObject } from "../adapters/shared.js";
 import { NormalizationError } from "../types.js";
-import type { Conversation, ConversationReaction } from "./types.js";
+import type { Conversation } from "./types.js";
 
-const META_KEYS = new Set(["role", "source", "channel"]);
+const META_KEYS = new Set(["role", "source", "channel", "channel_name", "participants"]);
 const MESSAGE_KEYS = new Set(["id", "speaker", "content", "timestamp", "reactions"]);
 const POST_KEYS = new Set([...MESSAGE_KEYS, "replies"]);
-const FRAGMENT_KEYS = new Set(["id", "replies"]);
-const SPEAKER_KEYS = new Set(["id", "name"]);
-const REACTION_KEYS = new Set(["name", "count", "users"]);
+const FRAGMENT_KEYS = new Set(["id", "missing_root", "replies"]);
+const PARTICIPANT_KEYS = new Set(["id", "bot"]);
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/;
 
 /** One channel: shared context, then top-level posts with replies nested once. */
 export function validateConversation(value: unknown): asserts value is Conversation {
-  if (!Array.isArray(value) || value.length < 2) {
-    fail("Conversation requires metadata and at least one post.");
+  if (!Array.isArray(value) || value.length < 1) {
+    fail("Conversation requires leading metadata.");
   }
   const meta = value[0];
   if (!isObject(meta) || meta.role !== "meta" || !nonempty(meta.source) || !nonempty(meta.channel)) {
     fail("Conversation requires leading meta with source and channel.");
   }
   exactKeys(meta, META_KEYS);
+  if ("channel_name" in meta && !nonempty(meta.channel_name)) {
+    fail("Channel name must be non-empty when present.");
+  }
+  const labels = validateParticipants(meta.participants);
   const ids = new Set<string>();
   for (const record of value.slice(1)) {
     if (!isObject(record) || "role" in record) {
       fail("Conversation body must contain only posts, not agent roles.");
     }
-    if (!("speaker" in record) && "replies" in record) {
+    if ("missing_root" in record) {
       exactKeys(record, FRAGMENT_KEYS);
+      if (record.missing_root !== true) fail("Thread fragments must set missing_root to true.");
+      if (!("replies" in record)) fail("Thread fragments require replies.");
       claimId(record.id, ids);
     } else {
       exactKeys(record, POST_KEYS);
-      validateMessage(record, ids);
+      validateMessage(record, ids, labels);
     }
     if ("replies" in record) {
       if (!Array.isArray(record.replies) || record.replies.length === 0) {
@@ -39,27 +44,37 @@ export function validateConversation(value: unknown): asserts value is Conversat
       for (const reply of record.replies) {
         if (!isObject(reply)) fail("Replies must be objects.");
         exactKeys(reply, MESSAGE_KEYS);
-        validateMessage(reply, ids);
+        validateMessage(reply, ids, labels);
       }
     }
   }
 }
 
-function validateMessage(record: Record<string, unknown>, ids: Set<string>): void {
+function validateParticipants(value: unknown): Set<string> {
+  if (!isObject(value)) fail("Conversation meta requires a participants object.");
+  const ids = new Set<string>();
+  for (const [label, participant] of Object.entries(value)) {
+    if (!nonempty(label)) fail("Participant labels must be non-empty.");
+    if (!isObject(participant) || !nonempty(participant.id)) fail("Participants must contain a non-empty id.");
+    exactKeys(participant, PARTICIPANT_KEYS);
+    if ("bot" in participant && participant.bot !== true) fail("Participant bot flag must be true when present.");
+    if (ids.has(participant.id)) fail("Participant IDs must be unique.");
+    ids.add(participant.id);
+  }
+  return new Set(Object.keys(value));
+}
+
+function validateMessage(record: Record<string, unknown>, ids: Set<string>, labels: Set<string>): void {
   claimId(record.id, ids);
-  validateSpeaker(record.speaker);
+  if (typeof record.speaker !== "string" || !labels.has(record.speaker)) {
+    fail("Message speaker must be a participant label.");
+  }
   if ("reactions" in record) validateReactions(record.reactions);
   if (!nonempty(record.content)) fail("Message content must be non-empty text.");
   if (typeof record.timestamp !== "string" || !ISO_TIMESTAMP.test(record.timestamp) ||
       Number.isNaN(Date.parse(record.timestamp))) {
     fail("Message timestamp must be a valid ISO timestamp.");
   }
-}
-
-function validateSpeaker(value: unknown): void {
-  if (!isObject(value) || !nonempty(value.id)) fail("Speaker must contain a non-empty id.");
-  exactKeys(value, SPEAKER_KEYS);
-  if ("name" in value && !nonempty(value.name)) fail("Speaker name must be non-empty when present.");
 }
 
 function claimId(id: unknown, ids: Set<string>): void {
@@ -69,30 +84,12 @@ function claimId(id: unknown, ids: Set<string>): void {
   ids.add(id);
 }
 
-/** Also used by source adapters before normalizing reaction ordering. */
-export function validateReactions(value: unknown): asserts value is ConversationReaction[] {
-  if (!Array.isArray(value)) fail("Reactions must be an array.");
-  const names = new Set<string>();
-  for (const reaction of value) {
-    if (!isObject(reaction)) fail("Reaction must be an object.");
-    exactKeys(reaction, REACTION_KEYS);
-    if (!nonempty(reaction.name) || names.has(reaction.name)) {
-      fail("Reaction names must be non-empty and unique per message.");
-    }
-    names.add(reaction.name);
-    if (typeof reaction.count !== "number" || !Number.isSafeInteger(reaction.count) || reaction.count < 0) {
+function validateReactions(value: unknown): void {
+  if (!isObject(value)) fail("Reactions must map reaction names to counts.");
+  for (const [name, count] of Object.entries(value)) {
+    if (!nonempty(name)) fail("Reaction names must be non-empty.");
+    if (typeof count !== "number" || !Number.isSafeInteger(count) || count < 0) {
       fail("Reaction count must be a non-negative safe integer.");
-    }
-    if (!Array.isArray(reaction.users) || reaction.users.length > reaction.count) {
-      fail("Reaction users cannot exceed the source-reported count.");
-    }
-    const ids = new Set<string>();
-    for (const user of reaction.users) {
-      validateSpeaker(user);
-      if (!isObject(user) || typeof user.id !== "string" || ids.has(user.id)) {
-        fail("Reaction users must be unique per reaction.");
-      }
-      ids.add(user.id);
     }
   }
 }

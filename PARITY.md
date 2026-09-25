@@ -1,5 +1,34 @@
 # Parity report
 
+## Slack channels
+
+Implemented against raw Slack message shapes supplied during mirror integration
+work (September 2026). No private transcripts were copied into this repository.
+Four synthetic fixtures cover a relay/human thread, a rich-text thread with
+user-directory names and reaction counts, a cleanup case (duplicate roots,
+broadcast reply copies, a service event, and a file-only post), and a mixed
+channel dump (a thread with a mention, standalone posts, a reply whose root
+predates the export, a file-only reply, and a channel name). All outputs are
+checked against runtime and JSON Schema validation and the separate Python
+conversation API. Additional tests cover JSONL/array/history-response inputs,
+nesting and top-level ordering, microsecond ordering, retry/edit identity,
+thread fragments, order-independent reconciliation of conflicting copies,
+rejected thread-membership conflicts, participant labels and mentions, file
+placeholders, empty channels, missing identity, channel mismatches, and
+malformed inputs. Generic format validation tests use synthetic Teams metadata
+without adding adapters for those sources, and check that replies nest exactly
+once. Cross-contract tests verify that agent APIs and schemas reject
+conversation records and vice versa; agent contracts are unchanged.
+
+Two real one-month channel exports (160 and 175 rows) were run locally through
+both the TypeScript and Python entry points with identical output and no
+diagnostics; they are not committed. That run predates the participants table,
+reaction counts, and file placeholders and has not been repeated since.
+
+No live Dream run has been exercised. Blocks-only posts, file contents, and
+event-stream edits/deletions are explicitly not supported; skipped rows produce
+diagnostics. No existing Slack reference normalizer was available for differential parity.
+
 > This report established parser parity before configurable bounds were added.
 > The current default uses marker-inclusive, head-tail tool-result truncation
 > and the canonical `claude-code` source ID. Oversized tool results and Claude

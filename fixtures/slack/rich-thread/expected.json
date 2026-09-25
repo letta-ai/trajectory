@@ -1,0 +1,35 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "slack",
+      "channel": "CEXAMPLE",
+      "participants": {
+        "Alice": {
+          "id": "UALICE"
+        },
+        "Bob Example": {
+          "id": "UBOB"
+        }
+      }
+    },
+    {
+      "id": "1700000000.000001",
+      "speaker": "Alice",
+      "content": "Please read the _updated_ guide before publishing.",
+      "timestamp": "2023-11-14T22:13:20Z",
+      "reactions": {
+        "nod": 2
+      },
+      "replies": [
+        {
+          "id": "1700000001.000001",
+          "speaker": "Bob Example",
+          "content": "I'll read it before publishing.",
+          "timestamp": "2023-11-14T22:13:21Z"
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

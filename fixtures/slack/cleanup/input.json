@@ -1,0 +1,59 @@
+{
+  "channel": "CEXAMPLE",
+  "messages": [
+    {
+      "type": "message",
+      "ts": "1700000000.000001",
+      "user": "UONE",
+      "text": "A question"
+    },
+    {
+      "type": "message",
+      "ts": "1700000000.000001",
+      "user": "UONE",
+      "text": "A question",
+      "reply_count": 1
+    },
+    {
+      "type": "message",
+      "subtype": "thread_broadcast",
+      "ts": "1700000001.000001",
+      "thread_ts": "1700000000.000001",
+      "user": "UTWO",
+      "text": "An answer",
+      "root": {
+        "type": "message",
+        "ts": "1700000000.000001",
+        "user": "UONE",
+        "text": "Do not emit this nested copy"
+      }
+    },
+    {
+      "type": "message",
+      "ts": "1700000001.000001",
+      "thread_ts": "1700000000.000001",
+      "user": "UTWO",
+      "text": "An answer"
+    },
+    {
+      "type": "message",
+      "subtype": "channel_join",
+      "ts": "1700000002.000001",
+      "user": "UTHREE",
+      "text": "joined"
+    },
+    {
+      "type": "message",
+      "subtype": "file_share",
+      "ts": "1700000003.000001",
+      "thread_ts": "1700000000.000001",
+      "user": "UONE",
+      "text": "",
+      "files": [
+        {
+          "id": "FEXAMPLE"
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,9 @@ import type { ListTrajectoriesResult } from "./listing.js";
 import type { NormalizeResult } from "./types.js";
 import { NormalizationError } from "./types.js";
 
+import { normalizeConversation, type NormalizeConversationResult } from "./conversations/index.js";
+import { isObject } from "./adapters/shared.js";
+
 const PROTOCOL_VERSION = 1;
 
 interface WireRequest {
@@ -22,7 +25,7 @@ interface WireError {
 }
 
 type WireResult =
-  | { ok: true; result: NormalizeResult | ListTrajectoriesResult }
+  | { ok: true; result: NormalizeResult | ListTrajectoriesResult | NormalizeConversationResult }
   | { ok: false; error: WireError };
 
 async function main(): Promise<void> {
@@ -30,6 +33,27 @@ async function main(): Promise<void> {
   const results: WireResult[] = [];
   for (const input of request.requests) {
     try {
+      if (isObject(input) && "conversation" in input) {
+        const request = input.conversation;
+        if (!isObject(request) || typeof request.transcript !== "string" || typeof request.channel !== "string") {
+          throw new NormalizationError("invalid_input", "Expected a conversation source, transcript, and channel.");
+        }
+        if (request.source !== "slack") {
+          throw new NormalizationError("unknown_source", "Unsupported conversation source.");
+        }
+        if (request.users !== undefined && !Array.isArray(request.users)) {
+          throw new NormalizationError("invalid_input", "Slack users must be an array.");
+        }
+        if (request.channelName !== undefined && typeof request.channelName !== "string") {
+          throw new NormalizationError("invalid_input", "Channel name must be a string.");
+        }
+        results.push({ ok: true, result: normalizeConversation({
+          source: request.source, transcript: request.transcript, channel: request.channel,
+          ...(request.channelName === undefined ? {} : { channelName: request.channelName }),
+          ...(request.users === undefined ? {} : { users: request.users }),
+        }) });
+        continue;
+      }
       const result =
         input !== null && typeof input === "object" && "list" in input
           ? await listTrajectories(

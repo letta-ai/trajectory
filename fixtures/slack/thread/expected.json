@@ -1,0 +1,39 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "slack",
+      "channel": "CEXAMPLE",
+      "participants": {
+        "Example Relay": {
+          "id": "URELAY",
+          "bot": true
+        },
+        "UREVIEWER": {
+          "id": "UREVIEWER"
+        }
+      }
+    },
+    {
+      "id": "1700000000.000001",
+      "speaker": "Example Relay",
+      "content": "*User*\nWhere is the guide?",
+      "timestamp": "2023-11-14T22:13:20Z",
+      "replies": [
+        {
+          "id": "1700000000.000002",
+          "speaker": "Example Relay",
+          "content": "*Agent*\nI will investigate.",
+          "timestamp": "2023-11-14T22:13:20Z"
+        },
+        {
+          "id": "1700000001.000001",
+          "speaker": "UREVIEWER",
+          "content": "The guide is here: <https://example.com/guide|Guide>. Привет!",
+          "timestamp": "2023-11-14T22:13:21Z"
+        }
+      ]
+    }
+  ],
+  "diagnostics": []
+}

@@ -11,6 +11,6 @@
  * manually and only when the canonical contract changes, independently of
  * packaging-only releases.
  */
-export const NORMALIZER_VERSION = "0.4.2";
+export const NORMALIZER_VERSION = "0.4.3";
 
 export const CANONICAL_SCHEMA_VERSION = 3;

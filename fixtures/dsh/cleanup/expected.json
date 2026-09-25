@@ -1,0 +1,51 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "dsh",
+      "cwd": "/workspace/cleanup",
+      "model": "sglang-local/Qwen3.8-27B-NVFP4"
+    },
+    {
+      "role": "user",
+      "content": "Try the governed operation.",
+      "timestamp": "2026-08-22T02:00:00.200Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "The operation can fail safely.",
+      "timestamp": "2026-08-22T02:00:00.300Z"
+    },
+    {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-failed",
+          "name": "ice_rag_search",
+          "args": "{\"query\":\"restricted\"}"
+        }
+      ],
+      "timestamp": "2026-08-22T02:00:00.300Z"
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call-failed",
+      "content": "Access denied.",
+      "ok": false,
+      "timestamp": "2026-08-22T02:00:00.500Z"
+    },
+    {
+      "role": "assistant",
+      "content": "The denied operation was not executed.",
+      "timestamp": "2026-08-22T02:00:00.800Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "invalid_json_line",
+      "message": "Skipped invalid JSON on line 4.",
+      "inputLine": 4
+    }
+  ]
+}

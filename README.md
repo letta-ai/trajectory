@@ -30,6 +30,12 @@ The Python wrapper is published as
 pip install agent-trajectory
 ```
 
+If publishing fails after the version tag was pushed, run **Publish existing
+release tag** on that tag (`gh workflow run publish-existing-tag.yml --ref vX.Y.Z`).
+It rebuilds and publishes missing npm/PyPI distributions without another bump
+or tag. The retry requires a tag containing this workflow, so it cannot recover
+older tags. Do not rerun the bump workflow after a tag was pushed.
+
 ## Quick start
 
 ```ts

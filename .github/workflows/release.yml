@@ -12,6 +12,11 @@ on:
         required: false
         default: ""
 
+# A publish retry and a fresh bump must not race to change npm dist-tags.
+concurrency:
+  group: trajectory-release-publish
+  cancel-in-progress: false
+
 jobs:
   publish:
     name: Bump, release, and publish to npm and PyPI

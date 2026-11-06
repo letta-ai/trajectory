@@ -72,6 +72,18 @@ export function parseTimestamp(value: unknown): Date | undefined {
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
 
+const TEXT_BLOCK_TYPES = new Set(["text", "input_text", "output_text"]);
+// Anthropic/MCP `image`, OpenAI Responses `input_image`, OpenAI chat `image_url`.
+const IMAGE_BLOCK_TYPES = new Set(["image", "input_image", "image_url"]);
+
+/** Whether a value is a typed text or image content block. */
+export function contentBlockKind(value: unknown): "text" | "image" | undefined {
+  if (!isObject(value) || typeof value.type !== "string") return undefined;
+  if (TEXT_BLOCK_TYPES.has(value.type)) return "text";
+  if (IMAGE_BLOCK_TYPES.has(value.type)) return "image";
+  return undefined;
+}
+
 export function blocksText(content: unknown): string {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
@@ -79,18 +91,20 @@ export function blocksText(content: unknown): string {
   const parts: string[] = [];
   for (const item of content) {
     if (!isObject(item)) continue;
-    const type = item.type;
-    if (
-      type === "text" ||
-      type === "input_text" ||
-      type === "output_text" ||
-      (type === undefined && "text" in item)
-    ) {
+    const kind = contentBlockKind(item);
+    if (kind === "text" || (item.type === undefined && "text" in item)) {
       if (typeof item.text === "string" && item.text.length > 0) {
         parts.push(item.text);
       }
-    } else if (type === "image") {
+    } else if (kind === "image") {
       parts.push("[image]");
+    } else if (
+      item.type === "tool_reference" &&
+      typeof item.tool_name === "string" &&
+      item.tool_name
+    ) {
+      // Claude Code ToolSearch results name the deferred tools they loaded.
+      parts.push(`tool_reference: ${item.tool_name}`);
     }
   }
   return parts.join("\n");

@@ -15,7 +15,11 @@ assigned to an arbitrary tool call. `session_id` supplies run identity;
 step identity. Canonical normalization requires `sourceContext.groupId` when
 both identifiers are absent. Text content parts are joined with newlines and
 image parts are represented as `[image]`, matching the other multimodal
-adapters.
+adapters. Some writers store a tool result's content blocks as one string,
+serialized as JSON or as a Python repr; when such a string contains an image
+block it is rendered the same way, and if it cannot be parsed, inline
+`data:image/...;base64,` URLs are still replaced with `[image]`. Other result
+strings are kept as written.
 
 Embedded `subagent_trajectories` are not flattened into the parent timeline;
 normalize each embedded trajectory separately when its records are needed. A

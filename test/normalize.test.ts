@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_NORMALIZATION_BOUNDS,
   DEFAULT_NORMALIZATION_FILTERS,
+  normalizeToCanonical,
   normalizeTranscript,
   validateTranscript,
 } from "../src/index.js";
@@ -1017,6 +1018,148 @@ describe("validation", () => {
   });
 });
 
+describe("content blocks", () => {
+  test("decodes Codex reasoning summaries without repeating agent_reasoning events", () => {
+    const transcript = [
+      JSON.stringify({ type: "session_meta", payload: { id: "codex-session" } }),
+      codexMessage("user", "list the tools"),
+      // Older writers emit each summary as an event and as a response item.
+      JSON.stringify({
+        type: "event_msg",
+        payload: { type: "agent_reasoning", text: "**Listing tools**" },
+      }),
+      codexReasoning(["**Listing tools**", "Checking which tools exist."]),
+      // Newer writers repeat the summary in an item_completed event.
+      JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "item_completed",
+          item: { type: "Reasoning", id: "rs_2", summary_text: ["Picking one."] },
+        },
+      }),
+      codexReasoning(["Picking one."]),
+      codexReasoning([]),
+      codexMessage("assistant", "done"),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "codex", transcript });
+    expect(
+      result.records.flatMap((record) =>
+        record.role === "reasoning" ? [record.content] : [],
+      ),
+    ).toEqual(["**Listing tools**", "Checking which tools exist.", "Picking one."]);
+
+    const canonical = normalizeToCanonical({ source: "codex", transcript });
+    const reasoningIds = canonical.records
+      .filter((record) => record.record_type === "reasoning")
+      .map((record) => record.record_id);
+    expect(new Set(reasoningIds).size).toBe(3);
+  });
+
+  test("renders Codex image blocks as [image]", () => {
+    const image = { type: "input_image", image_url: "data:image/png;base64,iVBORw0KGgo=" };
+    const toolContent = (output: unknown): unknown =>
+      normalizeTranscript({ source: "codex", transcript: codexToolTranscript(output) })
+        .records.find((record) => record.role === "tool")?.content;
+
+    expect(toolContent([{ type: "input_text", text: "Screenshot saved" }, image])).toBe(
+      "Screenshot saved\n[image]",
+    );
+    expect(toolContent([image])).toBe("[image]");
+
+    const transcript = [
+      JSON.stringify({
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "What is this?" }, image],
+        },
+      }),
+      codexMessage("assistant", "A chart."),
+    ].join("\n");
+    const user = normalizeTranscript({ source: "codex", transcript }).records.find(
+      (record) => record.role === "user",
+    );
+    expect(user?.content).toBe("What is this?\n[image]");
+  });
+
+  test("renders serialized ATIF image blocks as [image]", () => {
+    const contents = [
+      // Python repr of an OpenAI-style block list.
+      "[{'type': 'input_text', 'text': 'it\\'s \"done\"\\n\\ttab é \\x00 😀'}, {'type': 'input_image', 'image_url': 'data:image/png;base64,iVBORw0KGgo='}]",
+      // Python repr of an Anthropic image block.
+      `{'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/jpeg', 'data': '/9j/4AAQ'}}`,
+      // JSON block list and JSON image block.
+      JSON.stringify([
+        { type: "text", text: "Done" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: "iVBORw0KGgo=" } },
+      ]),
+      JSON.stringify({ type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } }),
+      // A block list its writer cut off still loses the inline base64.
+      `[{'type': 'input_image', 'image_url': 'data:image/png;base64,iVBORw0KGgo='}, {'type': 'input_te`,
+      // Strings that are not serialized image blocks pass through unchanged.
+      `const logo = "data:image/png;base64,iVBORw0KGgo=";`,
+      JSON.stringify([{ type: "text", text: "no images here" }]),
+      JSON.stringify([{ type: "image", url: "https://example.com/a.png" }, { id: 1 }]),
+    ];
+
+    const result = normalizeTranscript({ source: "atif", transcript: atifWithResults(contents) });
+    expect(
+      result.records.flatMap((record) => (record.role === "tool" ? [record.content] : [])),
+    ).toEqual([
+      `it's "done"\n\ttab é \u0000 😀\n[image]`,
+      "[image]",
+      "Done\n[image]",
+      "[image]",
+      `[{'type': 'input_image', 'image_url': '[image]'}, {'type': 'input_te`,
+      ...contents.slice(5),
+    ]);
+  });
+
+  test("renders Claude Code tool_reference blocks", () => {
+    const transcript = [
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        message: { role: "user", content: "find the cron tools" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "toolu_1", name: "ToolSearch", input: { query: "cron" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u2",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_1",
+              content: [
+                { type: "tool_reference", tool_name: "CronList" },
+                { type: "tool_reference", tool_name: "CronCreate" },
+              ],
+            },
+          ],
+        },
+      }),
+    ].join("\n");
+
+    const tool = normalizeTranscript({ source: "claude-code", transcript }).records.find(
+      (record) => record.role === "tool",
+    );
+    expect(tool?.content).toBe("tool_reference: CronList\ntool_reference: CronCreate");
+  });
+});
+
 function fixtureText(name: string, file: string): string {
   const url = new URL(`../fixtures/${name}/${file}`, import.meta.url);
   return readFileSync(fileURLToPath(url), "utf8");
@@ -1042,7 +1185,7 @@ function codexMessage(role: "user" | "assistant", text: string): string {
   });
 }
 
-function codexToolTranscript(output: string): string {
+function codexToolTranscript(output: unknown): string {
   return [
     codexMessage("user", "run the command"),
     JSON.stringify({
@@ -1073,5 +1216,37 @@ function codexFunctionOutput(callId: string, output: string): string {
       call_id: callId,
       output,
     },
+  });
+}
+
+function codexReasoning(summaries: string[]): string {
+  return JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "reasoning",
+      summary: summaries.map((text) => ({ type: "summary_text", text })),
+      encrypted_content: "opaque",
+    },
+  });
+}
+
+function atifWithResults(contents: string[]): string {
+  const ids = contents.map((_, index) => `call_${index}`);
+  return JSON.stringify({
+    schema_version: "ATIF-v1.6",
+    session_id: "atif-images",
+    agent: { name: "agent", version: "1" },
+    steps: [
+      { step_id: 1, source: "user", message: "take screenshots" },
+      {
+        step_id: 2,
+        source: "agent",
+        message: "",
+        tool_calls: ids.map((id) => ({ tool_call_id: id, function_name: "shot", arguments: {} })),
+        observation: {
+          results: contents.map((content, index) => ({ source_call_id: ids[index], content })),
+        },
+      },
+    ],
   });
 }

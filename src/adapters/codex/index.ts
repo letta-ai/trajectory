@@ -11,6 +11,7 @@ import {
   parseJsonLines,
   parseTimestamp,
 } from "../shared.js";
+import type { JsonLine } from "../shared.js";
 
 const INJECTED_PREFIXES = [
   "<environment_context>",
@@ -31,7 +32,10 @@ export const codexAdapter: SourceAdapter = {
     let createdAt: Date | undefined;
     let sessionId: string | undefined;
 
-    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
+    const lines = parseJsonLines(transcript, diagnostics);
+    const agentReasoning = agentReasoningTexts(lines);
+
+    for (const { value: record, line, byteOffset } of lines) {
       const recordType = record.type;
       const payload = isObject(record.payload) ? record.payload : {};
       const timestamp = parseTimestamp(record.timestamp);
@@ -40,12 +44,13 @@ export const codexAdapter: SourceAdapter = {
       // offset is the stable location anchor for identity (kind `location`).
       // The worker adds sourceContext.baseByteOffset to anchor it absolutely
       // across chunked uploads.
+      let componentIndex = 0;
       const emit = (event: DecodedEvent): void => {
         events.push({
           ...event,
           sourceOffset: byteOffset,
           sourceAnchorKind: "byte",
-          componentIndex: 0,
+          componentIndex: componentIndex++,
         });
       };
 
@@ -86,6 +91,26 @@ export const codexAdapter: SourceAdapter = {
       }
 
       if (recordType !== "response_item") continue;
+
+      if (payloadType === "reasoning") {
+        for (const text of reasoningSummaries(payload.summary)) {
+          // Older writers also emit each summary as an `agent_reasoning`
+          // event, which is already decoded above.
+          const key = text.trim();
+          const repeats = agentReasoning.get(key) ?? 0;
+          if (repeats > 0) {
+            agentReasoning.set(key, repeats - 1);
+            continue;
+          }
+          emit({
+            type: "reasoning",
+            content: text,
+            inputLine: line,
+            ...(timestamp ? { timestamp } : {}),
+          });
+        }
+        continue;
+      }
 
       if (payloadType === "message") {
         const role = payload.role;
@@ -219,6 +244,32 @@ export const codexAdapter: SourceAdapter = {
     };
   },
 };
+
+/**
+ * Counts `agent_reasoning` event texts. Writers that emit these events also
+ * store the same text as `response_item` reasoning summaries; newer writers
+ * store only the summaries.
+ */
+function agentReasoningTexts(lines: JsonLine[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const { value } of lines) {
+    if (value.type !== "event_msg" || !isObject(value.payload)) continue;
+    const { type, text } = value.payload;
+    if (type !== "agent_reasoning" || typeof text !== "string") continue;
+    const key = text.trim();
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+
+function reasoningSummaries(summary: unknown): string[] {
+  if (!Array.isArray(summary)) return [];
+  return summary.flatMap((part) =>
+    isObject(part) && typeof part.text === "string" && part.text.trim()
+      ? [part.text]
+      : [],
+  );
+}
 
 function outputText(output: unknown): string {
   if (typeof output === "string") return output;

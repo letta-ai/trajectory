@@ -1,0 +1,37 @@
+{
+  "records": [
+    {
+      "role": "meta",
+      "source": "dsh",
+      "cwd": "/sanitized/workspace",
+      "model": "qwen38-local/qwen3.8-27b-nvfp4"
+    },
+    {
+      "role": "user",
+      "content": "[sanitized text]",
+      "timestamp": "2026-08-20T20:15:17.994Z"
+    },
+    {
+      "role": "reasoning",
+      "content": "[sanitized reasoning]",
+      "timestamp": "2026-08-20T20:15:19.433Z"
+    },
+    {
+      "role": "assistant",
+      "content": "[sanitized text]",
+      "timestamp": "2026-08-20T20:15:19.433Z"
+    }
+  ],
+  "diagnostics": [
+    {
+      "code": "injected_context_dropped",
+      "message": "Dropped DeepSeek Harness non-user injected content on line 10.",
+      "inputLine": 10
+    },
+    {
+      "code": "injected_context_dropped",
+      "message": "Dropped DeepSeek Harness non-user injected content on line 11.",
+      "inputLine": 11
+    }
+  ]
+}

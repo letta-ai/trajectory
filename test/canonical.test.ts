@@ -44,6 +44,7 @@ const additionalInvariantFixtures = [
   { source: "atif", name: "atif/tool-calls" },
   { source: "copilot-cli", name: "copilot-cli/tool-calls" },
   { source: "cursor", name: "cursor/tool-calls" },
+  { source: "dsh", name: "dsh/tool-calls" },
   { source: "gemini-cli", name: "gemini-cli/tool-calls" },
   { source: "opencode", name: "opencode/tool-calls" },
 ] as const satisfies ReadonlyArray<{
@@ -152,6 +153,44 @@ describe("new source-native identity", () => {
     expect(body.every((record) => record.source_identity_kind === "location")).toBe(
       true,
     );
+  });
+
+  test("DeepSeek Harness preserves message ids, seqs, timestamps, tool linkage, and model route", () => {
+    const result = normalizeToCanonical({
+      source: "dsh",
+      transcript: fixtureText("dsh/tool-calls", "input.jsonl"),
+    });
+    const byType = (type: CanonicalRecord["record_type"]) =>
+      result.records.filter((record) => record.record_type === type);
+
+    expect(byType("meta")[0]?.record_json).toContain(
+      '\"model\":\"sglang-local/Qwen3.8-27B-NVFP4\"',
+    );
+    expect(byType("user")[0]).toMatchObject({
+      source_group_id: "dsh-session-1",
+      stable_source_record_id: "msg-user-1",
+      source_identity_kind: "native",
+      source_timestamp: "2026-08-22T01:00:00.300Z",
+    });
+    expect(byType("user")[0]?.source_order_id).toContain(
+      "00000000000000000002|msg-user-1",
+    );
+    expect(byType("reasoning")[0]).toMatchObject({
+      stable_source_record_id: "msg-assistant-1",
+      content: "I should use governed recall.",
+    });
+    expect(byType("assistant-tool-call")[0]).toMatchObject({
+      stable_source_record_id: "msg-assistant-1",
+      tool_call_id: "call-memory-1",
+      tool_name: "ice_memory_recall",
+      tool_arguments_json: '{"query":"preference"}',
+    });
+    expect(byType("tool")[0]).toMatchObject({
+      stable_source_record_id: "msg-tool-1",
+      tool_call_id: "call-memory-1",
+      tool_result_json: "Prefers concise status reports.",
+      tool_result_ok: true,
+    });
   });
 
   test("Cursor canonical normalization requires the caller's session id", () => {

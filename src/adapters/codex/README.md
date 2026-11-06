@@ -7,7 +7,8 @@ The adapter decodes `session_meta` (cwd, git branch, session id),
 `turn_context` (model), `event_msg` reasoning, and `response_item` payloads:
 `message`, `reasoning`, `function_call`, `custom_tool_call`, `web_search_call`,
 `tool_search_call`, and their outputs. Results link to calls by native
-`call_id`.
+`call_id`. Text blocks are joined with newlines, and `input_image` blocks in
+messages and tool outputs become `[image]`.
 
 Each `response_item` reasoning summary part becomes one reasoning record.
 Older writers also emit each summary part as an `agent_reasoning` event; those

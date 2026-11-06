@@ -6,7 +6,7 @@
     },
     {
       "role": "user",
-      "content": "Describe this screenshot.",
+      "content": "Describe this screenshot.\n[image]",
       "timestamp": "2026-07-03T17:33:21.500Z"
     },
     {

@@ -71,6 +71,17 @@ function parseTimestamp(value) {
   const date = new Date(withZone);
   return Number.isNaN(date.getTime()) ? undefined : date;
 }
+var TEXT_BLOCK_TYPES = new Set(["text", "input_text", "output_text"]);
+var IMAGE_BLOCK_TYPES = new Set(["image", "input_image", "image_url"]);
+function contentBlockKind(value) {
+  if (!isObject(value) || typeof value.type !== "string")
+    return;
+  if (TEXT_BLOCK_TYPES.has(value.type))
+    return "text";
+  if (IMAGE_BLOCK_TYPES.has(value.type))
+    return "image";
+  return;
+}
 function blocksText(content) {
   if (typeof content === "string")
     return content;
@@ -80,12 +91,12 @@ function blocksText(content) {
   for (const item of content) {
     if (!isObject(item))
       continue;
-    const type = item.type;
-    if (type === "text" || type === "input_text" || type === "output_text" || type === undefined && "text" in item) {
+    const kind = contentBlockKind(item);
+    if (kind === "text" || item.type === undefined && "text" in item) {
       if (typeof item.text === "string" && item.text.length > 0) {
         parts.push(item.text);
       }
-    } else if (type === "image") {
+    } else if (kind === "image") {
       parts.push("[image]");
     }
   }
@@ -95,6 +106,164 @@ function blocksText(content) {
 function jsonString(value) {
   const serialized = JSON.stringify(value ?? {});
   return serialized === undefined ? "{}" : serialized;
+}
+
+// src/adapters/serialized-blocks.ts
+var IMAGE_BLOCK_MARKER = /(["'])type\1\s*:\s*(["'])(?:image|input_image|image_url)\2/;
+var DATA_IMAGE_URL = /data:image\/[\w.+-]+;base64,[A-Za-z0-9+/]+=*/g;
+function serializedBlocksText(text) {
+  const head = text.trimStart()[0];
+  if (head !== "[" && head !== "{" || !IMAGE_BLOCK_MARKER.test(text)) {
+    return text;
+  }
+  const parsed = parseJson(text) ?? parsePythonLiteral(text);
+  const blocks = Array.isArray(parsed) ? parsed : [parsed];
+  if (parsed != null && blocks.length > 0 && blocks.every((block) => contentBlockKind(block) !== undefined) && blocks.some((block) => contentBlockKind(block) === "image")) {
+    return blocksText(blocks);
+  }
+  return text.replace(DATA_IMAGE_URL, "[image]");
+}
+function parseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return;
+  }
+}
+var PYTHON_ESCAPES = new Map([
+  ["\\", "\\"],
+  ["'", "'"],
+  ['"', '"'],
+  ["n", `
+`],
+  ["r", "\r"],
+  ["t", "\t"]
+]);
+var HEX_ESCAPE_LENGTHS = new Map([
+  ["x", 2],
+  ["u", 4],
+  ["U", 8]
+]);
+var PYTHON_SCALAR = /True|False|None|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/y;
+var HEX = /^[0-9a-fA-F]+$/;
+function parsePythonLiteral(text) {
+  let index = 0;
+  const fail = () => {
+    throw new SyntaxError("not a Python literal");
+  };
+  const skipSpace = () => {
+    while (index < text.length && /\s/.test(text[index] ?? ""))
+      index += 1;
+  };
+  const parseString = () => {
+    const quote = text[index];
+    index += 1;
+    let out = "";
+    let start = index;
+    for (;; ) {
+      const char = text[index];
+      if (char === undefined || char === `
+`)
+        fail();
+      if (char === quote) {
+        out += text.slice(start, index);
+        index += 1;
+        return out;
+      }
+      if (char !== "\\") {
+        index += 1;
+        continue;
+      }
+      out += text.slice(start, index);
+      const escape = text[index + 1] ?? fail();
+      index += 2;
+      const simple = PYTHON_ESCAPES.get(escape);
+      const hexLength = HEX_ESCAPE_LENGTHS.get(escape);
+      if (simple !== undefined) {
+        out += simple;
+      } else if (hexLength !== undefined) {
+        const hex = text.slice(index, index + hexLength);
+        if (hex.length !== hexLength || !HEX.test(hex))
+          fail();
+        out += String.fromCodePoint(Number.parseInt(hex, 16));
+        index += hexLength;
+      } else {
+        out += `\\${escape}`;
+      }
+      start = index;
+    }
+  };
+  const parseItems = (close, parseItem) => {
+    index += 1;
+    skipSpace();
+    if (text[index] === close) {
+      index += 1;
+      return;
+    }
+    for (;; ) {
+      parseItem();
+      skipSpace();
+      const char = text[index];
+      index += 1;
+      if (char === close)
+        return;
+      if (char !== ",")
+        fail();
+      skipSpace();
+      if (text[index] === close) {
+        index += 1;
+        return;
+      }
+    }
+  };
+  const parseValue = () => {
+    skipSpace();
+    const char = text[index];
+    if (char === "{") {
+      const out = {};
+      parseItems("}", () => {
+        skipSpace();
+        if (text[index] !== "'" && text[index] !== '"')
+          fail();
+        const key = parseString();
+        skipSpace();
+        if (text[index] !== ":")
+          fail();
+        index += 1;
+        Object.defineProperty(out, key, {
+          value: parseValue(),
+          enumerable: true,
+          writable: true,
+          configurable: true
+        });
+      });
+      return out;
+    }
+    if (char === "[" || char === "(") {
+      const out = [];
+      parseItems(char === "[" ? "]" : ")", () => out.push(parseValue()));
+      return out;
+    }
+    if (char === "'" || char === '"')
+      return parseString();
+    PYTHON_SCALAR.lastIndex = index;
+    const word = PYTHON_SCALAR.exec(text)?.[0] ?? fail();
+    index += word.length;
+    if (word === "True")
+      return true;
+    if (word === "False")
+      return false;
+    if (word === "None")
+      return null;
+    return Number(word);
+  };
+  try {
+    const value = parseValue();
+    skipSpace();
+    return index === text.length ? value : undefined;
+  } catch {
+    return;
+  }
 }
 
 // src/adapters/atif/index.ts
@@ -239,6 +408,8 @@ function atifContent(value) {
   return jsonString(value);
 }
 function observationContent(result) {
+  if (typeof result.content === "string")
+    return serializedBlocksText(result.content);
   if (result.content != null)
     return atifContent(result.content);
   if (Array.isArray(result.subagent_trajectory_ref)) {

@@ -12,6 +12,7 @@ import {
   nonemptyString,
   parseTimestamp,
 } from "../shared.js";
+import { serializedBlocksText } from "../serialized-blocks.js";
 
 const SUPPORTED_SCHEMA_VERSIONS = new Set(
   Array.from({ length: 8 }, (_, index) => `ATIF-v1.${index}`),
@@ -192,6 +193,7 @@ function atifContent(value: unknown): string {
 }
 
 function observationContent(result: Record<string, unknown>): string {
+  if (typeof result.content === "string") return serializedBlocksText(result.content);
   if (result.content != null) return atifContent(result.content);
   if (Array.isArray(result.subagent_trajectory_ref)) {
     return jsonString({ subagent_trajectory_ref: result.subagent_trajectory_ref });

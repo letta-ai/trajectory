@@ -1055,6 +1055,67 @@ describe("content blocks", () => {
       .map((record) => record.record_id);
     expect(new Set(reasoningIds).size).toBe(3);
   });
+
+  test("renders Codex image blocks as [image]", () => {
+    const image = { type: "input_image", image_url: "data:image/png;base64,iVBORw0KGgo=" };
+    const toolContent = (output: unknown): unknown =>
+      normalizeTranscript({ source: "codex", transcript: codexToolTranscript(output) })
+        .records.find((record) => record.role === "tool")?.content;
+
+    expect(toolContent([{ type: "input_text", text: "Screenshot saved" }, image])).toBe(
+      "Screenshot saved\n[image]",
+    );
+    expect(toolContent([image])).toBe("[image]");
+
+    const transcript = [
+      JSON.stringify({
+        type: "response_item",
+        payload: {
+          type: "message",
+          role: "user",
+          content: [{ type: "input_text", text: "What is this?" }, image],
+        },
+      }),
+      codexMessage("assistant", "A chart."),
+    ].join("\n");
+    const user = normalizeTranscript({ source: "codex", transcript }).records.find(
+      (record) => record.role === "user",
+    );
+    expect(user?.content).toBe("What is this?\n[image]");
+  });
+
+  test("renders serialized ATIF image blocks as [image]", () => {
+    const contents = [
+      // Python repr of an OpenAI-style block list.
+      "[{'type': 'input_text', 'text': 'it\\'s \"done\"\\n\\ttab é \\x00 😀'}, {'type': 'input_image', 'image_url': 'data:image/png;base64,iVBORw0KGgo='}]",
+      // Python repr of an Anthropic image block.
+      `{'type': 'image', 'source': {'type': 'base64', 'media_type': 'image/jpeg', 'data': '/9j/4AAQ'}}`,
+      // JSON block list and JSON image block.
+      JSON.stringify([
+        { type: "text", text: "Done" },
+        { type: "image", source: { type: "base64", media_type: "image/png", data: "iVBORw0KGgo=" } },
+      ]),
+      JSON.stringify({ type: "image_url", image_url: { url: "data:image/png;base64,iVBORw0KGgo=" } }),
+      // A block list its writer cut off still loses the inline base64.
+      `[{'type': 'input_image', 'image_url': 'data:image/png;base64,iVBORw0KGgo='}, {'type': 'input_te`,
+      // Strings that are not serialized image blocks pass through unchanged.
+      `const logo = "data:image/png;base64,iVBORw0KGgo=";`,
+      JSON.stringify([{ type: "text", text: "no images here" }]),
+      JSON.stringify([{ type: "image", url: "https://example.com/a.png" }, { id: 1 }]),
+    ];
+
+    const result = normalizeTranscript({ source: "atif", transcript: atifWithResults(contents) });
+    expect(
+      result.records.flatMap((record) => (record.role === "tool" ? [record.content] : [])),
+    ).toEqual([
+      `it's "done"\n\ttab é \u0000 😀\n[image]`,
+      "[image]",
+      "Done\n[image]",
+      "[image]",
+      `[{'type': 'input_image', 'image_url': '[image]'}, {'type': 'input_te`,
+      ...contents.slice(5),
+    ]);
+  });
 });
 
 function fixtureText(name: string, file: string): string {
@@ -1082,7 +1143,7 @@ function codexMessage(role: "user" | "assistant", text: string): string {
   });
 }
 
-function codexToolTranscript(output: string): string {
+function codexToolTranscript(output: unknown): string {
   return [
     codexMessage("user", "run the command"),
     JSON.stringify({
@@ -1124,5 +1185,26 @@ function codexReasoning(summaries: string[]): string {
       summary: summaries.map((text) => ({ type: "summary_text", text })),
       encrypted_content: "opaque",
     },
+  });
+}
+
+function atifWithResults(contents: string[]): string {
+  const ids = contents.map((_, index) => `call_${index}`);
+  return JSON.stringify({
+    schema_version: "ATIF-v1.6",
+    session_id: "atif-images",
+    agent: { name: "agent", version: "1" },
+    steps: [
+      { step_id: 1, source: "user", message: "take screenshots" },
+      {
+        step_id: 2,
+        source: "agent",
+        message: "",
+        tool_calls: ids.map((id) => ({ tool_call_id: id, function_name: "shot", arguments: {} })),
+        observation: {
+          results: contents.map((content, index) => ({ source_call_id: ids[index], content })),
+        },
+      },
+    ],
   });
 }

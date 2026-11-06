@@ -6,7 +6,9 @@ transcript string.
 
 The adapter decodes `user` and `assistant` rows — including `thinking`,
 `text`, `tool_use`, and `tool_result` content blocks — and links results to
-calls by the native tool-use id. Line `uuid`s provide native record identity,
+calls by the native tool-use id. Images become `[image]`, and the
+`tool_reference` blocks that ToolSearch returns become one
+`tool_reference: <tool name>` line each. Line `uuid`s provide native record identity,
 and session context (cwd, git branch) is resolved from source chronology so it
 does not depend on transport-arrival order.
 

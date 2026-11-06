@@ -98,6 +98,8 @@ function blocksText(content) {
       }
     } else if (kind === "image") {
       parts.push("[image]");
+    } else if (item.type === "tool_reference" && typeof item.tool_name === "string" && item.tool_name) {
+      parts.push(`tool_reference: ${item.tool_name}`);
     }
   }
   return parts.join(`

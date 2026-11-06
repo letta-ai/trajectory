@@ -1116,6 +1116,48 @@ describe("content blocks", () => {
       ...contents.slice(5),
     ]);
   });
+
+  test("renders Claude Code tool_reference blocks", () => {
+    const transcript = [
+      JSON.stringify({
+        type: "user",
+        uuid: "u1",
+        message: { role: "user", content: "find the cron tools" },
+      }),
+      JSON.stringify({
+        type: "assistant",
+        uuid: "a1",
+        message: {
+          role: "assistant",
+          content: [
+            { type: "tool_use", id: "toolu_1", name: "ToolSearch", input: { query: "cron" } },
+          ],
+        },
+      }),
+      JSON.stringify({
+        type: "user",
+        uuid: "u2",
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_1",
+              content: [
+                { type: "tool_reference", tool_name: "CronList" },
+                { type: "tool_reference", tool_name: "CronCreate" },
+              ],
+            },
+          ],
+        },
+      }),
+    ].join("\n");
+
+    const tool = normalizeTranscript({ source: "claude-code", transcript }).records.find(
+      (record) => record.role === "tool",
+    );
+    expect(tool?.content).toBe("tool_reference: CronList\ntool_reference: CronCreate");
+  });
 });
 
 function fixtureText(name: string, file: string): string {

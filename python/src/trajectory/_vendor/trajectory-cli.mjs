@@ -461,17 +461,20 @@ var codexAdapter = {
     let model;
     let createdAt;
     let sessionId;
-    for (const { value: record, line, byteOffset } of parseJsonLines(transcript, diagnostics)) {
+    const lines = parseJsonLines(transcript, diagnostics);
+    const agentReasoning = agentReasoningTexts(lines);
+    for (const { value: record, line, byteOffset } of lines) {
       const recordType = record.type;
       const payload = isObject(record.payload) ? record.payload : {};
       const timestamp = parseTimestamp(record.timestamp);
       const payloadType = payload.type;
+      let componentIndex = 0;
       const emit = (event) => {
         events.push({
           ...event,
           sourceOffset: byteOffset,
           sourceAnchorKind: "byte",
-          componentIndex: 0
+          componentIndex: componentIndex++
         });
       };
       if (recordType === "session_meta") {
@@ -507,6 +510,23 @@ var codexAdapter = {
       }
       if (recordType !== "response_item")
         continue;
+      if (payloadType === "reasoning") {
+        for (const text of reasoningSummaries(payload.summary)) {
+          const key = text.trim();
+          const repeats = agentReasoning.get(key) ?? 0;
+          if (repeats > 0) {
+            agentReasoning.set(key, repeats - 1);
+            continue;
+          }
+          emit({
+            type: "reasoning",
+            content: text,
+            inputLine: line,
+            ...timestamp ? { timestamp } : {}
+          });
+        }
+        continue;
+      }
       if (payloadType === "message") {
         const role = payload.role;
         const content = blocksText(payload.content);
@@ -620,6 +640,25 @@ var codexAdapter = {
     };
   }
 };
+function agentReasoningTexts(lines) {
+  const counts = new Map;
+  for (const { value } of lines) {
+    if (value.type !== "event_msg" || !isObject(value.payload))
+      continue;
+    const { type, text } = value.payload;
+    if (type !== "agent_reasoning" || typeof text !== "string")
+      continue;
+    const key = text.trim();
+    if (key)
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+}
+function reasoningSummaries(summary) {
+  if (!Array.isArray(summary))
+    return [];
+  return summary.flatMap((part) => isObject(part) && typeof part.text === "string" && part.text.trim() ? [part.text] : []);
+}
 function outputText(output) {
   if (typeof output === "string")
     return output;

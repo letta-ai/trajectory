@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   DEFAULT_NORMALIZATION_BOUNDS,
   DEFAULT_NORMALIZATION_FILTERS,
+  normalizeToCanonical,
   normalizeTranscript,
   validateTranscript,
 } from "../src/index.js";
@@ -1017,6 +1018,45 @@ describe("validation", () => {
   });
 });
 
+describe("content blocks", () => {
+  test("decodes Codex reasoning summaries without repeating agent_reasoning events", () => {
+    const transcript = [
+      JSON.stringify({ type: "session_meta", payload: { id: "codex-session" } }),
+      codexMessage("user", "list the tools"),
+      // Older writers emit each summary as an event and as a response item.
+      JSON.stringify({
+        type: "event_msg",
+        payload: { type: "agent_reasoning", text: "**Listing tools**" },
+      }),
+      codexReasoning(["**Listing tools**", "Checking which tools exist."]),
+      // Newer writers repeat the summary in an item_completed event.
+      JSON.stringify({
+        type: "event_msg",
+        payload: {
+          type: "item_completed",
+          item: { type: "Reasoning", id: "rs_2", summary_text: ["Picking one."] },
+        },
+      }),
+      codexReasoning(["Picking one."]),
+      codexReasoning([]),
+      codexMessage("assistant", "done"),
+    ].join("\n");
+
+    const result = normalizeTranscript({ source: "codex", transcript });
+    expect(
+      result.records.flatMap((record) =>
+        record.role === "reasoning" ? [record.content] : [],
+      ),
+    ).toEqual(["**Listing tools**", "Checking which tools exist.", "Picking one."]);
+
+    const canonical = normalizeToCanonical({ source: "codex", transcript });
+    const reasoningIds = canonical.records
+      .filter((record) => record.record_type === "reasoning")
+      .map((record) => record.record_id);
+    expect(new Set(reasoningIds).size).toBe(3);
+  });
+});
+
 function fixtureText(name: string, file: string): string {
   const url = new URL(`../fixtures/${name}/${file}`, import.meta.url);
   return readFileSync(fileURLToPath(url), "utf8");
@@ -1072,6 +1112,17 @@ function codexFunctionOutput(callId: string, output: string): string {
       type: "function_call_output",
       call_id: callId,
       output,
+    },
+  });
+}
+
+function codexReasoning(summaries: string[]): string {
+  return JSON.stringify({
+    type: "response_item",
+    payload: {
+      type: "reasoning",
+      summary: summaries.map((text) => ({ type: "summary_text", text })),
+      encrypted_content: "opaque",
     },
   });
 }
